@@ -1,0 +1,16 @@
+[package]
+name = "xcp"
+version = "0.1.0"
+authors = ["Steve Smith <tarkasteve@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+env_logger = "0.5"
+failure = "0.1"
+
+clap = "2"
+structopt = "0.2"
+
+walkdir = "2"
+ignore = "0.4"
