@@ -1,8 +1,11 @@
 
 use failure::{Error};
 
+use std::fs::File;
+use std::io::Write;
 use std::process::Command;
-use escargot::{CargoBuild, CargoError};
+use tempfile::tempdir;
+use escargot::{CargoBuild};
 
 fn get_bin() -> Result<Command, Error>  {
     let bin = CargoBuild::new()
@@ -13,7 +16,6 @@ fn get_bin() -> Result<Command, Error>  {
 
 #[test]
 fn basic_help() -> Result<(), Error>  {
-
     let out = get_bin()?
         .arg("--help")
         .output()?;
@@ -29,7 +31,6 @@ fn basic_help() -> Result<(), Error>  {
 
 #[test]
 fn no_args() -> Result<(), Error>  {
-
     let out = get_bin()?
         .output()?;
 
@@ -41,3 +42,41 @@ fn no_args() -> Result<(), Error>  {
 
     Ok(())
 }
+
+#[test]
+fn source_missing() -> Result<(), Error>  {
+    let out = get_bin()?
+        .arg("/this/should/not/exist")
+        .arg("/dev/null")
+        .output()?;
+
+    assert!(!out.status.success());
+    assert!(out.status.code().unwrap() == 1);
+
+    // let stderr = String::from_utf8(out.stderr)?;
+    // assert!(stderr.contains("The following required arguments were not provided"));
+
+    Ok(())
+}
+
+//#[test]
+fn file_copy() -> Result<(), Error>  {
+    let dir = tempdir()?;
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+
+    let mut source = File::create(&source_path)?;
+    writeln!(source, "This is a test file.");
+
+    let out = get_bin()?
+        .arg(source_path.as_os_str())
+        .arg(dest_path.as_os_str())
+        .output()?;
+
+    assert!(out.status.success());
+
+    let dest = File::open(dest_path)?;
+
+    Ok(())
+}
+

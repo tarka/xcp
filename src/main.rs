@@ -1,10 +1,13 @@
 
 mod errors;
 
-use crate::errors::Result;
-
-use std::path::PathBuf;
+use std::fs::{File, Metadata};
+use std::io;
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
+
+use crate::errors::{Result, Error};
+
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "xcp",
@@ -12,7 +15,7 @@ use structopt::StructOpt;
 struct Opts {
     /// Explain what is being done
     #[structopt(short = "v", long = "verbose")]
-    debug: bool,
+    verbose: bool,
 
     #[structopt(parse(from_os_str))]
     source: PathBuf,
@@ -22,11 +25,23 @@ struct Opts {
 }
 
 
+fn copy_file(opts: &Opts) -> Result<()> {
+
+    Ok(())
+}
 
 fn main() -> Result<()> {
-    let opt = Opts::from_args();
+    let opts = Opts::from_args();
 
-    println!("Hello, world!");
+    if ! opts.source.exists() {
+        let e = io::Error::new(io::ErrorKind::NotFound,
+                               "Source file does not exist.");
+        return Err(e.into());
+    }
+
+    if opts.source.is_file() {
+        copy_file(&opts)?;
+    }
 
     Ok(())
 }

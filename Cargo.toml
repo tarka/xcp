@@ -15,7 +15,7 @@ ignore = "0.4"
 
 
 [dev-dependencies]
-assert_cmd = "0.9"
+tempfile = "3"
 escargot = "0.3"
 
 # Others for testing...

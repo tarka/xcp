@@ -1,5 +1,5 @@
 use core::result;
-use failure::{Error, Fail};
+use failure::{Fail};
 
 #[derive(Debug, Fail)]
 pub enum XcpError {
@@ -7,4 +7,5 @@ pub enum XcpError {
     Unknown,
 }
 
+pub use failure::Error;
 pub type Result<T> = result::Result<T, Error>;
