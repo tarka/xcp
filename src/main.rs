@@ -1,12 +1,12 @@
 
 mod errors;
 
-use std::fs::{File, Metadata};
-use std::io;
+use std::fs::{copy, File, Metadata};
+use std::io::{Error as IOError, ErrorKind as IOKind};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
-use crate::errors::{Result, Error};
+use crate::errors::{Result, Error, XcpError};
 
 
 #[derive(Debug, StructOpt)]
@@ -29,23 +29,34 @@ struct Opts {
 }
 
 
+fn to_err(kind: IOKind, desc: &str) -> Error {
+    IOError::new(kind, desc).into()
+}
+
+
 fn copy_file(opts: &Opts) -> Result<()> {
-    if opts.dest.is_file() && opts.noclobber {
-        let e = io::Error::new(io::ErrorKind::AlreadyExists,
-                               "Destination file exists and no-clobber is set.");
-        return Err(e.into());
+    let dest = if opts.dest.is_dir() {
+        let fname = opts.source.file_name().ok_or(XcpError::UnknownFilename)?;
+        opts.dest.join(fname)
+    } else {
+        opts.dest.clone()
+    };
+
+    if dest.is_file() && opts.noclobber {
+        return Err(to_err(IOKind::AlreadyExists, "Destination file exists and no-clobber is set."));
     }
+
+    copy(&opts.source, &dest)?;
 
     Ok(())
 }
+
 
 fn main() -> Result<()> {
     let opts = Opts::from_args();
 
     if ! opts.source.exists() {
-        let e = io::Error::new(io::ErrorKind::NotFound,
-                               "Source does not exist.");
-        return Err(e.into());
+        return Err(to_err(IOKind::NotFound, "Source does not exist."));
     }
 
     if opts.source.is_file() {
