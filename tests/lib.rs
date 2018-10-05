@@ -59,6 +59,28 @@ fn source_missing() -> Result<(), Error>  {
     Ok(())
 }
 
+#[test]
+fn dest_file_exists() -> Result<(), Error>  {
+    let dir = tempdir()?;
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+
+    let mut source = File::create(&source_path)?;
+    let mut dest = File::create(&dest_path)?;
+
+    let out = get_bin()?
+        .arg("--no-clobber")
+        .arg(source_path.as_os_str())
+        .arg(dest_path.as_os_str())
+        .output()?;
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8(out.stderr)?;
+    assert!(stderr.contains("Destination file exists"));
+
+    Ok(())
+}
+
 //#[test]
 fn file_copy() -> Result<(), Error>  {
     let dir = tempdir()?;

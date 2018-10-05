@@ -17,6 +17,10 @@ struct Opts {
     #[structopt(short = "v", long = "verbose")]
     verbose: bool,
 
+    /// Do not overwrite an exising file
+    #[structopt(short = "n", long = "no-clobber")]
+    noclobber: bool,
+
     #[structopt(parse(from_os_str))]
     source: PathBuf,
 
@@ -26,6 +30,11 @@ struct Opts {
 
 
 fn copy_file(opts: &Opts) -> Result<()> {
+    if opts.dest.is_file() && opts.noclobber {
+        let e = io::Error::new(io::ErrorKind::AlreadyExists,
+                               "Destination file exists and no-clobber is set.");
+        return Err(e.into());
+    }
 
     Ok(())
 }
@@ -35,7 +44,7 @@ fn main() -> Result<()> {
 
     if ! opts.source.exists() {
         let e = io::Error::new(io::ErrorKind::NotFound,
-                               "Source file does not exist.");
+                               "Source does not exist.");
         return Err(e.into());
     }
 
