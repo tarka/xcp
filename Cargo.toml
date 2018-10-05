@@ -8,9 +8,16 @@ edition = "2018"
 log = "0.4"
 env_logger = "0.5"
 failure = "0.1"
-
 clap = "2"
 structopt = "0.2"
-
 walkdir = "2"
 ignore = "0.4"
+
+
+[dev-dependencies]
+assert_cmd = "0.9"
+escargot = "0.3"
+
+# Others for testing...
+# assert_fs
+# dir-diff
