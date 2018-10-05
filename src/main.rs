@@ -1,7 +1,7 @@
 
 mod errors;
 
-use std::fs::{copy, File, Metadata};
+use std::fs::{copy as fs_copy, File, Metadata};
 use std::io::{Error as IOError, ErrorKind as IOKind};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
@@ -34,7 +34,7 @@ fn to_err(kind: IOKind, desc: &str) -> Error {
 }
 
 
-fn copy_file(opts: &Opts) -> Result<()> {
+fn copy_single_file(opts: &Opts) -> Result<()> {
     let dest = if opts.dest.is_dir() {
         let fname = opts.source.file_name().ok_or(XcpError::UnknownFilename)?;
         opts.dest.join(fname)
@@ -46,7 +46,7 @@ fn copy_file(opts: &Opts) -> Result<()> {
         return Err(to_err(IOKind::AlreadyExists, "Destination file exists and no-clobber is set."));
     }
 
-    copy(&opts.source, &dest)?;
+    fs_copy(&opts.source, &dest)?;
 
     Ok(())
 }
@@ -60,7 +60,7 @@ fn main() -> Result<()> {
     }
 
     if opts.source.is_file() {
-        copy_file(&opts)?;
+        copy_single_file(&opts)?;
     }
 
     Ok(())

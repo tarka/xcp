@@ -1,8 +1,8 @@
 
 use failure::{Error};
 
-use std::fs::File;
-use std::io::Write;
+use std::fs::{File};
+use std::io::{Read, Write};
 use std::process::Command;
 use tempfile::tempdir;
 use escargot::{CargoBuild};
@@ -53,8 +53,8 @@ fn source_missing() -> Result<(), Error>  {
     assert!(!out.status.success());
     assert!(out.status.code().unwrap() == 1);
 
-    // let stderr = String::from_utf8(out.stderr)?;
-    // assert!(stderr.contains("The following required arguments were not provided"));
+    let stderr = String::from_utf8(out.stderr)?;
+    assert!(stderr.contains("Source does not exist."));
 
     Ok(())
 }
@@ -65,9 +65,10 @@ fn dest_file_exists() -> Result<(), Error>  {
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
 
-    let mut source = File::create(&source_path)?;
-    let mut dest = File::create(&dest_path)?;
-
+    {
+        File::create(&source_path)?;
+        File::create(&dest_path)?;
+    }
     let out = get_bin()?
         .arg("--no-clobber")
         .arg(source_path.as_os_str())
@@ -86,8 +87,10 @@ fn dest_file_in_dir_exists() -> Result<(), Error>  {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
 
-    let mut source = File::create(&source_path)?;
-    let mut dest = File::create(&dir.path().join("dest.txt"));
+    {
+        File::create(&source_path)?;
+        File::create(&dir.path().join("dest.txt"))?;
+    }
 
     let out = get_bin()?
         .arg("--no-clobber")
@@ -107,9 +110,12 @@ fn file_copy() -> Result<(), Error>  {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
+    let text = "This is a test file.";
 
-    let mut source = File::create(&source_path)?;
-    writeln!(source, "This is a test file.");
+    {
+        let source = File::create(&source_path)?;
+        write!(&source, "{}", text);
+    }
 
     let out = get_bin()?
         .arg(source_path.as_os_str())
@@ -118,7 +124,11 @@ fn file_copy() -> Result<(), Error>  {
 
     assert!(out.status.success());
 
-    let dest = File::open(dest_path)?;
+    let mut dest = File::open(dest_path)?;
+    let mut buf = String::new();
+    dest.read_to_string(&mut buf)?;
+
+    assert!(buf == text);
 
     Ok(())
 }
