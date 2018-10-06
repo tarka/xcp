@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
 edition = "2018"
 
+[features]
+default = ["kernel_copy_file_range"]
+kernel_copy_file_range = []
+
 [dependencies]
 log = "0.4"
 env_logger = "0.5"
@@ -12,7 +16,7 @@ clap = "2"
 structopt = "0.2"
 walkdir = "2"
 ignore = "0.4"
-
+libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
