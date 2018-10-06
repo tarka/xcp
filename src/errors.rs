@@ -1,5 +1,5 @@
 use core::result;
-use failure::{Fail};
+use failure::Fail;
 
 #[derive(Debug, Fail)]
 pub enum XcpError {

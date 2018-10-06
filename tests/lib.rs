@@ -1,25 +1,18 @@
+use failure::Error;
 
-use failure::{Error};
-
-use std::fs::{File};
+use escargot::CargoBuild;
+use std::fs::File;
 use std::io::{Read, Write};
-use std::process::{Output};
+use std::process::Output;
 use tempfile::tempdir;
-use escargot::{CargoBuild};
-
 
 fn run(args: &[&str]) -> Result<Output, Error> {
-    let out = CargoBuild::new()
-        .run()?
-        .command()
-        .args(args)
-        .output()?;
+    let out = CargoBuild::new().run()?.command().args(args).output()?;
     Ok(out)
 }
 
-
 #[test]
-fn basic_help() -> Result<(), Error>  {
+fn basic_help() -> Result<(), Error> {
     let out = run(&["--help"])?;
 
     assert!(out.status.success());
@@ -30,9 +23,8 @@ fn basic_help() -> Result<(), Error>  {
     Ok(())
 }
 
-
 #[test]
-fn no_args() -> Result<(), Error>  {
+fn no_args() -> Result<(), Error> {
     let out = run(&[])?;
 
     assert!(!out.status.success());
@@ -45,9 +37,8 @@ fn no_args() -> Result<(), Error>  {
 }
 
 #[test]
-fn source_missing() -> Result<(), Error>  {
-    let out = run(&["/this/should/not/exist",
-                    "/dev/null"])?;
+fn source_missing() -> Result<(), Error> {
+    let out = run(&["/this/should/not/exist", "/dev/null"])?;
 
     assert!(!out.status.success());
     assert!(out.status.code().unwrap() == 1);
@@ -59,7 +50,7 @@ fn source_missing() -> Result<(), Error>  {
 }
 
 #[test]
-fn dest_file_exists() -> Result<(), Error>  {
+fn dest_file_exists() -> Result<(), Error> {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
@@ -68,9 +59,11 @@ fn dest_file_exists() -> Result<(), Error>  {
         File::create(&source_path)?;
         File::create(&dest_path)?;
     }
-    let out = run(&["--no-clobber",
-                    source_path.to_str().unwrap(),
-                    dest_path.to_str().unwrap()])?;
+    let out = run(&[
+        "--no-clobber",
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])?;
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr)?;
@@ -80,7 +73,7 @@ fn dest_file_exists() -> Result<(), Error>  {
 }
 
 #[test]
-fn dest_file_in_dir_exists() -> Result<(), Error>  {
+fn dest_file_in_dir_exists() -> Result<(), Error> {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
 
@@ -89,9 +82,11 @@ fn dest_file_in_dir_exists() -> Result<(), Error>  {
         File::create(&dir.path().join("dest.txt"))?;
     }
 
-    let out = run(&["--no-clobber",
-                    source_path.to_str().unwrap(),
-                    dir.path().to_str().unwrap()])?;
+    let out = run(&[
+        "--no-clobber",
+        source_path.to_str().unwrap(),
+        dir.path().to_str().unwrap(),
+    ])?;
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr)?;
@@ -101,7 +96,7 @@ fn dest_file_in_dir_exists() -> Result<(), Error>  {
 }
 
 #[test]
-fn file_copy() -> Result<(), Error>  {
+fn file_copy() -> Result<(), Error> {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
@@ -112,8 +107,7 @@ fn file_copy() -> Result<(), Error>  {
         write!(&source, "{}", text);
     }
 
-    let out = run(&[source_path.to_str().unwrap(),
-                    dest_path.to_str().unwrap()])?;
+    let out = run(&[source_path.to_str().unwrap(), dest_path.to_str().unwrap()])?;
 
     assert!(out.status.success());
 
@@ -125,4 +119,3 @@ fn file_copy() -> Result<(), Error>  {
 
     Ok(())
 }
-
