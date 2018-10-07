@@ -1,20 +1,18 @@
-use std::io;
-use std::io::{ErrorKind as IOKind};
 use std::cmp;
-use std::fs::{File};
-use std::path::{Path};
-use std::ptr::null_mut;
+use std::fs::File;
+use std::io;
+use std::io::ErrorKind as IOKind;
 use std::os::unix::io::AsRawFd;
+use std::path::Path;
+use std::ptr::null_mut;
 
 use libc;
 
-use crate::{Opts};
 use crate::errors::{Result, XcpError};
-use crate::utils::{to_err};
+use crate::utils::to_err;
+use crate::Opts;
 
-
-
-// Assumes Linux kernel > 4.5.
+// Assumes Linux kernel >= 4.5.
 #[cfg(feature = "kernel_copy_file_range")]
 unsafe fn copy_file_range(
     fd_in: libc::c_int,
@@ -37,7 +35,7 @@ unsafe fn copy_file_range(
 
 // Requires GlibC >= 2.27
 #[cfg(not(feature = "kernel_copy_file_range"))]
-extern {
+extern "C" {
     fn copy_file_range(
         fd_in: libc::c_int,
         off_in: libc::loff_t,
@@ -55,14 +53,15 @@ fn r_copy_file_range(infd: &File, outfd: &File, bytes: usize) -> Result<u64> {
             null_mut(),
             outfd.as_raw_fd(),
             null_mut(),
-            bytes, 0)
+            bytes,
+            0,
+        )
     };
     match r {
         -1 => Err(io::Error::last_os_error().into()),
-        _ => Ok(r as u64)
+        _ => Ok(r as u64),
     }
 }
-
 
 pub fn copy(from: &Path, to: &Path) -> Result<u64> {
     let infd = File::open(from)?;
@@ -81,8 +80,6 @@ pub fn copy(from: &Path, to: &Path) -> Result<u64> {
     outfd.set_permissions(perm)?;
     Ok(written)
 }
-
-
 
 pub fn copy_single_file(opts: &Opts) -> Result<()> {
     let dest = if opts.dest.is_dir() {

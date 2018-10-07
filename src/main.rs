@@ -2,11 +2,11 @@ mod errors;
 mod operations;
 mod utils;
 
-use std::io::{ErrorKind as IOKind};
+use std::io::ErrorKind as IOKind;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-use crate::errors::{Result};
+use crate::errors::Result;
 use crate::operations::copy_single_file;
 use crate::utils::to_err;
 
@@ -30,7 +30,6 @@ pub struct Opts {
     #[structopt(parse(from_os_str))]
     dest: PathBuf,
 }
-
 
 fn main() -> Result<()> {
     let opts = Opts::from_args();
