@@ -15,7 +15,8 @@ use crate::operations::{copy_single_file, copy_tree};
     about = "Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY."
 )]
 pub struct Opts {
-    /// Explain what is being done
+    /// Explain what is being done. Can be specified multiple times to
+    /// increase logging.
     #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
     verbose: u64,
 
@@ -49,12 +50,15 @@ fn check_and_copy_tree(opts: &Opts) -> Result<()> {
 fn main() -> Result<()> {
     let opts = Opts::from_args();
 
-    TermLogger::init(match opts.verbose {
-        0 => LevelFilter::Warn,
-        1 => LevelFilter::Info,
-        2 => LevelFilter::Debug,
-        _ => LevelFilter::Trace,
-    }, Config::default())?;
+    TermLogger::init(
+        match opts.verbose {
+            0 => LevelFilter::Warn,
+            1 => LevelFilter::Info,
+            2 => LevelFilter::Debug,
+            _ => LevelFilter::Trace,
+        },
+        Config::default(),
+    )?;
 
     if !opts.source.exists() {
         return Err(io_err(IOKind::NotFound, "Source does not exist."));
@@ -62,6 +66,7 @@ fn main() -> Result<()> {
 
     if opts.source.is_file() {
         copy_single_file(&opts)?;
+
     } else if opts.source.is_dir() {
         match opts.recursive {
             true => check_and_copy_tree(&opts)?,

@@ -121,7 +121,7 @@ pub fn copy_single_file(opts: &Opts) -> Result<()> {
         opts.dest.clone()
     };
 
-    if (dest).is_file() && opts.noclobber {
+    if dest.is_file() && opts.noclobber {
         return Err(io_err(
             IOKind::AlreadyExists,
             "Destination file exists and no-clobber is set.",
