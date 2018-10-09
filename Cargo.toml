@@ -10,7 +10,7 @@ kernel_copy_file_range = []
 
 [dependencies]
 log = "0.4"
-env_logger = "0.5"
+simplelog = "0.5"
 failure = "0.1"
 clap = "2"
 structopt = "0.2"

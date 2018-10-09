@@ -1,7 +1,7 @@
 use failure::Error;
 
 use escargot::CargoBuild;
-use std::fs::File;
+use std::fs::{File, create_dir_all};
 use std::io::{Read, Write};
 use std::process::Output;
 use tempfile::tempdir;
@@ -119,3 +119,27 @@ fn file_copy() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn copy_empty_dir() -> Result<(), Error> {
+    let dir = tempdir()?;
+
+    let source_path = dir.path().join("mydir");
+    create_dir_all(&source_path)?;
+
+    let dest_base = dir.path().join("dest");
+    create_dir_all(&dest_base)?;
+
+    let out = run(&[source_path.to_str().unwrap(), dir.path().to_str().unwrap()])?;
+
+    assert!(out.status.success());
+
+    // let mut dest = File::open(dest_path)?;
+    // let mut buf = String::new();
+    // dest.read_to_string(&mut buf)?;
+
+    // assert!(buf == text);
+
+    Ok(())
+}
+

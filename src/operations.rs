@@ -1,15 +1,17 @@
+
+use log::{error, info, debug};
 use std::cmp;
-use std::fs::File;
+use std::fs::{create_dir, File};
 use std::io;
 use std::io::ErrorKind as IOKind;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::ptr::null_mut;
+use walkdir::{DirEntry, WalkDir};
 
 use libc;
 
-use crate::errors::{Result, XcpError};
-use crate::utils::to_err;
+use crate::errors::{io_err, Result, XcpError};
 use crate::Opts;
 
 // Assumes Linux kernel >= 4.5.
@@ -81,6 +83,36 @@ pub fn copy(from: &Path, to: &Path) -> Result<u64> {
     Ok(written)
 }
 
+
+pub fn copy_tree(opts: &Opts) -> Result<()> {
+    let sourcedir = opts
+        .source
+        .components()
+        .last()
+        .ok_or(XcpError::InvalidSource {
+            msg: "Failed to find source directory name.",
+        })?;
+    let basedir = opts.dest.join(sourcedir);
+
+    for entry in WalkDir::new(&opts.source).into_iter() {
+        let e = entry?;
+        let m = e.metadata()?;
+
+        if m.is_file() {
+            //println!("{}", e.path().display());
+
+        } else if m.is_dir() {
+            let suffix = e.path().strip_prefix(&opts.source)?;
+            let target = basedir.join(&suffix);
+            info!("Creating directory: {:?}", target);
+            create_dir(target)?;
+        }
+    }
+
+    Ok(())
+}
+
+
 pub fn copy_single_file(opts: &Opts) -> Result<()> {
     let dest = if opts.dest.is_dir() {
         let fname = opts.source.file_name().ok_or(XcpError::UnknownFilename)?;
@@ -89,8 +121,8 @@ pub fn copy_single_file(opts: &Opts) -> Result<()> {
         opts.dest.clone()
     };
 
-    if dest.is_file() && opts.noclobber {
-        return Err(to_err(
+    if (dest).is_file() && opts.noclobber {
+        return Err(io_err(
             IOKind::AlreadyExists,
             "Destination file exists and no-clobber is set.",
         ));
