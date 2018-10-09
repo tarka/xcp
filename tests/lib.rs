@@ -130,15 +130,42 @@ fn copy_empty_dir() -> Result<(), Error> {
     let dest_base = dir.path().join("dest");
     create_dir_all(&dest_base)?;
 
-    let out = run(&[source_path.to_str().unwrap(), dir.path().to_str().unwrap()])?;
+    let out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap()
+    ])?;
 
     assert!(out.status.success());
 
-    // let mut dest = File::open(dest_path)?;
-    // let mut buf = String::new();
-    // dest.read_to_string(&mut buf)?;
+    assert!(dest_base.join("mydir").exists());
+    assert!(dest_base.join("mydir").is_dir());
 
-    // assert!(buf == text);
+    Ok(())
+}
+
+
+#[test]
+fn copy_all_dirs() -> Result<(), Error> {
+    let dir = tempdir()?;
+
+    let source_path = dir.path().join("mydir");
+    create_dir_all(&source_path)?;
+    create_dir_all(source_path.join("one/two/three/"))?;
+
+    let dest_base = dir.path().join("dest");
+    create_dir_all(&dest_base)?;
+
+    let out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap()
+    ])?;
+
+    assert!(out.status.success());
+
+    assert!(dest_base.join("mydir/one/two/three/").exists());
+    assert!(dest_base.join("mydir/one/two/three/").is_dir());
 
     Ok(())
 }
