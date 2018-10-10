@@ -1,5 +1,6 @@
 mod errors;
 mod operations;
+mod utils;
 
 use simplelog::{Config, LevelFilter, TermLogger};
 use std::io::ErrorKind as IOKind;
