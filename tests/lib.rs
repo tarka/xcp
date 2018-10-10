@@ -3,7 +3,7 @@ use failure::Error;
 use escargot::CargoBuild;
 use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tempfile::tempdir;
 use uuid::Uuid;
@@ -24,6 +24,13 @@ fn tempdir_rel() -> Result<PathBuf, Error> {
     create_dir_all(&dir)?;
     Ok(dir)
 }
+
+fn create_file(path: &Path, text: &str) -> Result<(), Error> {
+    let file = File::create(&path)?;
+    write!(&file, "{}", text);
+    Ok(())
+}
+
 
 #[test]
 fn basic_help() -> Result<(), Error> {
@@ -116,10 +123,7 @@ fn file_copy() -> Result<(), Error> {
     let dest_path = dir.path().join("dest.txt");
     let text = "This is a test file.";
 
-    {
-        let source = File::create(&source_path)?;
-        write!(&source, "{}", text);
-    }
+    create_file(&source_path, text)?;
 
     let out = run(&[source_path.to_str().unwrap(), dest_path.to_str().unwrap()])?;
 
@@ -141,10 +145,7 @@ fn file_copy_rel() -> Result<(), Error> {
     let dest_path = dir.join("dest.txt");
     let text = "This is a test file.";
 
-    {
-        let source = File::create(&source_path)?;
-        write!(&source, "{}", text);
-    }
+    create_file(&source_path, text)?;
 
     let out = run(&[source_path.to_str().unwrap(), dest_path.to_str().unwrap()])?;
 
@@ -229,6 +230,40 @@ fn copy_all_dirs_rel() -> Result<(), Error> {
 
     assert!(dest_base.join("mydir/one/two/three/").exists());
     assert!(dest_base.join("mydir/one/two/three/").is_dir());
+
+    Ok(())
+}
+
+#[test]
+fn copy_dirs_files() -> Result<(), Error> {
+    let dir = tempdir()?;
+
+    let source_path = dir.path().join("mydir");
+    create_dir_all(&source_path)?;
+    //create_dir_all(source_path.join("one/two/three/"))?;
+
+    let mut p = source_path.clone();
+    for d in ["one", "two", "three"].iter() {
+        p.push(d);
+        create_dir_all(&p)?;
+        create_file(&p.join(format!("{}.txt", d)), d)?;
+    }
+
+
+    let dest_base = dir.path().join("dest");
+    create_dir_all(&dest_base)?;
+
+    let out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+
+    assert!(dest_base.join("mydir/one/one.txt").is_file());
+    assert!(dest_base.join("mydir/one/two/two.txt").is_file());
+    assert!(dest_base.join("mydir/one/two/three/three.txt").is_file());
 
     Ok(())
 }

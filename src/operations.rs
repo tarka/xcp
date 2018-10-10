@@ -1,4 +1,4 @@
-use log::{debug, error, info};
+use log::{debug, info};
 use std::cmp;
 use std::fs::{create_dir, File};
 use std::io;
@@ -10,8 +10,9 @@ use walkdir::WalkDir;
 
 use libc;
 
-use crate::errors::{io_err, Result, XcpError};
 use crate::Opts;
+use crate::errors::{io_err, Result, XcpError};
+use crate::utils::{FileType, ToFileType};
 
 // Assumes Linux kernel >= 4.5.
 #[cfg(feature = "kernel_copy_file_range")]
@@ -64,7 +65,7 @@ fn r_copy_file_range(infd: &File, outfd: &File, bytes: usize) -> Result<u64> {
     }
 }
 
-pub fn copy(from: &Path, to: &Path) -> Result<u64> {
+pub fn copy_file(from: &Path, to: &Path) -> Result<u64> {
     let infd = File::open(from)?;
     let outfd = File::create(to)?;
     let (perm, len) = {
@@ -94,24 +95,34 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
     let basedir = opts.dest.join(sourcedir);
 
     for entry in WalkDir::new(&opts.source).into_iter() {
-        let e = entry?;
-        let path = e.path().strip_prefix(&opts.source)?;
-        let meta = e.metadata()?;
+        debug!("Got tree entry {:?}", entry);
+        let from = entry?;
+        let meta = from.metadata()?;
+        let path = from.path().strip_prefix(&opts.source)?;
+        let target = basedir.join(&path);
 
-        if meta.is_file() {
-            //println!("{}", e.path().display());
+        match meta.file_type().to_enum() {
+            FileType::File => {
+                info!("Copying file {:?} to {:?}", from.path(), target);
+                copy_file(&from.path(), &target)?;
+            },
 
-        } else if meta.is_dir() {
-            let target = basedir.join(&path);
-            info!("Creating directory: {:?}", target);
-            create_dir(target)?;
-        }
+            FileType::Dir => {
+                info!("Creating directory: {:?}", target);
+                create_dir(target)?;
+            },
+
+            FileType::Symlink => {
+            },
+        };
+
     }
 
     Ok(())
 }
 
 
+// FIXME: Could just use copy_tree if works on single files?
 pub fn copy_single_file(opts: &Opts) -> Result<()> {
     let dest = if opts.dest.is_dir() {
         let fname = opts.source.file_name().ok_or(XcpError::UnknownFilename)?;
@@ -127,7 +138,7 @@ pub fn copy_single_file(opts: &Opts) -> Result<()> {
         ));
     }
 
-    copy(&opts.source, &dest)?;
+    copy_file(&opts.source, &dest)?;
 
     Ok(())
 }
