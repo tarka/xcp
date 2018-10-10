@@ -35,7 +35,6 @@ pub struct Opts {
     dest: PathBuf,
 }
 
-
 fn check_and_copy_tree(opts: &Opts) -> Result<()> {
     if opts.dest.exists() && !opts.dest.is_dir() {
         return Err(XcpError::InvalidDestination {
@@ -45,7 +44,6 @@ fn check_and_copy_tree(opts: &Opts) -> Result<()> {
     }
     copy_tree(opts)
 }
-
 
 fn main() -> Result<()> {
     let opts = Opts::from_args();
@@ -66,7 +64,6 @@ fn main() -> Result<()> {
 
     if opts.source.is_file() {
         copy_single_file(&opts)?;
-
     } else if opts.source.is_dir() {
         match opts.recursive {
             true => check_and_copy_tree(&opts)?,

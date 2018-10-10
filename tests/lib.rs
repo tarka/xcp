@@ -2,12 +2,11 @@ use failure::Error;
 
 use escargot::CargoBuild;
 use std::fs::{create_dir_all, File};
-use std::io;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Command, Output};
-use tempfile::{TempDir, tempdir, tempdir_in};
-
+use tempfile::tempdir;
+use uuid::Uuid;
 
 fn get_command() -> Result<Command, Error> {
     let cmd = CargoBuild::new().run()?.command();
@@ -19,11 +18,12 @@ fn run(args: &[&str]) -> Result<Output, Error> {
     Ok(out)
 }
 
-
-fn tempdir_rel() -> Result<TempDir, io::Error> {
-    tempdir_in(Path::new("target/"))
+fn tempdir_rel() -> Result<PathBuf, Error> {
+    let uuid = Uuid::new_v4();
+    let dir = PathBuf::from("target/").join(uuid.to_string());
+    create_dir_all(&dir)?;
+    Ok(dir)
 }
-
 
 #[test]
 fn basic_help() -> Result<(), Error> {
@@ -135,6 +135,31 @@ fn file_copy() -> Result<(), Error> {
 }
 
 #[test]
+fn file_copy_rel() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+    let source_path = dir.join("source.txt");
+    let dest_path = dir.join("dest.txt");
+    let text = "This is a test file.";
+
+    {
+        let source = File::create(&source_path)?;
+        write!(&source, "{}", text);
+    }
+
+    let out = run(&[source_path.to_str().unwrap(), dest_path.to_str().unwrap()])?;
+
+    assert!(out.status.success());
+
+    let mut dest = File::open(dest_path)?;
+    let mut buf = String::new();
+    dest.read_to_string(&mut buf)?;
+
+    assert!(buf == text);
+
+    Ok(())
+}
+
+#[test]
 fn copy_empty_dir() -> Result<(), Error> {
     let dir = tempdir()?;
 
@@ -158,7 +183,6 @@ fn copy_empty_dir() -> Result<(), Error> {
     Ok(())
 }
 
-
 #[test]
 fn copy_all_dirs() -> Result<(), Error> {
     let dir = tempdir()?;
@@ -168,6 +192,31 @@ fn copy_all_dirs() -> Result<(), Error> {
     create_dir_all(source_path.join("one/two/three/"))?;
 
     let dest_base = dir.path().join("dest");
+    create_dir_all(&dest_base)?;
+
+    let out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+
+    assert!(dest_base.join("mydir/one/two/three/").exists());
+    assert!(dest_base.join("mydir/one/two/three/").is_dir());
+
+    Ok(())
+}
+
+#[test]
+fn copy_all_dirs_rel() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+
+    let source_path = dir.join("mydir");
+    create_dir_all(&source_path)?;
+    create_dir_all(source_path.join("one/two/three/"))?;
+
+    let dest_base = dir.join("dest");
     create_dir_all(&dest_base)?;
 
     let out = run(&[

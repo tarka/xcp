@@ -1,5 +1,4 @@
-
-use log::{error, info, debug};
+use log::{debug, error, info};
 use std::cmp;
 use std::fs::{create_dir, File};
 use std::io;
@@ -7,7 +6,7 @@ use std::io::ErrorKind as IOKind;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::ptr::null_mut;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 
 use libc;
 
@@ -96,14 +95,14 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
 
     for entry in WalkDir::new(&opts.source).into_iter() {
         let e = entry?;
-        let m = e.metadata()?;
+        let path = e.path().strip_prefix(&opts.source)?;
+        let meta = e.metadata()?;
 
-        if m.is_file() {
+        if meta.is_file() {
             //println!("{}", e.path().display());
 
-        } else if m.is_dir() {
-            let suffix = e.path().strip_prefix(&opts.source)?;
-            let target = basedir.join(&suffix);
+        } else if meta.is_dir() {
+            let target = basedir.join(&path);
             info!("Creating directory: {:?}", target);
             create_dir(target)?;
         }
