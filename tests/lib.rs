@@ -2,14 +2,28 @@ use failure::Error;
 
 use escargot::CargoBuild;
 use std::fs::{create_dir_all, File};
+use std::io;
 use std::io::{Read, Write};
-use std::process::Output;
-use tempfile::tempdir;
+use std::path::Path;
+use std::process::{Command, Output};
+use tempfile::{TempDir, tempdir, tempdir_in};
+
+
+fn get_command() -> Result<Command, Error> {
+    let cmd = CargoBuild::new().run()?.command();
+    Ok(cmd)
+}
 
 fn run(args: &[&str]) -> Result<Output, Error> {
-    let out = CargoBuild::new().run()?.command().args(args).output()?;
+    let out = get_command()?.args(args).output()?;
     Ok(out)
 }
+
+
+fn tempdir_rel() -> Result<TempDir, io::Error> {
+    tempdir_in(Path::new("target/"))
+}
+
 
 #[test]
 fn basic_help() -> Result<(), Error> {

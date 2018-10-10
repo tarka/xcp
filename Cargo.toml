@@ -21,7 +21,3 @@ libc = "0.2"
 [dev-dependencies]
 tempfile = "3"
 escargot = "0.3"
-
-# Others for testing...
-# assert_fs
-# dir-diff
