@@ -1,11 +1,13 @@
 use log::{debug, info};
 use std::cmp;
-use std::fs::{create_dir, File};
+use std::fs::{create_dir, create_dir_all, File};
 use std::io;
 use std::io::ErrorKind as IOKind;
 use std::os::unix::io::AsRawFd;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
+use std::sync::mpsc;
+use threadpool::ThreadPool;
 use walkdir::WalkDir;
 
 use libc;
@@ -120,6 +122,56 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
 
     Ok(())
 }
+
+
+fn par_copy(from: PathBuf, to: PathBuf) {
+    let dir = to.parent().unwrap(); // FIXME
+    create_dir_all(&dir).unwrap();
+    copy_file(&from, &to).unwrap();
+}
+
+pub fn par_copy_tree(opts: &Opts) -> Result<()> {
+    let sourcedir = opts
+        .source
+        .components()
+        .last()
+        .ok_or(XcpError::InvalidSource {
+            msg: "Failed to find source directory name.",
+        })?;
+    let basedir = opts.dest.join(sourcedir);
+
+    let pool = ThreadPool::new(2);
+    //let (work_tx, work_rx) = mpsc::channel();
+
+    for entry in WalkDir::new(&opts.source).into_iter() {
+        debug!("[par] Got tree entry {:?}", entry);
+        let from = entry?;
+        let meta = from.metadata()?;
+        let path = from.path().strip_prefix(&opts.source)?;
+        let target = basedir.join(&path);
+
+        match meta.file_type().to_enum() {
+            FileType::File => {
+                info!("[par] Copying file {:?} to {:?}", from.path(), target);
+                pool.execute(move || par_copy(from.path().to_path_buf(), target));
+            },
+
+            FileType::Dir => {
+                if from.path().read_dir()?.count() == 0 {
+                    info!("[par] Creating directory: {:?}", target);
+                    create_dir_all(target)?;
+                }
+            },
+
+            FileType::Symlink => {
+            },
+        };
+    }
+    pool.join();
+
+    Ok(())
+}
+
 
 
 // FIXME: Could just use copy_tree if works on single files?

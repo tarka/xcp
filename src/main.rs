@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use crate::errors::{io_err, Result, XcpError};
-use crate::operations::{copy_single_file, copy_tree};
+use crate::operations::{copy_single_file, copy_tree, par_copy_tree};
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -43,7 +43,7 @@ fn check_and_copy_tree(opts: &Opts) -> Result<()> {
         }
         .into());
     }
-    copy_tree(opts)
+    par_copy_tree(opts)
 }
 
 fn main() -> Result<()> {
