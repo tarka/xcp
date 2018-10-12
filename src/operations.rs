@@ -93,6 +93,7 @@ fn copy_file(from: &Path, to: &Path) -> Result<u64> {
 #[derive(Debug)]
 enum Operation {
     Copy(PathBuf, PathBuf),
+    CreateDir(PathBuf),
     End,
 }
 
@@ -105,16 +106,27 @@ enum OpResult {
 fn copy_worker(work: mpsc::Receiver<Operation>,
                results: mpsc::Sender<OpResult>) -> Result<()>
 {
-    debug!("Starting worker {:?}", thread::current().id());
+    debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
         debug!("Received operation {:?}", op);
 
         match op {
             Operation::Copy(from, to) => {
+                // FIXME: If we implement parallel copies (which may
+                // improve performance on some SSD configurations) we
+                // should also created the parent directory, and the
+                // dir-create operation could be out of order.
+
                 info!("Worker: Copy {:?} -> {:?}", from, to);
                 let res = copy_file(&from, &to);
                 results.send(OpResult::Copied(res))?;
             }
+
+            Operation::CreateDir(dir) => {
+                info!("Creating directory: {:?}", dir);
+                create_dir_all(dir)?;
+            }
+
             Operation::End => {
                 info!("Worker received shutdown command.");
                 break;
@@ -122,7 +134,7 @@ fn copy_worker(work: mpsc::Receiver<Operation>,
         }
 
     }
-    debug!("Worker {:?} shutting down", thread::current().id());
+    debug!("Copy worker {:?} shutting down", thread::current().id());
     Ok(())
 }
 
@@ -155,8 +167,8 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
             },
 
             FileType::Dir => {
-                info!("Creating directory: {:?}", target);
-                create_dir(target)?;
+                info!("Send create-dir operation {:?} to {:?}", from.path(), target);
+                work_tx.send(Operation::CreateDir(target))?;
             },
 
             FileType::Symlink => {
@@ -166,9 +178,9 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
     work_tx.send(Operation::End)?;
 
     for n in res_rx {
-        println!("hi number {:?} from the main thread!", n);
+        debug!("Received {:?} from the main thread!", n);
     }
-    println!("Ran out of results.");
+    debug!("Done");
 
     Ok(())
 }
