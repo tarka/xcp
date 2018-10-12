@@ -1,4 +1,3 @@
-use log::{debug, info};
 use std::cmp;
 use std::fs::{create_dir, create_dir_all, File};
 use std::io;
@@ -8,13 +7,19 @@ use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use std::sync::mpsc;
 use std::thread;
+use log::{debug, info};
 use walkdir::WalkDir;
+
+
+use indicatif::{ProgressBar, ProgressStyle};
 
 use libc;
 
 use crate::Opts;
 use crate::errors::{io_err, Result, XcpError};
 use crate::utils::{FileType, ToFileType};
+
+
 
 /* **** Low level operations **** */
 
@@ -166,8 +171,8 @@ fn tree_walker(source: PathBuf, dest: PathBuf,
         match meta.file_type().to_enum() {
             FileType::File => {
                 debug!("Send copy operation {:?} to {:?}", from.path(), target);
-                work_tx.send(Operation::Copy(from.path().to_path_buf(), target))?;
                 stat_tx.send(OpStatus::Size(Ok(meta.len())))?;
+                work_tx.send(Operation::Copy(from.path().to_path_buf(), target))?;
             },
 
             FileType::Dir => {
@@ -196,10 +201,30 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
     let _walk_worker = thread::spawn(move || tree_walker(source, dest,
                                                          work_tx, stat_tx2));
 
-    for n in stat_rx {
-        debug!("Received {:?} from the main thread!", n);
+
+    let mut copied = 0;
+    let mut total = 0;
+
+    let pb = ProgressBar::new(total);
+    pb.set_style(ProgressStyle::default_bar()
+                 .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                 .progress_chars("#>-"));
+
+    for stat in stat_rx {
+        debug!("Received status {:?}", stat);
+        match stat {
+            OpStatus::Size(s) => {
+                total += s?;
+                pb.set_length(total);
+            }
+            OpStatus::Copied(s) => {
+                copied += s?;
+                pb.set_position(copied);
+            }
+        }
     }
 
+    pb.finish_with_message("Copy-tree complete");
     debug!("Copy-tree complete");
     Ok(())
 }
