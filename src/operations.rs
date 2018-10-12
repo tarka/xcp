@@ -7,7 +7,7 @@ use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use std::sync::mpsc;
-use threadpool::ThreadPool;
+use std::thread;
 use walkdir::WalkDir;
 
 use libc;
@@ -15,6 +15,8 @@ use libc;
 use crate::Opts;
 use crate::errors::{io_err, Result, XcpError};
 use crate::utils::{FileType, ToFileType};
+
+/* **** Low level operations **** */
 
 // Assumes Linux kernel >= 4.5.
 #[cfg(feature = "kernel_copy_file_range")]
@@ -67,7 +69,7 @@ fn r_copy_file_range(infd: &File, outfd: &File, bytes: usize) -> Result<u64> {
     }
 }
 
-pub fn copy_file(from: &Path, to: &Path) -> Result<u64> {
+fn copy_file(from: &Path, to: &Path) -> Result<u64> {
     let infd = File::open(from)?;
     let outfd = File::create(to)?;
     let (perm, len) = {
@@ -86,6 +88,45 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<u64> {
 }
 
 
+/* **** Structured operations **** */
+
+#[derive(Debug)]
+enum Operation {
+    Copy(PathBuf, PathBuf),
+    End,
+}
+
+#[derive(Debug)]
+enum OpResult {
+    Copied(Result<(u64)>)
+}
+
+
+fn copy_worker(work: mpsc::Receiver<Operation>,
+               results: mpsc::Sender<OpResult>) -> Result<()>
+{
+    debug!("Starting worker {:?}", thread::current().id());
+    for op in work {
+        debug!("Received operation {:?}", op);
+
+        match op {
+            Operation::Copy(from, to) => {
+                info!("Worker: Copy {:?} -> {:?}", from, to);
+                let res = copy_file(&from, &to);
+                results.send(OpResult::Copied(res))?;
+            }
+            Operation::End => {
+                info!("Worker received shutdown command.");
+                break;
+            }
+        }
+
+    }
+    debug!("Worker {:?} shutting down", thread::current().id());
+    Ok(())
+}
+
+
 pub fn copy_tree(opts: &Opts) -> Result<()> {
     let sourcedir = opts
         .source
@@ -96,6 +137,10 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
         })?;
     let basedir = opts.dest.join(sourcedir);
 
+    let (work_tx, work_rx) = mpsc::channel();
+    let (res_tx, res_rx) = mpsc::channel();
+    let _worker = thread::spawn(move || copy_worker(work_rx, res_tx));
+
     for entry in WalkDir::new(&opts.source).into_iter() {
         debug!("Got tree entry {:?}", entry);
         let from = entry?;
@@ -105,8 +150,8 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
 
         match meta.file_type().to_enum() {
             FileType::File => {
-                info!("Copying file {:?} to {:?}", from.path(), target);
-                copy_file(&from.path(), &target)?;
+                info!("Send copy operation {:?} to {:?}", from.path(), target);
+                work_tx.send(Operation::Copy(from.path().to_path_buf(), target))?;
             },
 
             FileType::Dir => {
@@ -117,61 +162,16 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
             FileType::Symlink => {
             },
         };
-
     }
+    work_tx.send(Operation::End)?;
+
+    for n in res_rx {
+        println!("hi number {:?} from the main thread!", n);
+    }
+    println!("Ran out of results.");
 
     Ok(())
 }
-
-
-fn par_copy(from: PathBuf, to: PathBuf) {
-    let dir = to.parent().unwrap(); // FIXME
-    create_dir_all(&dir).unwrap();
-    copy_file(&from, &to).unwrap();
-}
-
-pub fn par_copy_tree(opts: &Opts) -> Result<()> {
-    let sourcedir = opts
-        .source
-        .components()
-        .last()
-        .ok_or(XcpError::InvalidSource {
-            msg: "Failed to find source directory name.",
-        })?;
-    let basedir = opts.dest.join(sourcedir);
-
-    let pool = ThreadPool::new(2);
-    //let (work_tx, work_rx) = mpsc::channel();
-
-    for entry in WalkDir::new(&opts.source).into_iter() {
-        debug!("[par] Got tree entry {:?}", entry);
-        let from = entry?;
-        let meta = from.metadata()?;
-        let path = from.path().strip_prefix(&opts.source)?;
-        let target = basedir.join(&path);
-
-        match meta.file_type().to_enum() {
-            FileType::File => {
-                info!("[par] Copying file {:?} to {:?}", from.path(), target);
-                pool.execute(move || par_copy(from.path().to_path_buf(), target));
-            },
-
-            FileType::Dir => {
-                if from.path().read_dir()?.count() == 0 {
-                    info!("[par] Creating directory: {:?}", target);
-                    create_dir_all(target)?;
-                }
-            },
-
-            FileType::Symlink => {
-            },
-        };
-    }
-    pool.join();
-
-    Ok(())
-}
-
 
 
 // FIXME: Could just use copy_tree if works on single files?
