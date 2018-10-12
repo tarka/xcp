@@ -98,13 +98,15 @@ enum Operation {
 }
 
 #[derive(Debug)]
-enum OpResult {
-    Copied(Result<(u64)>)
+enum OpStatus {
+    Copied(Result<(u64)>),
+    Size(Result<u64>)
 }
 
 
 fn copy_worker(work: mpsc::Receiver<Operation>,
-               results: mpsc::Sender<OpResult>) -> Result<()>
+               results: mpsc::Sender<OpStatus>)
+               -> Result<()>
 {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
@@ -119,11 +121,11 @@ fn copy_worker(work: mpsc::Receiver<Operation>,
 
                 info!("Worker: Copy {:?} -> {:?}", from, to);
                 let res = copy_file(&from, &to);
-                results.send(OpResult::Copied(res))?;
+                results.send(OpStatus::Copied(res))?;
             }
 
             Operation::CreateDir(dir) => {
-                info!("Creating directory: {:?}", dir);
+                info!("Worker: Creating directory: {:?}", dir);
                 create_dir_all(dir)?;
             }
 
@@ -138,36 +140,38 @@ fn copy_worker(work: mpsc::Receiver<Operation>,
     Ok(())
 }
 
+fn tree_walker(source: PathBuf, dest: PathBuf,
+               work_tx: mpsc::Sender<Operation>,
+               stat_tx: mpsc::Sender<OpStatus>)
+               -> Result<()>
+{
+    debug!("Starting walk worker {:?}", thread::current().id());
 
-pub fn copy_tree(opts: &Opts) -> Result<()> {
-    let sourcedir = opts
-        .source
+    let sourcedir = source
         .components()
         .last()
         .ok_or(XcpError::InvalidSource {
             msg: "Failed to find source directory name.",
         })?;
-    let basedir = opts.dest.join(sourcedir);
+    let basedir = dest.join(sourcedir);
 
-    let (work_tx, work_rx) = mpsc::channel();
-    let (res_tx, res_rx) = mpsc::channel();
-    let _worker = thread::spawn(move || copy_worker(work_rx, res_tx));
-
-    for entry in WalkDir::new(&opts.source).into_iter() {
+    for entry in WalkDir::new(&source).into_iter() {
         debug!("Got tree entry {:?}", entry);
+        // FIXME: Return errors to the master thread.
         let from = entry?;
         let meta = from.metadata()?;
-        let path = from.path().strip_prefix(&opts.source)?;
+        let path = from.path().strip_prefix(&source)?;
         let target = basedir.join(&path);
 
         match meta.file_type().to_enum() {
             FileType::File => {
-                info!("Send copy operation {:?} to {:?}", from.path(), target);
+                debug!("Send copy operation {:?} to {:?}", from.path(), target);
                 work_tx.send(Operation::Copy(from.path().to_path_buf(), target))?;
+                stat_tx.send(OpStatus::Size(Ok(meta.len())))?;
             },
 
             FileType::Dir => {
-                info!("Send create-dir operation {:?} to {:?}", from.path(), target);
+                debug!("Send create-dir operation {:?} to {:?}", from.path(), target);
                 work_tx.send(Operation::CreateDir(target))?;
             },
 
@@ -175,13 +179,28 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
             },
         };
     }
-    work_tx.send(Operation::End)?;
 
-    for n in res_rx {
+    debug!("Walk-worker finished: {:?}", thread::current().id());
+    Ok(())
+}
+
+pub fn copy_tree(opts: &Opts) -> Result<()> {
+
+    let (work_tx, work_rx) = mpsc::channel();
+    let (stat_tx, stat_rx) = mpsc::channel();
+    let stat_tx2 = stat_tx.clone();
+    let source = opts.source.clone();
+    let dest = opts.dest.clone();
+
+    let _copy_worker = thread::spawn(move || copy_worker(work_rx, stat_tx));
+    let _walk_worker = thread::spawn(move || tree_walker(source, dest,
+                                                         work_tx, stat_tx2));
+
+    for n in stat_rx {
         debug!("Received {:?} from the main thread!", n);
     }
-    debug!("Done");
 
+    debug!("Copy-tree complete");
     Ok(())
 }
 
