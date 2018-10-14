@@ -102,15 +102,52 @@ enum Operation {
     End,
 }
 
+#[derive(Debug, Clone)]
+enum StatusUpdate {
+    Copied(u64),
+    Size(u64)
+}
+
+impl StatusUpdate {
+    fn set(&self, bytes: u64) -> StatusUpdate {
+        match self {
+            StatusUpdate::Copied(_) => StatusUpdate::Copied(bytes),
+            StatusUpdate::Size(_) => StatusUpdate::Size(bytes),
+        }
+    }
+    fn value(&self) -> u64 {
+        match self {
+            StatusUpdate::Copied(v) => *v,
+            StatusUpdate::Size(v) => *v,
+        }
+    }
+}
+
+
 #[derive(Debug)]
-enum OpStatus {
-    Copied(Result<(u64)>),
-    Size(Result<u64>)
+struct Batcher {
+    sender: mpsc::Sender<StatusUpdate>,
+    stat: StatusUpdate,
+    batch_size: u64,
+}
+
+
+impl Batcher {
+    fn send(&mut self, bytes: u64) -> Result<()> {
+        let curr = self.stat.value() + bytes;
+        self.stat = self.stat.set(curr);
+
+        if curr >= self.batch_size {
+            self.sender.send(self.stat.clone())?;
+            self.stat = self.stat.set(0);
+        }
+        Ok(())
+    }
 }
 
 
 fn copy_worker(work: mpsc::Receiver<Operation>,
-               results: mpsc::Sender<OpStatus>)
+               mut updates: Batcher)
                -> Result<()>
 {
     debug!("Starting copy worker {:?}", thread::current().id());
@@ -126,12 +163,13 @@ fn copy_worker(work: mpsc::Receiver<Operation>,
 
                 info!("Worker: Copy {:?} -> {:?}", from, to);
                 let res = copy_file(&from, &to);
-                results.send(OpStatus::Copied(res))?;
+                updates.send(res?)?;
             }
 
             Operation::CreateDir(dir) => {
                 info!("Worker: Creating directory: {:?}", dir);
-                create_dir_all(dir)?;
+                create_dir_all(&dir)?;
+                updates.send(dir.metadata()?.len())?;
             }
 
             Operation::End => {
@@ -147,7 +185,7 @@ fn copy_worker(work: mpsc::Receiver<Operation>,
 
 fn tree_walker(source: PathBuf, dest: PathBuf,
                work_tx: mpsc::Sender<Operation>,
-               stat_tx: mpsc::Sender<OpStatus>)
+               mut updates: Batcher)
                -> Result<()>
 {
     debug!("Starting walk worker {:?}", thread::current().id());
@@ -171,13 +209,14 @@ fn tree_walker(source: PathBuf, dest: PathBuf,
         match meta.file_type().to_enum() {
             FileType::File => {
                 debug!("Send copy operation {:?} to {:?}", from.path(), target);
-                stat_tx.send(OpStatus::Size(Ok(meta.len())))?;
+                updates.send(meta.len())?;
                 work_tx.send(Operation::Copy(from.path().to_path_buf(), target))?;
             },
 
             FileType::Dir => {
                 debug!("Send create-dir operation {:?} to {:?}", from.path(), target);
                 work_tx.send(Operation::CreateDir(target))?;
+                updates.send(from.path().metadata()?.len())?;
             },
 
             FileType::Symlink => {
@@ -185,6 +224,7 @@ fn tree_walker(source: PathBuf, dest: PathBuf,
         };
     }
 
+    work_tx.send(Operation::End)?;
     debug!("Walk-worker finished: {:?}", thread::current().id());
     Ok(())
 }
@@ -193,13 +233,18 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
 
     let (work_tx, work_rx) = mpsc::channel();
     let (stat_tx, stat_rx) = mpsc::channel();
-    let stat_tx2 = stat_tx.clone();
+    let copy_stat = Batcher { sender: stat_tx.clone(),
+                              stat: StatusUpdate::Copied(0),
+                              batch_size: 1000 * 4096};
+    let size_stat = Batcher { sender: stat_tx,
+                              stat: StatusUpdate::Size(0),
+                              batch_size: 1000 *4096 };
     let source = opts.source.clone();
     let dest = opts.dest.clone();
 
-    let _copy_worker = thread::spawn(move || copy_worker(work_rx, stat_tx));
+    let _copy_worker = thread::spawn(move || copy_worker(work_rx, copy_stat));
     let _walk_worker = thread::spawn(move || tree_walker(source, dest,
-                                                         work_tx, stat_tx2));
+                                                         work_tx, size_stat));
 
 
     let mut copied = 0;
@@ -207,18 +252,17 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
 
     let pb = ProgressBar::new(total);
     pb.set_style(ProgressStyle::default_bar()
-                 .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                 .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
                  .progress_chars("#>-"));
 
     for stat in stat_rx {
-        debug!("Received status {:?}", stat);
         match stat {
-            OpStatus::Size(s) => {
-                total += s?;
+            StatusUpdate::Size(s) => {
+                total += s;
                 pb.set_length(total);
             }
-            OpStatus::Copied(s) => {
-                copied += s?;
+            StatusUpdate::Copied(s) => {
+                copied += s;
                 pb.set_position(copied);
             }
         }
