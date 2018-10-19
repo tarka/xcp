@@ -1,3 +1,5 @@
+use libc;
+use log::{debug, info};
 use std::cmp;
 use std::fs::{create_dir, create_dir_all, File};
 use std::io;
@@ -7,18 +9,14 @@ use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use std::sync::mpsc;
 use std::thread;
-use log::{debug, info};
 use walkdir::WalkDir;
-
 
 use indicatif::{ProgressBar, ProgressStyle};
 
-use libc;
 
-use crate::Opts;
 use crate::errors::{io_err, Result, XcpError};
 use crate::utils::{FileType, ToFileType};
-
+use crate::Opts;
 
 
 /* **** Low level operations **** */
@@ -57,14 +55,14 @@ extern "C" {
     ) -> libc::ssize_t;
 }
 
-fn r_copy_file_range(infd: &File, outfd: &File, bytes: usize) -> Result<u64> {
+fn r_copy_file_range(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
     let r = unsafe {
         copy_file_range(
             infd.as_raw_fd(),
             null_mut(),
             outfd.as_raw_fd(),
             null_mut(),
-            bytes,
+            bytes as usize,
             0,
         )
     };
@@ -72,24 +70,6 @@ fn r_copy_file_range(infd: &File, outfd: &File, bytes: usize) -> Result<u64> {
         -1 => Err(io::Error::last_os_error().into()),
         _ => Ok(r as u64),
     }
-}
-
-fn copy_file(from: &Path, to: &Path) -> Result<u64> {
-    let infd = File::open(from)?;
-    let outfd = File::create(to)?;
-    let (perm, len) = {
-        let metadata = infd.metadata()?;
-        (metadata.permissions(), metadata.len())
-    };
-
-    let mut written = 0u64;
-    while written < len {
-        let bytes_to_copy = cmp::min(len - written, usize::max_value() as u64) as usize;
-        let result = r_copy_file_range(&infd, &outfd, bytes_to_copy)?;
-        written += result;
-    }
-    outfd.set_permissions(perm)?;
-    Ok(written)
 }
 
 
@@ -105,7 +85,7 @@ enum Operation {
 #[derive(Debug, Clone)]
 enum StatusUpdate {
     Copied(u64),
-    Size(u64)
+    Size(u64),
 }
 
 impl StatusUpdate {
@@ -126,7 +106,7 @@ impl StatusUpdate {
 
 #[derive(Debug)]
 struct Batcher {
-    sender: mpsc::Sender<StatusUpdate>,
+    sender: Option<mpsc::Sender<StatusUpdate>>,
     stat: StatusUpdate,
     batch_size: u64,
 }
@@ -134,22 +114,40 @@ struct Batcher {
 
 impl Batcher {
     fn send(&mut self, bytes: u64) -> Result<()> {
-        let curr = self.stat.value() + bytes;
-        self.stat = self.stat.set(curr);
+        if let Some(sender) = &self.sender {
+            let curr = self.stat.value() + bytes;
+            self.stat = self.stat.set(curr);
 
-        if curr >= self.batch_size {
-            self.sender.send(self.stat.clone())?;
-            self.stat = self.stat.set(0);
+            if curr >= self.batch_size {
+                sender.send(self.stat.clone())?;
+                self.stat = self.stat.set(0);
+            }
         }
         Ok(())
     }
 }
 
+fn copy_file(from: &Path, to: &Path, updates: &mut Batcher) -> Result<u64> {
+    let infd = File::open(from)?;
+    let outfd = File::create(to)?;
+    let (perm, len) = {
+        let metadata = infd.metadata()?;
+        (metadata.permissions(), metadata.len())
+    };
 
-fn copy_worker(work: mpsc::Receiver<Operation>,
-               mut updates: Batcher)
-               -> Result<()>
-{
+    let mut written = 0u64;
+    while written < len {
+        let bytes_to_copy = cmp::min(len - written, updates.batch_size);
+        let result = r_copy_file_range(&infd, &outfd, bytes_to_copy)?;
+        written += result;
+        updates.send(result)?;
+    }
+    outfd.set_permissions(perm)?;
+    Ok(written)
+}
+
+
+fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: Batcher) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
         debug!("Received operation {:?}", op);
@@ -162,8 +160,8 @@ fn copy_worker(work: mpsc::Receiver<Operation>,
                 // dir-create operation could be out of order.
 
                 info!("Worker: Copy {:?} -> {:?}", from, to);
-                let res = copy_file(&from, &to);
-                updates.send(res?)?;
+                let res = copy_file(&from, &to, &mut updates);
+                //updates.send(res?)?;
             }
 
             Operation::CreateDir(dir) => {
@@ -177,25 +175,22 @@ fn copy_worker(work: mpsc::Receiver<Operation>,
                 break;
             }
         }
-
     }
     debug!("Copy worker {:?} shutting down", thread::current().id());
     Ok(())
 }
 
-fn tree_walker(source: PathBuf, dest: PathBuf,
-               work_tx: mpsc::Sender<Operation>,
-               mut updates: Batcher)
-               -> Result<()>
-{
+fn tree_walker(
+    source: PathBuf,
+    dest: PathBuf,
+    work_tx: mpsc::Sender<Operation>,
+    mut updates: Batcher,
+) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 
-    let sourcedir = source
-        .components()
-        .last()
-        .ok_or(XcpError::InvalidSource {
-            msg: "Failed to find source directory name.",
-        })?;
+    let sourcedir = source.components().last().ok_or(XcpError::InvalidSource {
+        msg: "Failed to find source directory name.",
+    })?;
     let basedir = dest.join(sourcedir);
 
     for entry in WalkDir::new(&source).into_iter() {
@@ -211,16 +206,19 @@ fn tree_walker(source: PathBuf, dest: PathBuf,
                 debug!("Send copy operation {:?} to {:?}", from.path(), target);
                 updates.send(meta.len())?;
                 work_tx.send(Operation::Copy(from.path().to_path_buf(), target))?;
-            },
+            }
 
             FileType::Dir => {
-                debug!("Send create-dir operation {:?} to {:?}", from.path(), target);
+                debug!(
+                    "Send create-dir operation {:?} to {:?}",
+                    from.path(),
+                    target
+                );
                 work_tx.send(Operation::CreateDir(target))?;
                 updates.send(from.path().metadata()?.len())?;
-            },
+            }
 
-            FileType::Symlink => {
-            },
+            FileType::Symlink => {}
         };
     }
 
@@ -230,30 +228,33 @@ fn tree_walker(source: PathBuf, dest: PathBuf,
 }
 
 pub fn copy_tree(opts: &Opts) -> Result<()> {
-
     let (work_tx, work_rx) = mpsc::channel();
     let (stat_tx, stat_rx) = mpsc::channel();
-    let copy_stat = Batcher { sender: stat_tx.clone(),
-                              stat: StatusUpdate::Copied(0),
-                              batch_size: 1000 * 4096};
-    let size_stat = Batcher { sender: stat_tx,
-                              stat: StatusUpdate::Size(0),
-                              batch_size: 1000 *4096 };
+    let copy_stat = Batcher {
+        sender: Some(stat_tx.clone()),
+        stat: StatusUpdate::Copied(0),
+        batch_size: 1000 * 4096,
+    };
+    let size_stat = Batcher {
+        sender: Some(stat_tx),
+        stat: StatusUpdate::Size(0),
+        batch_size: 1000 * 4096,
+    };
     let source = opts.source.clone();
     let dest = opts.dest.clone();
 
     let _copy_worker = thread::spawn(move || copy_worker(work_rx, copy_stat));
-    let _walk_worker = thread::spawn(move || tree_walker(source, dest,
-                                                         work_tx, size_stat));
-
+    let _walk_worker = thread::spawn(move || tree_walker(source, dest, work_tx, size_stat));
 
     let mut copied = 0;
     let mut total = 0;
 
     let pb = ProgressBar::new(total);
-    pb.set_style(ProgressStyle::default_bar()
-                 .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-                 .progress_chars("#>-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .progress_chars("#>-"),
+    );
 
     for stat in stat_rx {
         match stat {
@@ -290,7 +291,12 @@ pub fn copy_single_file(opts: &Opts) -> Result<()> {
         ));
     }
 
-    copy_file(&opts.source, &dest)?;
+    let mut copy_stat = Batcher {
+        sender: None,
+        stat: StatusUpdate::Copied(0),
+        batch_size: usize::max_value() as u64,
+    };
+    copy_file(&opts.source, &dest, &mut copy_stat)?;
 
     Ok(())
 }
