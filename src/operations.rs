@@ -110,28 +110,53 @@ impl StoredValue<u64, StatusUpdate> for StatusUpdate {
 }
 
 
-#[derive(Debug)]
+trait Updater {
+    fn update(&self, update: StatusUpdate) -> Result<()>;
+}
+
+
+//#[derive(Debug)]
 struct Batcher {
-    sender: Option<mpsc::Sender<StatusUpdate>>,
+    //sender: Option<mpsc::Sender<StatusUpdate>>,
+    sender: Option<Box<Updater + Send>>,
     stat: StatusUpdate,
     batch_size: u64,
 }
 
 
 impl Batcher {
-    fn send(&mut self, bytes: u64) -> Result<()> {
+    fn update(&mut self, bytes: u64) -> Result<()> {
         if let Some(sender) = &self.sender {
             let curr = self.stat.value() + bytes;
             self.stat = self.stat.set(curr);
 
             if curr >= self.batch_size {
-                sender.send(self.stat.clone())?;
+                sender.update(self.stat.clone())?;
                 self.stat = self.stat.set(0);
             }
         }
         Ok(())
     }
 }
+
+
+impl Updater for mpsc::Sender<StatusUpdate> {
+    fn update(&self, update: StatusUpdate) -> Result<()> {
+        self.send(update)?;
+        Ok(())
+    }
+}
+
+
+struct NopUpdater {
+}
+
+impl Updater for NopUpdater {
+    fn update(&self, _update: StatusUpdate) -> Result<()> {
+        Ok(())
+    }
+}
+
 
 
 /* **** File operations **** */
@@ -149,7 +174,7 @@ fn copy_file(from: &Path, to: &Path, updates: &mut Batcher) -> Result<u64> {
         let bytes_to_copy = cmp::min(len - written, updates.batch_size);
         let result = r_copy_file_range(&infd, &outfd, bytes_to_copy)?;
         written += result;
-        updates.send(result)?;
+        updates.update(result)?;
     }
     outfd.set_permissions(perm)?;
     Ok(written)
@@ -169,14 +194,14 @@ fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: Batcher) -> Result<
                 // dir-create operation could be out of order.
 
                 info!("Worker: Copy {:?} -> {:?}", from, to);
-                let res = copy_file(&from, &to, &mut updates);
-                //updates.send(res?)?;
+                let _res = copy_file(&from, &to, &mut updates);
+                //updates.update(res?)?;
             }
 
             Operation::CreateDir(dir) => {
                 info!("Worker: Creating directory: {:?}", dir);
                 create_dir_all(&dir)?;
-                updates.send(dir.metadata()?.len())?;
+                updates.update(dir.metadata()?.len())?;
             }
 
             Operation::End => {
@@ -213,7 +238,7 @@ fn tree_walker(
         match meta.file_type().to_enum() {
             FileType::File => {
                 debug!("Send copy operation {:?} to {:?}", from.path(), target);
-                updates.send(meta.len())?;
+                updates.update(meta.len())?;
                 work_tx.send(Operation::Copy(from.path().to_path_buf(), target))?;
             }
 
@@ -224,7 +249,7 @@ fn tree_walker(
                     target
                 );
                 work_tx.send(Operation::CreateDir(target))?;
-                updates.send(from.path().metadata()?.len())?;
+                updates.update(from.path().metadata()?.len())?;
             }
 
             FileType::Symlink => {}
@@ -240,12 +265,12 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
     let (work_tx, work_rx) = mpsc::channel();
     let (stat_tx, stat_rx) = mpsc::channel();
     let copy_stat = Batcher {
-        sender: Some(stat_tx.clone()),
+        sender: Some(Box::new(stat_tx.clone())),
         stat: StatusUpdate::Copied(0),
         batch_size: 1000 * 4096,
     };
     let size_stat = Batcher {
-        sender: Some(stat_tx),
+        sender: Some(Box::new(stat_tx)),
         stat: StatusUpdate::Size(0),
         batch_size: 1000 * 4096,
     };
@@ -303,7 +328,7 @@ pub fn copy_single_file(opts: &Opts) -> Result<()> {
     }
 
     let mut copy_stat = Batcher {
-        sender: None,
+        sender: Some(Box::new(NopUpdater {})),
         stat: StatusUpdate::Copied(0),
         batch_size: usize::max_value() as u64,
     };
