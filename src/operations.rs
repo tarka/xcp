@@ -110,20 +110,19 @@ impl StoredValue<u64, StatusUpdate> for StatusUpdate {
 }
 
 
-trait Updater {
-    fn update(&mut self, update: StatusUpdate) -> Result<()>;
+trait Updater<T> {
+    fn update(&mut self, update: T) -> Result<()>;
 }
 
 
-//#[derive(Debug)]
-struct Batcher {
-    sender: Box<Updater + Send>,
+struct BatchUpdater {
+    sender: Box<Updater<StatusUpdate> + Send>,
     stat: StatusUpdate,
     batch_size: u64,
 }
 
 
-impl Batcher {
+impl Updater<u64> for BatchUpdater {
     fn update(&mut self, bytes: u64) -> Result<()> {
         let curr = self.stat.value() + bytes;
         self.stat = self.stat.set(curr);
@@ -137,19 +136,17 @@ impl Batcher {
 }
 
 
-impl Updater for mpsc::Sender<StatusUpdate> {
+impl Updater<StatusUpdate> for mpsc::Sender<StatusUpdate> {
     fn update(&mut self, update: StatusUpdate) -> Result<()> {
-        self.send(update)?;
-        Ok(())
+        Ok(self.send(update)?)
     }
 }
 
 
-struct NopUpdater {
-}
+struct NopUpdater {}
 
-impl Updater for NopUpdater {
-    fn update(&mut self, _update: StatusUpdate) -> Result<()> {
+impl Updater<()> for NopUpdater {
+    fn update(&mut self, _update: ()) -> Result<()> {
         Ok(())
     }
 }
@@ -170,7 +167,7 @@ struct ProgressUpdater {
     written: u64,
 }
 
-impl Updater for ProgressUpdater {
+impl Updater<StatusUpdate> for ProgressUpdater {
     fn update(&mut self, update: StatusUpdate) -> Result<()> {
         if let StatusUpdate::Copied(bytes) = update {
             self.written += bytes;
@@ -181,10 +178,9 @@ impl Updater for ProgressUpdater {
 }
 
 
-
 /* **** File operations **** */
 
-fn copy_file(from: &Path, to: &Path, updates: &mut Batcher) -> Result<u64> {
+fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> {
     let infd = File::open(from)?;
     let outfd = File::create(to)?;
     let (perm, len) = {
@@ -204,7 +200,7 @@ fn copy_file(from: &Path, to: &Path, updates: &mut Batcher) -> Result<u64> {
 }
 
 
-fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: Batcher) -> Result<()> {
+fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
         debug!("Received operation {:?}", op);
@@ -241,7 +237,7 @@ fn tree_walker(
     source: PathBuf,
     dest: PathBuf,
     work_tx: mpsc::Sender<Operation>,
-    mut updates: Batcher,
+    mut updates: BatchUpdater,
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 
@@ -287,12 +283,12 @@ fn tree_walker(
 pub fn copy_tree(opts: &Opts) -> Result<()> {
     let (work_tx, work_rx) = mpsc::channel();
     let (stat_tx, stat_rx) = mpsc::channel();
-    let copy_stat = Batcher {
+    let copy_stat = BatchUpdater {
         sender: Box::new(stat_tx.clone()),
         stat: StatusUpdate::Copied(0),
         batch_size: 1000 * 4096,
     };
-    let size_stat = Batcher {
+    let size_stat = BatchUpdater {
         sender: Box::new(stat_tx),
         stat: StatusUpdate::Size(0),
         batch_size: 1000 * 4096,
@@ -345,17 +341,17 @@ pub fn copy_single_file(opts: &Opts) -> Result<()> {
         ));
     }
 
-    let pb = progress_bar(opts.source.metadata()?.len());
-    let mut copy_stat = Batcher {
-        sender: Box::new(ProgressUpdater { pb: pb, written: 0}),
+    let size = opts.source.metadata()?.len();
+    let mut copy_stat = BatchUpdater {
+        sender: Box::new(ProgressUpdater {
+            pb: progress_bar(size),
+            written: 0,
+        }),
         stat: StatusUpdate::Copied(0),
-        batch_size: 1000 * 4096,
+        batch_size: size / 10,
     };
 
-
     copy_file(&opts.source, &dest, &mut copy_stat)?;
-
-
 
     Ok(())
 }
