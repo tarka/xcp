@@ -1,7 +1,7 @@
 use failure::Error;
 
 use escargot::CargoBuild;
-use std::fs::{create_dir_all, File};
+use std::fs::{create_dir_all, File, write};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -29,6 +29,14 @@ fn create_file(path: &Path, text: &str) -> Result<(), Error> {
     let file = File::create(&path)?;
     write!(&file, "{}", text);
     Ok(())
+}
+
+fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
+    let mut dest = File::open(path)?;
+    let mut buf = String::new();
+    dest.read_to_string(&mut buf)?;
+
+    Ok(buf == text)
 }
 
 
@@ -128,12 +136,7 @@ fn file_copy() -> Result<(), Error> {
     let out = run(&[source_path.to_str().unwrap(), dest_path.to_str().unwrap()])?;
 
     assert!(out.status.success());
-
-    let mut dest = File::open(dest_path)?;
-    let mut buf = String::new();
-    dest.read_to_string(&mut buf)?;
-
-    assert!(buf == text);
+    assert!(file_contains(&dest_path, text)?);
 
     Ok(())
 }
@@ -150,12 +153,7 @@ fn file_copy_rel() -> Result<(), Error> {
     let out = run(&[source_path.to_str().unwrap(), dest_path.to_str().unwrap()])?;
 
     assert!(out.status.success());
-
-    let mut dest = File::open(dest_path)?;
-    let mut buf = String::new();
-    dest.read_to_string(&mut buf)?;
-
-    assert!(buf == text);
+    assert!(file_contains(&dest_path, text)?);
 
     Ok(())
 }
@@ -240,7 +238,6 @@ fn copy_dirs_files() -> Result<(), Error> {
 
     let source_path = dir.path().join("mydir");
     create_dir_all(&source_path)?;
-    //create_dir_all(source_path.join("one/two/three/"))?;
 
     let mut p = source_path.clone();
     for d in ["one", "two", "three"].iter() {
@@ -264,6 +261,44 @@ fn copy_dirs_files() -> Result<(), Error> {
     assert!(dest_base.join("mydir/one/one.txt").is_file());
     assert!(dest_base.join("mydir/one/two/two.txt").is_file());
     assert!(dest_base.join("mydir/one/two/three/three.txt").is_file());
+
+    Ok(())
+}
+
+#[test]
+fn copy_dirs_overwrites() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+
+    let source_path = dir.join("mydir");
+    let source_file = source_path.join("file.txt");
+    create_dir_all(&source_path)?;
+    create_file(&source_file, "orig")?;
+
+    let dest_base = dir.join("dest");
+    create_dir_all(&dest_base)?;
+    let dest_file = dest_base.join("mydir/file.txt");
+
+    let mut out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(file_contains(&dest_file, "orig")?);
+
+
+    write(&source_file, "new content")?;
+    assert!(file_contains(&source_file, "new content")?);
+
+    out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(file_contains(&dest_file, "new content")?);
 
     Ok(())
 }
