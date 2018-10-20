@@ -111,7 +111,7 @@ impl StoredValue<u64, StatusUpdate> for StatusUpdate {
 
 
 trait Updater {
-    fn update(&self, update: StatusUpdate) -> Result<()>;
+    fn update(&mut self, update: StatusUpdate) -> Result<()>;
 }
 
 
@@ -126,7 +126,7 @@ struct Batcher {
 
 impl Batcher {
     fn update(&mut self, bytes: u64) -> Result<()> {
-        if let Some(sender) = &self.sender {
+        if let Some(sender) = &mut self.sender {
             let curr = self.stat.value() + bytes;
             self.stat = self.stat.set(curr);
 
@@ -141,7 +141,7 @@ impl Batcher {
 
 
 impl Updater for mpsc::Sender<StatusUpdate> {
-    fn update(&self, update: StatusUpdate) -> Result<()> {
+    fn update(&mut self, update: StatusUpdate) -> Result<()> {
         self.send(update)?;
         Ok(())
     }
@@ -152,7 +152,33 @@ struct NopUpdater {
 }
 
 impl Updater for NopUpdater {
-    fn update(&self, _update: StatusUpdate) -> Result<()> {
+    fn update(&mut self, _update: StatusUpdate) -> Result<()> {
+        Ok(())
+    }
+}
+
+
+fn progress_bar(total: u64) -> ProgressBar {
+    let pb = ProgressBar::new(total);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .progress_chars("#>-"),
+    );
+    pb
+}
+
+struct ProgressUpdater {
+    pb: ProgressBar,
+    written: u64,
+}
+
+impl Updater for ProgressUpdater {
+    fn update(&mut self, update: StatusUpdate) -> Result<()> {
+        if let StatusUpdate::Copied(bytes) = update {
+            self.written += bytes;
+            self.pb.set_position(self.written);
+        }
         Ok(())
     }
 }
@@ -283,12 +309,7 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
     let mut copied = 0;
     let mut total = 0;
 
-    let pb = ProgressBar::new(total);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-            .progress_chars("#>-"),
-    );
+    let pb = progress_bar(total);
 
     for stat in stat_rx {
         match stat {
@@ -327,12 +348,17 @@ pub fn copy_single_file(opts: &Opts) -> Result<()> {
         ));
     }
 
+    let pb = progress_bar(opts.source.metadata()?.len());
     let mut copy_stat = Batcher {
-        sender: Some(Box::new(NopUpdater {})),
+        sender: Some(Box::new(ProgressUpdater { pb: pb, written: 0})),
         stat: StatusUpdate::Copied(0),
-        batch_size: usize::max_value() as u64,
+        batch_size: 1000 * 4096,
     };
+
+
     copy_file(&opts.source, &dest, &mut copy_stat)?;
+
+
 
     Ok(())
 }
