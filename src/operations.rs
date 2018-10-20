@@ -117,8 +117,7 @@ trait Updater {
 
 //#[derive(Debug)]
 struct Batcher {
-    //sender: Option<mpsc::Sender<StatusUpdate>>,
-    sender: Option<Box<Updater + Send>>,
+    sender: Box<Updater + Send>,
     stat: StatusUpdate,
     batch_size: u64,
 }
@@ -126,14 +125,12 @@ struct Batcher {
 
 impl Batcher {
     fn update(&mut self, bytes: u64) -> Result<()> {
-        if let Some(sender) = &mut self.sender {
-            let curr = self.stat.value() + bytes;
-            self.stat = self.stat.set(curr);
+        let curr = self.stat.value() + bytes;
+        self.stat = self.stat.set(curr);
 
-            if curr >= self.batch_size {
-                sender.update(self.stat.clone())?;
-                self.stat = self.stat.set(0);
-            }
+        if curr >= self.batch_size {
+            self.sender.update(self.stat.clone())?;
+            self.stat = self.stat.set(0);
         }
         Ok(())
     }
@@ -291,12 +288,12 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
     let (work_tx, work_rx) = mpsc::channel();
     let (stat_tx, stat_rx) = mpsc::channel();
     let copy_stat = Batcher {
-        sender: Some(Box::new(stat_tx.clone())),
+        sender: Box::new(stat_tx.clone()),
         stat: StatusUpdate::Copied(0),
         batch_size: 1000 * 4096,
     };
     let size_stat = Batcher {
-        sender: Some(Box::new(stat_tx)),
+        sender: Box::new(stat_tx),
         stat: StatusUpdate::Size(0),
         batch_size: 1000 * 4096,
     };
@@ -350,7 +347,7 @@ pub fn copy_single_file(opts: &Opts) -> Result<()> {
 
     let pb = progress_bar(opts.source.metadata()?.len());
     let mut copy_stat = Batcher {
-        sender: Some(Box::new(ProgressUpdater { pb: pb, written: 0})),
+        sender: Box::new(ProgressUpdater { pb: pb, written: 0}),
         stat: StatusUpdate::Copied(0),
         batch_size: 1000 * 4096,
     };
