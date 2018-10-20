@@ -75,11 +75,6 @@ fn r_copy_file_range(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
 
 /* **** Progress operations **** */
 
-trait StoredValue<V, T> {
-    fn set(&self, bytes: V) -> T;
-    fn value(&self) -> V;
-}
-
 
 #[derive(Debug)]
 enum Operation {
@@ -94,7 +89,7 @@ enum StatusUpdate {
     Size(u64),
 }
 
-impl StoredValue<u64, StatusUpdate> for StatusUpdate {
+impl StatusUpdate {
     fn set(&self, bytes: u64) -> StatusUpdate {
         match self {
             StatusUpdate::Copied(_) => StatusUpdate::Copied(bytes),
