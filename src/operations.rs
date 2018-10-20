@@ -73,7 +73,13 @@ fn r_copy_file_range(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
 }
 
 
-/* **** Structured operations **** */
+/* **** Progress operations **** */
+
+trait StoredValue<V, T> {
+    fn set(&self, bytes: V) -> T;
+    fn value(&self) -> V;
+}
+
 
 #[derive(Debug)]
 enum Operation {
@@ -88,7 +94,7 @@ enum StatusUpdate {
     Size(u64),
 }
 
-impl StatusUpdate {
+impl StoredValue<u64, StatusUpdate> for StatusUpdate {
     fn set(&self, bytes: u64) -> StatusUpdate {
         match self {
             StatusUpdate::Copied(_) => StatusUpdate::Copied(bytes),
@@ -126,6 +132,9 @@ impl Batcher {
         Ok(())
     }
 }
+
+
+/* **** File operations **** */
 
 fn copy_file(from: &Path, to: &Path, updates: &mut Batcher) -> Result<u64> {
     let infd = File::open(from)?;
@@ -275,7 +284,9 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
 }
 
 
-// FIXME: Could just use copy_tree if works on single files?
+// FIXME: This could be changed to use copy_tree, but involves some
+// special cases, e.g. when target file is a different name from the
+// source.
 pub fn copy_single_file(opts: &Opts) -> Result<()> {
     let dest = if opts.dest.is_dir() {
         let fname = opts.source.file_name().ok_or(XcpError::UnknownFilename)?;
