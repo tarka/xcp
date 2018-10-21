@@ -1,28 +1,30 @@
-use log::error;
 use std::fs;
-use std::process;
 
 pub enum FileType {
     File,
     Dir,
     Symlink,
+    Unknown,
 }
 
 pub trait ToFileType {
     fn to_enum(&self) -> FileType;
 }
 
+fn to_enum(ft: &fs::FileType) -> FileType {
+    if ft.is_dir() {
+        FileType::Dir
+    } else if ft.is_file() {
+        FileType::File
+    } else if ft.is_symlink() {
+        FileType::Symlink
+    } else {
+        FileType::Unknown
+    }
+}
+
 impl ToFileType for fs::FileType {
     fn to_enum(&self) -> FileType {
-        if self.is_dir() {
-            FileType::Dir
-        } else if self.is_file() {
-            FileType::File
-        } else if self.is_symlink() {
-            FileType::Symlink
-        } else {
-            error!("Unknown filetype found; this should never happen!");
-            process::abort()
-        }
+        to_enum(self)
     }
 }

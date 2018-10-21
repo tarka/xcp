@@ -1,5 +1,5 @@
 use libc;
-use log::{debug, info};
+use log::{error, debug, info};
 use std::cmp;
 use std::fs::{create_dir_all, File};
 use std::io;
@@ -255,14 +255,12 @@ fn tree_walker(
         opts.dest.clone()
     };
 
-    debug!("SOURCE/DEST {:?} {:?}", sourcedir, target_base);
-
     for entry in WalkDir::new(&opts.source).into_iter() {
         debug!("Got tree entry {:?}", entry);
-        // FIXME: Return errors to the master thread.
-        let from = entry?;
-        let meta = from.metadata()?;
-        let path = from.path().strip_prefix(&opts.source)?;
+        let e = entry?;
+        let from = e.into_path();
+        let meta = from.symlink_metadata()?;
+        let path = from.strip_prefix(&opts.source)?;
         let target = target_base.join(&path);
 
         if target.exists() && opts.noclobber {
@@ -276,22 +274,26 @@ fn tree_walker(
 
         match meta.file_type().to_enum() {
             FileType::File => {
-                debug!("Send copy operation {:?} to {:?}", from.path(), target);
+                debug!("Send copy operation {:?} to {:?}", from, target);
                 updates.update(Ok(meta.len()))?;
-                work_tx.send(Operation::Copy(from.path().to_path_buf(), target))?;
+                work_tx.send(Operation::Copy(from.to_path_buf(), target))?;
             }
 
             FileType::Dir => {
                 debug!(
-                    "Send create-dir operation {:?} to {:?}",
-                    from.path(),
-                    target
+                    "Send create-dir operation {:?} to {:?}", from, target
                 );
                 work_tx.send(Operation::CreateDir(target))?;
-                updates.update(Ok(from.path().metadata()?.len()))?;
+                updates.update(Ok(from.metadata()?.len()))?;
             }
 
-            FileType::Symlink => {}
+            FileType::Symlink => {},
+
+            FileType::Unknown => {
+                error!("Unknown filetype found; this should never happen!");
+                work_tx.send(Operation::End)?;
+                updates.update(Err(XcpError::UnknownFiletype { path: target }.into()))?;
+            },
         };
     }
 
@@ -370,6 +372,7 @@ pub fn copy_single_file(opts: Opts) -> Result<()> {
         stat: StatusUpdate::Copied(0),
         batch_size: size / 10,
     };
+
 
     copy_file(&opts.source, &dest, &mut copy_stat)?;
 

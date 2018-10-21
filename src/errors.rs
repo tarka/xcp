@@ -8,6 +8,9 @@ pub enum XcpError {
     #[fail(display = "Failed to find filename.")]
     UnknownFilename,
 
+    #[fail(display = "Unknown file-type: {:?}", path)]
+    UnknownFiletype { path: PathBuf },
+
     #[fail(display = "Invalid source: {}", msg)]
     InvalidSource { msg: &'static str },
 
