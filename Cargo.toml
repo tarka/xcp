@@ -16,7 +16,7 @@ failure = "0.1"
 clap = "2"
 structopt = "0.2"
 walkdir = "2"
-ignore = "0.4"
+indicatif = "0.9"
 
 [dev-dependencies]
 tempfile = "3"
