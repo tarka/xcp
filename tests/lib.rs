@@ -3,6 +3,7 @@ use failure::Error;
 use escargot::CargoBuild;
 use std::fs::{create_dir_all, write, File};
 use std::io::{Read, Write};
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tempfile::tempdir;
@@ -301,7 +302,7 @@ fn copy_dirs_overwrites() -> Result<(), Error> {
 }
 
 #[test]
-fn copy_to_nonexistent_is_rename() -> Result<(), Error> {
+fn dir_copy_to_nonexistent_is_rename() -> Result<(), Error> {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -312,7 +313,7 @@ fn copy_to_nonexistent_is_rename() -> Result<(), Error> {
     let dest_base = dir.join("dest");
     let dest_file = dest_base.join("file.txt");
 
-    let mut out = run(&[
+    let out = run(&[
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -358,6 +359,37 @@ fn dir_overwrite_with_noclobber() -> Result<(), Error> {
     ])?;
 
     assert!(!out.status.success());
+
+    Ok(())
+}
+
+
+#[test]
+fn dir_copy_containing_symlinks() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+
+    let source_path = dir.join("mydir");
+    let source_file = source_path.join("file.txt");
+    let source_rlink = source_path.join("link.txt");
+    create_dir_all(&source_path)?;
+    create_file(&source_file, "orig")?;
+    symlink("file.txt", source_rlink)?;
+    symlink("/etc/hosts", source_path.join("hosts"))?;
+
+    let dest_base = dir.join("dest");
+    let dest_file = dest_base.join("file.txt");
+    let dest_rlink = source_path.join("link.txt");
+
+    let out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(dest_file.exists());
+    assert!(dest_rlink.symlink_metadata()?.file_type().is_symlink());
+    assert!(dest_base.join("hosts").symlink_metadata()?.file_type().is_symlink());
 
     Ok(())
 }

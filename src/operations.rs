@@ -1,10 +1,11 @@
 use libc;
-use log::{error, debug, info};
+use log::{debug, error, info};
 use std::cmp;
-use std::fs::{create_dir_all, File};
+use std::fs::{create_dir_all, File, read_link};
 use std::io;
 use std::io::ErrorKind as IOKind;
 use std::os::unix::io::AsRawFd;
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use std::sync::mpsc;
@@ -78,6 +79,7 @@ fn r_copy_file_range(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
 #[derive(Debug)]
 enum Operation {
     Copy(PathBuf, PathBuf),
+    Link(PathBuf, PathBuf),
     CreateDir(PathBuf),
     End,
 }
@@ -207,15 +209,20 @@ fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Re
     for op in work {
         debug!("Received operation {:?}", op);
 
+        // FIXME: If we implement parallel copies (which may
+        // improve performance on some SSD configurations) we
+        // should also created the parent directory, and the
+        // dir-create operation could be out of order.
         match op {
-            Operation::Copy(from, to) => {
-                // FIXME: If we implement parallel copies (which may
-                // improve performance on some SSD configurations) we
-                // should also created the parent directory, and the
-                // dir-create operation could be out of order.
 
+            Operation::Copy(from, to) => {
                 info!("Worker: Copy {:?} -> {:?}", from, to);
                 let _res = copy_file(&from, &to, &mut updates);
+            }
+
+            Operation::Link(from, to) => {
+                info!("Worker: Symlink {:?} -> {:?}", from, to);
+                let _res = symlink(&from, &to);
             }
 
             Operation::CreateDir(dir) => {
@@ -273,27 +280,29 @@ fn tree_walker(
         }
 
         match meta.file_type().to_enum() {
-            FileType::File => {
+            FileType::File  => {
                 debug!("Send copy operation {:?} to {:?}", from, target);
                 updates.update(Ok(meta.len()))?;
-                work_tx.send(Operation::Copy(from.to_path_buf(), target))?;
+                work_tx.send(Operation::Copy(from, target))?;
+            }
+
+            FileType::Symlink => {
+                let lfile = read_link(from)?;
+                debug!("Send symlink operation {:?} to {:?}", lfile, target);
+                work_tx.send(Operation::Link(lfile, target))?;
             }
 
             FileType::Dir => {
-                debug!(
-                    "Send create-dir operation {:?} to {:?}", from, target
-                );
+                debug!("Send create-dir operation {:?} to {:?}", from, target);
                 work_tx.send(Operation::CreateDir(target))?;
                 updates.update(Ok(from.metadata()?.len()))?;
             }
-
-            FileType::Symlink => {},
 
             FileType::Unknown => {
                 error!("Unknown filetype found; this should never happen!");
                 work_tx.send(Operation::End)?;
                 updates.update(Err(XcpError::UnknownFiletype { path: target }.into()))?;
-            },
+            }
         };
     }
 
