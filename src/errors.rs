@@ -1,7 +1,7 @@
 use core::result;
-use std::path::PathBuf;
 use failure::Fail;
 use std::io::{Error as IOError, ErrorKind as IOKind};
+use std::path::PathBuf;
 
 #[derive(Debug, Fail)]
 pub enum XcpError {

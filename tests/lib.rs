@@ -1,7 +1,7 @@
 use failure::Error;
 
 use escargot::CargoBuild;
-use std::fs::{create_dir_all, File, write};
+use std::fs::{create_dir_all, write, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -38,7 +38,6 @@ fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
 
     Ok(buf == text)
 }
-
 
 #[test]
 fn basic_help() -> Result<(), Error> {
@@ -246,7 +245,6 @@ fn copy_dirs_files() -> Result<(), Error> {
         create_file(&p.join(format!("{}.txt", d)), d)?;
     }
 
-
     let dest_base = dir.path().join("dest");
     create_dir_all(&dest_base)?;
 
@@ -287,7 +285,6 @@ fn copy_dirs_overwrites() -> Result<(), Error> {
     assert!(out.status.success());
     assert!(file_contains(&dest_file, "orig")?);
 
-
     write(&source_file, "new content")?;
     assert!(file_contains(&source_file, "new content")?);
 
@@ -303,6 +300,30 @@ fn copy_dirs_overwrites() -> Result<(), Error> {
     Ok(())
 }
 
+#[test]
+fn copy_to_nonexistent_is_rename() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+
+    let source_path = dir.join("mydir");
+    let source_file = source_path.join("file.txt");
+    create_dir_all(&source_path)?;
+    create_file(&source_file, "orig")?;
+
+    let dest_base = dir.join("dest");
+    let dest_file = dest_base.join("file.txt");
+
+    let mut out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(dest_file.exists());
+    assert!(file_contains(&dest_file, "orig")?);
+
+    Ok(())
+}
 
 #[test]
 fn dir_overwrite_with_noclobber() -> Result<(), Error> {
@@ -326,12 +347,12 @@ fn dir_overwrite_with_noclobber() -> Result<(), Error> {
     assert!(out.status.success());
     assert!(file_contains(&dest_file, "orig")?);
 
-
     write(&source_file, "new content")?;
     assert!(file_contains(&source_file, "new content")?);
 
     out = run(&[
-        "-r", "--no-clobber",
+        "-r",
+        "--no-clobber",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
     ])?;

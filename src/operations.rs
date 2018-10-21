@@ -127,7 +127,7 @@ impl Updater<Result<u64>> for BatchUpdater {
                     self.sender.update(Ok(self.stat.clone()))?;
                     self.stat = self.stat.set(0);
                 }
-            },
+            }
             Err(e) => {
                 self.sender.update(Err(e))?;
             }
@@ -241,10 +241,21 @@ fn tree_walker(
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 
-    let sourcedir = opts.source.components().last().ok_or(XcpError::InvalidSource {
-        msg: "Failed to find source directory name.",
-    })?;
-    let basedir = opts.dest.join(sourcedir);
+    let sourcedir = opts
+        .source
+        .components()
+        .last()
+        .ok_or(XcpError::InvalidSource {
+            msg: "Failed to find source directory name.",
+        })?;
+
+    let target_base = if opts.dest.exists() {
+        opts.dest.join(sourcedir)
+    } else {
+        opts.dest.clone()
+    };
+
+    debug!("SOURCE/DEST {:?} {:?}", sourcedir, target_base);
 
     for entry in WalkDir::new(&opts.source).into_iter() {
         debug!("Got tree entry {:?}", entry);
@@ -252,12 +263,15 @@ fn tree_walker(
         let from = entry?;
         let meta = from.metadata()?;
         let path = from.path().strip_prefix(&opts.source)?;
-        let target = basedir.join(&path);
+        let target = target_base.join(&path);
 
         if target.exists() && opts.noclobber {
             work_tx.send(Operation::End)?;
             updates.update(Err(XcpError::DestinationExists { path: target }.into()))?;
-            return Err(XcpError::EarlyShutdown { msg: "Path exists and --no-clobber set." }.into());
+            return Err(XcpError::EarlyShutdown {
+                msg: "Path exists and --no-clobber set.",
+            }
+            .into());
         }
 
         match meta.file_type().to_enum() {
