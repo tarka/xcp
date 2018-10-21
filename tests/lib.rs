@@ -393,3 +393,56 @@ fn dir_copy_containing_symlinks() -> Result<(), Error> {
 
     Ok(())
 }
+
+
+#[test]
+fn dir_copy_with_hidden_file() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+    println!("PATH {:?}", dir);
+
+    let source_path = dir.join("mydir");
+    let source_file = source_path.join(".file.txt");
+    create_dir_all(&source_path)?;
+    create_file(&source_file, "orig")?;
+
+    let dest_base = dir.join("dest");
+    let dest_file = dest_base.join(".file.txt");
+
+    let out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(dest_file.exists());
+    assert!(file_contains(&dest_file, "orig")?);
+
+    Ok(())
+}
+
+#[test]
+fn dir_copy_with_hidden_dir() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+    println!("PATH {:?}", dir);
+
+    let source_path = dir.join("mydir/.hidden");
+    let source_file = source_path.join("file.txt");
+    create_dir_all(&source_path)?;
+    create_file(&source_file, "orig")?;
+
+    let dest_base = dir.join("dest/.hidden");
+    let dest_file = dest_base.join("file.txt");
+
+    let out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(dest_file.exists());
+    assert!(file_contains(&dest_file, "orig")?);
+
+    Ok(())
+}
