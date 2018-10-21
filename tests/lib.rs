@@ -302,3 +302,41 @@ fn copy_dirs_overwrites() -> Result<(), Error> {
 
     Ok(())
 }
+
+
+#[test]
+fn dir_overwrite_with_noclobber() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+
+    let source_path = dir.join("mydir");
+    let source_file = source_path.join("file.txt");
+    create_dir_all(&source_path)?;
+    create_file(&source_file, "orig")?;
+
+    let dest_base = dir.join("dest");
+    create_dir_all(&dest_base)?;
+    let dest_file = dest_base.join("mydir/file.txt");
+
+    let mut out = run(&[
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(file_contains(&dest_file, "orig")?);
+
+
+    write(&source_file, "new content")?;
+    assert!(file_contains(&source_file, "new content")?);
+
+    out = run(&[
+        "-r", "--no-clobber",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(!out.status.success());
+
+    Ok(())
+}

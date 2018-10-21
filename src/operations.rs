@@ -1,7 +1,7 @@
 use libc;
 use log::{debug, info};
 use std::cmp;
-use std::fs::{create_dir, create_dir_all, File};
+use std::fs::{create_dir_all, File};
 use std::io;
 use std::io::ErrorKind as IOKind;
 use std::os::unix::io::AsRawFd;
@@ -12,7 +12,6 @@ use std::thread;
 use walkdir::WalkDir;
 
 use indicatif::{ProgressBar, ProgressStyle};
-
 
 use crate::errors::{io_err, Result, XcpError};
 use crate::utils::{FileType, ToFileType};
@@ -117,14 +116,21 @@ struct BatchUpdater {
 }
 
 
-impl Updater<u64> for BatchUpdater {
-    fn update(&mut self, bytes: u64) -> Result<()> {
-        let curr = self.stat.value() + bytes;
-        self.stat = self.stat.set(curr);
+impl Updater<Result<u64>> for BatchUpdater {
+    fn update(&mut self, status: Result<u64>) -> Result<()> {
+        match status {
+            Ok(bytes) => {
+                let curr = self.stat.value() + bytes;
+                self.stat = self.stat.set(curr);
 
-        if curr >= self.batch_size {
-            self.sender.update(Ok(self.stat.clone()))?;
-            self.stat = self.stat.set(0);
+                if curr >= self.batch_size {
+                    self.sender.update(Ok(self.stat.clone()))?;
+                    self.stat = self.stat.set(0);
+                }
+            },
+            Err(e) => {
+                self.sender.update(Err(e))?;
+            }
         }
         Ok(())
     }
@@ -138,6 +144,7 @@ impl Updater<Result<StatusUpdate>> for mpsc::Sender<Result<StatusUpdate>> {
 }
 
 
+#[allow(dead_code)]
 struct NopUpdater {}
 
 impl Updater<()> for NopUpdater {
@@ -188,7 +195,7 @@ fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> 
         let bytes_to_copy = cmp::min(len - written, updates.batch_size);
         let result = r_copy_file_range(&infd, &outfd, bytes_to_copy)?;
         written += result;
-        updates.update(result)?;
+        updates.update(Ok(result))?;
     }
     outfd.set_permissions(perm)?;
     Ok(written)
@@ -209,13 +216,12 @@ fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Re
 
                 info!("Worker: Copy {:?} -> {:?}", from, to);
                 let _res = copy_file(&from, &to, &mut updates);
-                //updates.update(res?)?;
             }
 
             Operation::CreateDir(dir) => {
                 info!("Worker: Creating directory: {:?}", dir);
                 create_dir_all(&dir)?;
-                updates.update(dir.metadata()?.len())?;
+                updates.update(Ok(dir.metadata()?.len()))?;
             }
 
             Operation::End => {
@@ -229,30 +235,35 @@ fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Re
 }
 
 fn tree_walker(
-    source: PathBuf,
-    dest: PathBuf,
+    opts: Opts,
     work_tx: mpsc::Sender<Operation>,
     mut updates: BatchUpdater,
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 
-    let sourcedir = source.components().last().ok_or(XcpError::InvalidSource {
+    let sourcedir = opts.source.components().last().ok_or(XcpError::InvalidSource {
         msg: "Failed to find source directory name.",
     })?;
-    let basedir = dest.join(sourcedir);
+    let basedir = opts.dest.join(sourcedir);
 
-    for entry in WalkDir::new(&source).into_iter() {
+    for entry in WalkDir::new(&opts.source).into_iter() {
         debug!("Got tree entry {:?}", entry);
         // FIXME: Return errors to the master thread.
         let from = entry?;
         let meta = from.metadata()?;
-        let path = from.path().strip_prefix(&source)?;
+        let path = from.path().strip_prefix(&opts.source)?;
         let target = basedir.join(&path);
+
+        if target.exists() && opts.noclobber {
+            work_tx.send(Operation::End)?;
+            updates.update(Err(XcpError::DestinationExists { path: target }.into()))?;
+            return Err(XcpError::EarlyShutdown { msg: "Path exists and --no-clobber set." }.into());
+        }
 
         match meta.file_type().to_enum() {
             FileType::File => {
                 debug!("Send copy operation {:?} to {:?}", from.path(), target);
-                updates.update(meta.len())?;
+                updates.update(Ok(meta.len()))?;
                 work_tx.send(Operation::Copy(from.path().to_path_buf(), target))?;
             }
 
@@ -263,7 +274,7 @@ fn tree_walker(
                     target
                 );
                 work_tx.send(Operation::CreateDir(target))?;
-                updates.update(from.path().metadata()?.len())?;
+                updates.update(Ok(from.path().metadata()?.len()))?;
             }
 
             FileType::Symlink => {}
@@ -275,7 +286,7 @@ fn tree_walker(
     Ok(())
 }
 
-pub fn copy_tree(opts: &Opts) -> Result<()> {
+pub fn copy_tree(opts: Opts) -> Result<()> {
     let (work_tx, work_rx) = mpsc::channel();
     let (stat_tx, stat_rx) = mpsc::channel();
     let copy_stat = BatchUpdater {
@@ -288,11 +299,9 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
         stat: StatusUpdate::Size(0),
         batch_size: 1000 * 4096,
     };
-    let source = opts.source.clone();
-    let dest = opts.dest.clone();
 
     let _copy_worker = thread::spawn(move || copy_worker(work_rx, copy_stat));
-    let _walk_worker = thread::spawn(move || tree_walker(source, dest, work_tx, size_stat));
+    let _walk_worker = thread::spawn(move || tree_walker(opts, work_tx, size_stat));
 
     let mut copied = 0;
     let mut total = 0;
@@ -311,9 +320,11 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
             }
         }
     }
+    // FIXME: We should probably join the threads and consume any errors.
 
     pb.finish_with_message("Copy-tree complete");
     debug!("Copy-tree complete");
+
     Ok(())
 }
 
@@ -321,7 +332,7 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
 // FIXME: This could be changed to use copy_tree, but involves some
 // special cases, e.g. when target file is a different name from the
 // source.
-pub fn copy_single_file(opts: &Opts) -> Result<()> {
+pub fn copy_single_file(opts: Opts) -> Result<()> {
     let dest = if opts.dest.is_dir() {
         let fname = opts.source.file_name().ok_or(XcpError::UnknownFilename)?;
         opts.dest.join(fname)

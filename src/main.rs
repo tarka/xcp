@@ -36,7 +36,7 @@ pub struct Opts {
     dest: PathBuf,
 }
 
-fn check_and_copy_tree(opts: &Opts) -> Result<()> {
+fn check_and_copy_tree(opts: Opts) -> Result<()> {
     if opts.dest.exists() && !opts.dest.is_dir() {
         return Err(XcpError::InvalidDestination {
             msg: "Source is directory but target exists and is not a directory",
@@ -64,10 +64,10 @@ fn main() -> Result<()> {
     }
 
     if opts.source.is_file() {
-        copy_single_file(&opts)?;
+        copy_single_file(opts)?;
     } else if opts.source.is_dir() {
         match opts.recursive {
-            true => check_and_copy_tree(&opts)?,
+            true => check_and_copy_tree(opts)?,
             false => {
                 return Err(XcpError::InvalidSource {
                     msg: "Source is directory and --recursive not specified.",

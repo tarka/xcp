@@ -1,4 +1,5 @@
 use core::result;
+use std::path::PathBuf;
 use failure::Fail;
 use std::io::{Error as IOError, ErrorKind as IOKind};
 
@@ -12,6 +13,12 @@ pub enum XcpError {
 
     #[fail(display = "Invalid destination: {}", msg)]
     InvalidDestination { msg: &'static str },
+
+    #[fail(display = "Destination Exists: {:?}", path)]
+    DestinationExists { path: PathBuf },
+
+    #[fail(display = "Early shutdown: {:?}", msg)]
+    EarlyShutdown { msg: &'static str },
 }
 
 pub fn io_err(kind: IOKind, desc: &str) -> Error {
