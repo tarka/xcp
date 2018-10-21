@@ -111,7 +111,7 @@ trait Updater<T> {
 
 
 struct BatchUpdater {
-    sender: Box<Updater<StatusUpdate> + Send>,
+    sender: Box<Updater<Result<StatusUpdate>> + Send>,
     stat: StatusUpdate,
     batch_size: u64,
 }
@@ -123,7 +123,7 @@ impl Updater<u64> for BatchUpdater {
         self.stat = self.stat.set(curr);
 
         if curr >= self.batch_size {
-            self.sender.update(self.stat.clone())?;
+            self.sender.update(Ok(self.stat.clone()))?;
             self.stat = self.stat.set(0);
         }
         Ok(())
@@ -131,8 +131,8 @@ impl Updater<u64> for BatchUpdater {
 }
 
 
-impl Updater<StatusUpdate> for mpsc::Sender<StatusUpdate> {
-    fn update(&mut self, update: StatusUpdate) -> Result<()> {
+impl Updater<Result<StatusUpdate>> for mpsc::Sender<Result<StatusUpdate>> {
+    fn update(&mut self, update: Result<StatusUpdate>) -> Result<()> {
         Ok(self.send(update)?)
     }
 }
@@ -162,9 +162,9 @@ struct ProgressUpdater {
     written: u64,
 }
 
-impl Updater<StatusUpdate> for ProgressUpdater {
-    fn update(&mut self, update: StatusUpdate) -> Result<()> {
-        if let StatusUpdate::Copied(bytes) = update {
+impl Updater<Result<StatusUpdate>> for ProgressUpdater {
+    fn update(&mut self, update: Result<StatusUpdate>) -> Result<()> {
+        if let Ok(StatusUpdate::Copied(bytes)) = update {
             self.written += bytes;
             self.pb.set_position(self.written);
         }
@@ -300,7 +300,7 @@ pub fn copy_tree(opts: &Opts) -> Result<()> {
     let pb = progress_bar(total);
 
     for stat in stat_rx {
-        match stat {
+        match stat? {
             StatusUpdate::Size(s) => {
                 total += s;
                 pb.set_length(total);
