@@ -5,9 +5,15 @@ full replacement, but as a companion utility with some more user-friendly
 feedback and some optimisations that make sense under certain tasks (see
 below).
 
-Note: `xcp` is currently pre-alpha level software and almost certainly contains
+*Warning*: `xcp` is currently pre-alpha level software and almost certainly contains
 bugs and unexpected or inconsistent behaviour. It probably shouldn't be used for
 anything critical yet.
+
+*Note*: `xcp` currently targets the [Rust 2018
+edition](https://rust-lang-nursery.github.io/edition-guide/rust-2018/index.html). This
+is due for release December 2018. You will need a recent beta of the Rust
+toolchain to compile this code; if you are using `rustup` it will install it
+automatically.
 
 ## Features and Anti-Features
 
