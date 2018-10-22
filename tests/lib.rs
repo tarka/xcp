@@ -398,7 +398,6 @@ fn dir_copy_containing_symlinks() -> Result<(), Error> {
 #[test]
 fn dir_copy_with_hidden_file() -> Result<(), Error> {
     let dir = tempdir_rel()?;
-    println!("PATH {:?}", dir);
 
     let source_path = dir.join("mydir");
     let source_file = source_path.join(".file.txt");
@@ -424,7 +423,6 @@ fn dir_copy_with_hidden_file() -> Result<(), Error> {
 #[test]
 fn dir_copy_with_hidden_dir() -> Result<(), Error> {
     let dir = tempdir_rel()?;
-    println!("PATH {:?}", dir);
 
     let source_path = dir.join("mydir/.hidden");
     let source_file = source_path.join("file.txt");
@@ -443,6 +441,37 @@ fn dir_copy_with_hidden_dir() -> Result<(), Error> {
     assert!(out.status.success());
     assert!(dest_file.exists());
     assert!(file_contains(&dest_file, "orig")?);
+
+    Ok(())
+}
+
+
+#[test]
+fn dir_with_gitignore() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+
+    let source_path = dir.join("mydir");
+    let source_file = source_path.join("file.txt");
+    let ignore_file = source_path.join(".gitignore");
+    let hidden_path = dir.join("mydir/.hidden");
+    let hidden_file = hidden_path.join("file.txt");
+    create_dir_all(&hidden_path)?;
+    create_file(&source_file, "orig")?;
+    create_file(&hidden_file, "orig")?;
+    create_file(&ignore_file, "/.hidden\n")?;
+
+    let dest_base = dir.join("dest");
+
+    let out = run(&[
+        "-r",
+        "--gitignore",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(dest_base.join("file.txt").exists());
+    assert!(!dest_base.join(".hidden").join("file.txt").exists());
 
     Ok(())
 }

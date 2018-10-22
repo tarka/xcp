@@ -29,6 +29,13 @@ pub struct Opts {
     #[structopt(short = "n", long = "no-clobber")]
     noclobber: bool,
 
+    /// Use .gitignore if present. NOTE: This is fairly basic at the
+    /// moment, and only honours a .gitignore in the directory root
+    /// for directory copies; global or sub-directory ignores are
+    /// skipped.
+    #[structopt(long = "gitignore")]
+    gitignore: bool,
+
     #[structopt(parse(from_os_str))]
     source: PathBuf,
 

@@ -1,16 +1,17 @@
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use libc;
 use log::{debug, error, info};
 use std::cmp;
-use std::fs::{create_dir_all, File, read_link};
+use std::fs::{create_dir_all, read_link, File};
 use std::io;
 use std::io::ErrorKind as IOKind;
-use std::os::unix::io::AsRawFd;
 use std::os::unix::fs::symlink;
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use std::sync::mpsc;
 use std::thread;
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -214,7 +215,6 @@ fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Re
         // should also created the parent directory, and the
         // dir-create operation could be out of order.
         match op {
-
             Operation::Copy(from, to) => {
                 info!("Worker: Copy {:?} -> {:?}", from, to);
                 let _res = copy_file(&from, &to, &mut updates);
@@ -241,6 +241,19 @@ fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Re
     Ok(())
 }
 
+
+fn ignore_filter(entry: &DirEntry, ignore: &Option<Gitignore>) -> bool {
+    match ignore {
+        None => true,
+        Some(gi) => {
+            let path = entry.path();
+            let m = gi.matched(&path, path.is_dir());
+            !m.is_ignore()
+        }
+    }
+}
+
+
 fn tree_walker(
     opts: Opts,
     work_tx: mpsc::Sender<Operation>,
@@ -262,7 +275,21 @@ fn tree_walker(
         opts.dest.clone()
     };
 
-    for entry in WalkDir::new(&opts.source).into_iter() {
+
+    let gitignore = if opts.gitignore {
+        let mut builder = GitignoreBuilder::new(&opts.source);
+        builder.add(opts.source.join(".gitignore"));
+        let ignore = builder.build()?;
+        Some(ignore)
+    } else {
+        None
+    };
+
+    let witer = WalkDir::new(&opts.source)
+        .into_iter()
+        .filter_entry(|e| ignore_filter(e, &gitignore));
+
+    for entry in witer {
         debug!("Got tree entry {:?}", entry);
         let e = entry?;
         let from = e.into_path();
@@ -280,7 +307,7 @@ fn tree_walker(
         }
 
         match meta.file_type().to_enum() {
-            FileType::File  => {
+            FileType::File => {
                 debug!("Send copy operation {:?} to {:?}", from, target);
                 updates.update(Ok(meta.len()))?;
                 work_tx.send(Operation::Copy(from, target))?;
