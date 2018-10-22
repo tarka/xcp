@@ -471,7 +471,8 @@ fn dir_with_gitignore() -> Result<(), Error> {
 
     assert!(out.status.success());
     assert!(dest_base.join("file.txt").exists());
-    assert!(!dest_base.join(".hidden").join("file.txt").exists());
+    assert!(dest_base.join(".gitignore").exists());
+    assert!(!dest_base.join(".hidden").exists());
 
     Ok(())
 }
