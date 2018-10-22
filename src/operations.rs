@@ -110,6 +110,7 @@ trait Updater<T> {
     fn update(&mut self, update: T) -> Result<()>;
 }
 
+const BATCH_DEFAULT: u64 = 1024 * 1024 * 64;
 
 struct BatchUpdater {
     sender: Box<Updater<Result<StatusUpdate>> + Send>,
@@ -335,7 +336,7 @@ pub fn copy_tree(opts: Opts) -> Result<()> {
     let (pb, batch_size) = if opts.noprogress {
         (ProgressBar::Nop, usize::max_value() as u64)
     } else {
-        (iprogress_bar(0), 1024 * 1024 * 64)
+        (iprogress_bar(0), BATCH_DEFAULT)
     };
 
     let copy_stat = BatchUpdater {
@@ -410,7 +411,7 @@ pub fn copy_single_file(opts: Opts) -> Result<()> {
                 written: 0,
             }),
             stat: StatusUpdate::Copied(0),
-            batch_size: size / 10,
+            batch_size: cmp::min(size / 10, BATCH_DEFAULT),
         }
     };
 
