@@ -1,5 +1,6 @@
 mod errors;
 mod operations;
+mod progress;
 mod utils;
 
 use simplelog::{Config, LevelFilter, TermLogger};
@@ -25,7 +26,7 @@ pub struct Opts {
     #[structopt(short = "r", long = "recursive")]
     recursive: bool,
 
-    /// Do not overwrite an exising file
+    /// Do not overwrite an existing file
     #[structopt(short = "n", long = "no-clobber")]
     noclobber: bool,
 
@@ -35,6 +36,10 @@ pub struct Opts {
     /// skipped.
     #[structopt(long = "gitignore")]
     gitignore: bool,
+
+    /// Disable progress bar.
+    #[structopt(long = "no-progress")]
+    noprogress: bool,
 
     #[structopt(parse(from_os_str))]
     source: PathBuf,

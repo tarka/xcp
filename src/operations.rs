@@ -13,9 +13,8 @@ use std::sync::mpsc;
 use std::thread;
 use walkdir::{DirEntry, WalkDir};
 
-use indicatif::{ProgressBar, ProgressStyle};
-
 use crate::errors::{io_err, Result, XcpError};
+use crate::progress::{ProgressBar, iprogress_bar};
 use crate::utils::{FileType, ToFileType};
 use crate::Opts;
 
@@ -150,22 +149,13 @@ impl Updater<Result<StatusUpdate>> for mpsc::Sender<Result<StatusUpdate>> {
 #[allow(dead_code)]
 struct NopUpdater {}
 
-impl Updater<()> for NopUpdater {
-    fn update(&mut self, _update: ()) -> Result<()> {
+impl Updater<Result<StatusUpdate>> for NopUpdater {
+    fn update(&mut self, _update: Result<StatusUpdate>) -> Result<()> {
         Ok(())
     }
 }
 
 
-fn progress_bar(total: u64) -> ProgressBar {
-    let pb = ProgressBar::new(total);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-            .progress_chars("#>-"),
-    );
-    pb
-}
 
 struct ProgressUpdater {
     pb: ProgressBar,
@@ -341,15 +331,22 @@ fn tree_walker(
 pub fn copy_tree(opts: Opts) -> Result<()> {
     let (work_tx, work_rx) = mpsc::channel();
     let (stat_tx, stat_rx) = mpsc::channel();
+
+    let (pb, batch_size) = if opts.noprogress {
+        (ProgressBar::Nop, usize::max_value() as u64)
+    } else {
+        (iprogress_bar(0), 1024 * 4096)
+    };
+
     let copy_stat = BatchUpdater {
         sender: Box::new(stat_tx.clone()),
         stat: StatusUpdate::Copied(0),
-        batch_size: 1000 * 4096,
+        batch_size: batch_size,
     };
     let size_stat = BatchUpdater {
         sender: Box::new(stat_tx),
         stat: StatusUpdate::Size(0),
-        batch_size: 1000 * 4096,
+        batch_size: batch_size,
     };
 
     let _copy_worker = thread::spawn(move || copy_worker(work_rx, copy_stat));
@@ -358,13 +355,11 @@ pub fn copy_tree(opts: Opts) -> Result<()> {
     let mut copied = 0;
     let mut total = 0;
 
-    let pb = progress_bar(total);
-
     for stat in stat_rx {
         match stat? {
             StatusUpdate::Size(s) => {
                 total += s;
-                pb.set_length(total);
+                pb.set_size(total);
             }
             StatusUpdate::Copied(s) => {
                 copied += s;
@@ -374,7 +369,7 @@ pub fn copy_tree(opts: Opts) -> Result<()> {
     }
     // FIXME: We should probably join the threads and consume any errors.
 
-    pb.finish_with_message("Copy-tree complete");
+    pb.end();
     debug!("Copy-tree complete");
 
     Ok(())
@@ -399,16 +394,25 @@ pub fn copy_single_file(opts: Opts) -> Result<()> {
         ));
     }
 
-    let size = opts.source.metadata()?.len();
-    let mut copy_stat = BatchUpdater {
-        sender: Box::new(ProgressUpdater {
-            pb: progress_bar(size),
-            written: 0,
-        }),
-        stat: StatusUpdate::Copied(0),
-        batch_size: size / 10,
-    };
 
+    let mut copy_stat = if opts.noprogress {
+        BatchUpdater {
+            sender: Box::new(NopUpdater {}),
+            stat: StatusUpdate::Copied(0),
+            batch_size: usize::max_value() as u64,
+        }
+
+    } else {
+        let size = opts.source.metadata()?.len();
+        BatchUpdater {
+            sender: Box::new(ProgressUpdater {
+                pb: iprogress_bar(size),
+                written: 0,
+            }),
+            stat: StatusUpdate::Copied(0),
+            batch_size: size / 10,
+        }
+    };
 
     copy_file(&opts.source, &dest, &mut copy_stat)?;
 
