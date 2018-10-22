@@ -1,4 +1,4 @@
-# `xcp`: An extended `cp`
+# xcp: An extended cp
 
 `xcp` is a (partial) clone of the Unix `cp` command. It is not intended as a
 full replacement, but as a companion utility with some more user-friendly
@@ -14,7 +14,7 @@ anything critical yet.
 ### Features
 
 * Displays a progress-bar, both for directory and single file copies. This can
-  be disabled with $FIXME.
+  be disabled with `--no-progress`.
 * Uses the Linux `copy_file_range` call to copy files. This is the most
   efficient method of file-copying under Linux; in particular it is
   filesystem-aware, and can massively speed-up copies on network mounts by
