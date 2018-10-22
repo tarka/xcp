@@ -335,7 +335,7 @@ pub fn copy_tree(opts: Opts) -> Result<()> {
     let (pb, batch_size) = if opts.noprogress {
         (ProgressBar::Nop, usize::max_value() as u64)
     } else {
-        (iprogress_bar(0), 1024 * 4096)
+        (iprogress_bar(0), 1024 * 1024 * 64)
     };
 
     let copy_stat = BatchUpdater {
