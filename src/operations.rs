@@ -244,14 +244,14 @@ fn ignore_filter(entry: &DirEntry, ignore: &Option<Gitignore>) -> bool {
 
 
 fn tree_walker(
+    source: PathBuf,
     opts: Opts,
     work_tx: mpsc::Sender<Operation>,
     mut updates: BatchUpdater,
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 
-    let sourcedir = opts
-        .source
+    let sourcedir = source
         .components()
         .last()
         .ok_or(XcpError::InvalidSource {
@@ -266,15 +266,15 @@ fn tree_walker(
 
 
     let gitignore = if opts.gitignore {
-        let mut builder = GitignoreBuilder::new(&opts.source);
-        builder.add(opts.source.join(".gitignore"));
+        let mut builder = GitignoreBuilder::new(&source);
+        builder.add(&source.join(".gitignore"));
         let ignore = builder.build()?;
         Some(ignore)
     } else {
         None
     };
 
-    let witer = WalkDir::new(&opts.source)
+    let witer = WalkDir::new(&source)
         .into_iter()
         .filter_entry(|e| ignore_filter(e, &gitignore));
 
@@ -283,7 +283,7 @@ fn tree_walker(
         let e = entry?;
         let from = e.into_path();
         let meta = from.symlink_metadata()?;
-        let path = from.strip_prefix(&opts.source)?;
+        let path = from.strip_prefix(&source)?;
         let target = target_base.join(&path);
 
         if target.exists() && opts.noclobber {
@@ -327,7 +327,7 @@ fn tree_walker(
     Ok(())
 }
 
-pub fn copy_tree(opts: Opts) -> Result<()> {
+pub fn copy_tree(source: PathBuf, opts: &Opts) -> Result<()> {
     let (work_tx, work_rx) = mpsc::channel();
     let (stat_tx, stat_rx) = mpsc::channel();
 
@@ -349,7 +349,8 @@ pub fn copy_tree(opts: Opts) -> Result<()> {
     };
 
     let _copy_worker = thread::spawn(move || copy_worker(work_rx, copy_stat));
-    let _walk_worker = thread::spawn(move || tree_walker(opts, work_tx, size_stat));
+    let (tsource, topts) = (source.clone(), opts.clone());
+    let _walk_worker = thread::spawn(move || tree_walker(tsource, topts, work_tx, size_stat));
 
     let mut copied = 0;
     let mut total = 0;
@@ -378,9 +379,9 @@ pub fn copy_tree(opts: Opts) -> Result<()> {
 // FIXME: This could be changed to use copy_tree, but involves some
 // special cases, e.g. when target file is a different name from the
 // source.
-pub fn copy_single_file(opts: Opts) -> Result<()> {
+pub fn copy_single_file(source: &PathBuf, opts: &Opts) -> Result<()> {
     let dest = if opts.dest.is_dir() {
-        let fname = opts.source.file_name().ok_or(XcpError::UnknownFilename)?;
+        let fname = source.file_name().ok_or(XcpError::UnknownFilename)?;
         opts.dest.join(fname)
     } else {
         opts.dest.clone()
@@ -402,7 +403,7 @@ pub fn copy_single_file(opts: Opts) -> Result<()> {
         }
 
     } else {
-        let size = opts.source.metadata()?.len();
+        let size = source.metadata()?.len();
         BatchUpdater {
             sender: Box::new(ProgressUpdater {
                 pb: iprogress_bar(size),
@@ -413,7 +414,7 @@ pub fn copy_single_file(opts: Opts) -> Result<()> {
         }
     };
 
-    copy_file(&opts.source, &dest, &mut copy_stat)?;
+    copy_file(source, &dest, &mut copy_stat)?;
 
     Ok(())
 }
