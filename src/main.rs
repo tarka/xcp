@@ -14,7 +14,8 @@ use crate::operations::{copy_single_file, copy_tree};
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "xcp",
-    about = "Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY."
+    about = "Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY.",
+    raw(setting = "structopt::clap::AppSettings::ColoredHelp")
 )]
 pub struct Opts {
     /// Explain what is being done. Can be specified multiple times to
