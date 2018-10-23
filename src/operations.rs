@@ -147,7 +147,6 @@ impl Updater<Result<StatusUpdate>> for mpsc::Sender<Result<StatusUpdate>> {
 }
 
 
-#[allow(dead_code)]
 struct NopUpdater {}
 
 impl Updater<Result<StatusUpdate>> for NopUpdater {
@@ -155,7 +154,6 @@ impl Updater<Result<StatusUpdate>> for NopUpdater {
         Ok(())
     }
 }
-
 
 
 struct ProgressUpdater {
