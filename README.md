@@ -34,11 +34,11 @@ automatically.
 
 * Optional aggressive parallelism for systems with parallel IO. Quick
   experiments on a modern laptop suggest there may be benefits to parallel
-  copies on NVRAM disks, this is obviously highly system-dependent.
+  copies on NVMe disks. This is obviously highly system-dependent.
 
 ### Anti-Features
 
-* Currenly only supports Linux, specifically kernels 4.5 and onwards. Other
+* Currently only supports Linux, specifically kernels 4.5 and onwards. Other
   Unix-like OS's may be added later.
 * Reportedly `copy_file_range` does not understand sparse files, and will expand
   any 'holes' on disk. One common use of sparse files is virtual disks
@@ -55,7 +55,8 @@ Benchmarks are mostly meaningless, but to check we're not introducing _too_ much
 overhead for local copies, the following are results from a laptop with an NVMe
 disk and in single-user mode. The target copy directory is a git checkout of the
 Firefox codebase, having been recently gc'd (i.e. a single 4.1GB pack
-file). `fstrim -va` is run before each test run.
+file). `fstrim -va` is run before each test run to minimise SSD allocation
+performance interference.
 
 ### Local copy
 
@@ -72,13 +73,10 @@ file). `fstrim -va` is run before each test run.
 ** `cp`: ~6.9s
 ** `xcp`: ~7.4s
 
-To give an idea of how difficult meaningful benchmarks are, the reason `fstrim`
-is run each time is that without it there is huget
-
 ### NFS copy
 
 `xcp` uses `copy_file_range`, which is filesystem aware. On NFSv4 this will result
-in the copy occuring server-side rather than tranferring across the network. For
+in the copy occurring server-side rather than transferring across the network. For
 large files this can be a significant win:
 
 * Single 4.1GB file on NFSv4 mount
