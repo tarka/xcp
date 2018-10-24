@@ -158,6 +158,32 @@ fn file_copy_rel() -> Result<(), Error> {
     Ok(())
 }
 
+
+#[test]
+fn file_copy_multiple() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+    let dest = dir.join("dest");
+    create_dir_all(&dest)?;
+
+    let (f1, f2) = (dir.join("file1.txt"),
+                    dir.join("file2.txt"));
+    create_file(&f1, "test")?;
+    create_file(&f2, "test")?;
+
+    let out = run(&[
+        "-vv",
+        f1.to_str().unwrap(),
+        f2.to_str().unwrap(),
+        dest.to_str().unwrap()])?;
+
+    assert!(out.status.success());
+    assert!(dest.join("file1.txt").exists());
+    assert!(dest.join("file2.txt").exists());
+
+    Ok(())
+}
+
+
 #[test]
 fn copy_empty_dir() -> Result<(), Error> {
     let dir = tempdir()?;
