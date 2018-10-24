@@ -337,20 +337,24 @@ pub fn copy_tree(source: PathBuf, opts: &Opts) -> Result<()> {
         (iprogress_bar(0), BATCH_DEFAULT)
     };
 
-    let copy_stat = BatchUpdater {
-        sender: Box::new(stat_tx.clone()),
-        stat: StatusUpdate::Copied(0),
-        batch_size: batch_size,
-    };
-    let size_stat = BatchUpdater {
-        sender: Box::new(stat_tx),
-        stat: StatusUpdate::Size(0),
-        batch_size: batch_size,
-    };
 
-    let _copy_worker = thread::spawn(move || copy_worker(work_rx, copy_stat));
-    let topts = opts.clone();
-    let _walk_worker = thread::spawn(move || tree_walker(source, topts, work_tx, size_stat));
+    let _copy_worker = {
+        let copy_stat = BatchUpdater {
+            sender: Box::new(stat_tx.clone()),
+            stat: StatusUpdate::Copied(0),
+            batch_size: batch_size,
+        };
+        thread::spawn(move || copy_worker(work_rx, copy_stat))
+    };
+    let _walk_worker = {
+        let topts = opts.clone();
+        let size_stat = BatchUpdater {
+            sender: Box::new(stat_tx),
+            stat: StatusUpdate::Size(0),
+            batch_size: batch_size,
+        };
+        thread::spawn(move || tree_walker(source, topts, work_tx, size_stat))
+    };
 
     let mut copied = 0;
     let mut total = 0;
