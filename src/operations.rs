@@ -75,7 +75,6 @@ fn r_copy_file_range(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
 
 /* **** Progress operations **** */
 
-
 #[derive(Debug)]
 enum Operation {
     Copy(PathBuf, PathBuf),
@@ -414,7 +413,7 @@ pub fn copy_single_file(source: &PathBuf, opts: &Opts) -> Result<()> {
                 written: 0,
             }),
             stat: StatusUpdate::Copied(0),
-            batch_size: cmp::min(size / 10, BATCH_DEFAULT),
+            batch_size: BATCH_DEFAULT,
         }
     };
 
