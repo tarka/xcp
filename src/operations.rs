@@ -349,8 +349,8 @@ pub fn copy_tree(source: PathBuf, opts: &Opts) -> Result<()> {
     };
 
     let _copy_worker = thread::spawn(move || copy_worker(work_rx, copy_stat));
-    let (tsource, topts) = (source.clone(), opts.clone());
-    let _walk_worker = thread::spawn(move || tree_walker(tsource, topts, work_tx, size_stat));
+    let topts = opts.clone();
+    let _walk_worker = thread::spawn(move || tree_walker(source, topts, work_tx, size_stat));
 
     let mut copied = 0;
     let mut total = 0;
