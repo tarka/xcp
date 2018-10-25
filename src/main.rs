@@ -1,5 +1,6 @@
 mod errors;
 mod operations;
+mod os;
 mod progress;
 mod utils;
 
