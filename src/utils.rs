@@ -2,7 +2,7 @@ use std::fs;
 use std::result;
 use std::path::PathBuf;
 
-use glob::{glob, GlobResult, GlobError, Paths, PatternError};
+use glob::{glob, Paths};
 
 use crate::errors::Result;
 

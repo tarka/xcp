@@ -2,7 +2,6 @@ use core::result;
 use failure::Fail;
 use std::io::{Error as IOError, ErrorKind as IOKind};
 use std::path::PathBuf;
-use glob::PatternError;
 
 #[derive(Debug, Fail)]
 pub enum XcpError {
@@ -20,9 +19,6 @@ pub enum XcpError {
 
     #[fail(display = "Destination Exists: {:?}", path)]
     DestinationExists { path: PathBuf },
-
-    #[fail(display = "Error expanding wildcard: {:?}", error)]
-    ExpansionError { error: PatternError },
 
     #[fail(display = "Early shutdown: {:?}", msg)]
     EarlyShutdown { msg: &'static str },
