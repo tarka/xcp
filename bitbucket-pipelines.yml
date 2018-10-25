@@ -7,9 +7,13 @@ pipelines:
     - step:
         caches:
           - cargo
+          - rustup
+          - build
         script:
           - cargo test --color never
 
 definitions:
   caches:
     cargo: /usr/local/cargo
+    rustup: /usr/local/rustup
+    build: target/debug
