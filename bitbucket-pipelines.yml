@@ -1,13 +1,11 @@
 ---
 image: rust
 
-
 pipelines:
   default:
     - step:
         caches:
           - cargo
-          - rustup
           - build
         script:
           - cargo test --color never
