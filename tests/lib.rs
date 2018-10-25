@@ -73,7 +73,7 @@ fn source_missing() -> Result<(), Error> {
     assert!(out.status.code().unwrap() == 1);
 
     let stderr = String::from_utf8(out.stderr)?;
-    assert!(stderr.contains("Source does not exist."));
+    assert!(stderr.contains("No source files found"));
 
     Ok(())
 }
@@ -502,3 +502,27 @@ fn dir_with_gitignore() -> Result<(), Error> {
 
     Ok(())
 }
+
+
+#[test]
+fn copy_with_glob() -> Result<(), Error> {
+    let dir = tempdir_rel()?;
+    let dest = dir.join("dest");
+    create_dir_all(&dest)?;
+
+    let (f1, f2) = (dir.join("file1.txt"),
+                    dir.join("file2.txt"));
+    create_file(&f1, "test")?;
+    create_file(&f2, "test")?;
+
+    let out = run(&[
+        dir.join("file*.txt").to_str().unwrap(),
+        dest.to_str().unwrap()])?;
+
+    assert!(out.status.success());
+    assert!(dest.join("file1.txt").exists());
+    assert!(dest.join("file2.txt").exists());
+
+    Ok(())
+}
+

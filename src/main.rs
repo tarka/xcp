@@ -3,14 +3,18 @@ mod operations;
 mod progress;
 mod utils;
 
+use glob::{glob};
 use log::{info};
 use simplelog::{Config, LevelFilter, TermLogger};
 use std::io::ErrorKind as IOKind;
+use std::result;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
 use crate::errors::{io_err, Result, XcpError};
 use crate::operations::{copy_single_file, copy_tree};
+use crate::utils::expand_globs;
+
 
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(
@@ -44,10 +48,9 @@ pub struct Opts {
     noprogress: bool,
 
     #[structopt(
-        raw(required="true", min_values="1"),
-        parse(from_os_str)
+        raw(required="true", min_values="1")
     )]
-    source_list: Vec<PathBuf>,
+    source_list: Vec<String>,
 
     #[structopt(parse(from_os_str))]
     dest: PathBuf,
@@ -82,7 +85,12 @@ fn main() -> Result<()> {
         }.into())
     }
 
-    for source in &opts.source_list {
+    let sources = expand_globs(&opts.source_list)?;
+    if sources.is_empty() {
+        return Err(io_err(IOKind::NotFound, "No source files found."));
+    }
+
+    for source in sources {
         info!("Copying source {:?} to {:?}", source, opts.dest);
         if !source.exists() {
             return Err(io_err(IOKind::NotFound, "Source does not exist."));
