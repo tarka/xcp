@@ -44,21 +44,16 @@ impl ToFileType for fs::FileType {
 // globs. Should we convert empty glob results into errors?
 //
 pub fn expand_globs(patterns: &Vec<String>) -> Result<Vec<PathBuf>> {
-    let mut globs = patterns
-        .iter()
-        // Call glob() on each pattern, yealding Vec<Result<Paths>>.
-        .map(|s| glob(&*s.as_str()))
-        // Convert Vec<Result<>> to Result<Vec<>>.
-        .collect::<result::Result<Vec<Paths>, _>>()?;
-    let path_vecs = globs
-        .iter_mut()
+    let mut globs = patterns.iter()
+        .map(|s| glob(&*s.as_str()))                  // -> Vec<Result<Paths>>
+        .collect::<result::Result<Vec<Paths>, _>>()?; // -> Result<Vec<Paths>>
+    let path_vecs = globs.iter_mut()
         // Force resolve each glob Paths iterator into a vector of the results...
         .map::<result::Result<Vec<PathBuf>, _>, _>(|p| p.collect())
         // And lift all the results up to the top.
         .collect::<result::Result<Vec<Vec<PathBuf>>,_>>()?;
     // And finally flatten the nested paths into a single collection of the results
-    let paths = path_vecs
-        .iter()
+    let paths = path_vecs.iter()
         .flat_map(|p| p.to_owned())
         .collect::<Vec<PathBuf>>();
 
