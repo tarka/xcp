@@ -3,11 +3,9 @@ mod operations;
 mod progress;
 mod utils;
 
-use glob::{glob};
 use log::{info};
-use simplelog::{Config, LevelFilter, TermLogger};
+use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger};
 use std::io::ErrorKind as IOKind;
-use std::result;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -69,15 +67,14 @@ fn check_and_copy_tree(source: PathBuf, opts: &Opts) -> Result<()> {
 fn main() -> Result<()> {
     let opts = Opts::from_args();
 
-    TermLogger::init(
-        match opts.verbose {
-            0 => LevelFilter::Warn,
-            1 => LevelFilter::Info,
-            2 => LevelFilter::Debug,
-            _ => LevelFilter::Trace,
-        },
-        Config::default(),
-    )?;
+    let log_level = match opts.verbose {
+        0 => LevelFilter::Warn,
+        1 => LevelFilter::Info,
+        2 => LevelFilter::Debug,
+        _ => LevelFilter::Trace,
+    };
+    TermLogger::init(log_level, Config::default())
+        .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
     if opts.source_list.len() > 1 && !opts.dest.is_dir() {
         return Err(XcpError::InvalidDestination {
