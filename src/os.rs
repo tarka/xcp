@@ -1,6 +1,6 @@
 use libc;
-use std::io;
 use std::fs::File;
+use std::io;
 use std::os::unix::io::AsRawFd;
 use std::ptr::null_mut;
 
@@ -58,4 +58,3 @@ pub fn r_copy_file_range(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
         _ => Ok(r as u64),
     }
 }
-

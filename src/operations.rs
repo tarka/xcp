@@ -11,7 +11,10 @@ use walkdir::{DirEntry, WalkDir};
 
 use crate::errors::{io_err, Result, XcpError};
 use crate::os::r_copy_file_range;
-use crate::progress::{ProgressBar, iprogress_bar};
+use crate::progress::{
+    iprogress_bar, BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
+    BATCH_DEFAULT,
+};
 use crate::utils::{FileType, ToFileType};
 use crate::Opts;
 
@@ -24,93 +27,6 @@ enum Operation {
     Link(PathBuf, PathBuf),
     CreateDir(PathBuf),
     End,
-}
-
-#[derive(Debug, Clone)]
-enum StatusUpdate {
-    Copied(u64),
-    Size(u64),
-}
-
-impl StatusUpdate {
-    fn set(&self, bytes: u64) -> StatusUpdate {
-        match self {
-            StatusUpdate::Copied(_) => StatusUpdate::Copied(bytes),
-            StatusUpdate::Size(_) => StatusUpdate::Size(bytes),
-        }
-    }
-    fn value(&self) -> u64 {
-        match self {
-            StatusUpdate::Copied(v) => *v,
-            StatusUpdate::Size(v) => *v,
-        }
-    }
-}
-
-
-trait Updater<T> {
-    fn update(&mut self, update: T) -> Result<()>;
-}
-
-const BATCH_DEFAULT: u64 = 1024 * 1024 * 64;
-
-struct BatchUpdater {
-    sender: Box<Updater<Result<StatusUpdate>> + Send>,
-    stat: StatusUpdate,
-    batch_size: u64,
-}
-
-
-impl Updater<Result<u64>> for BatchUpdater {
-    fn update(&mut self, status: Result<u64>) -> Result<()> {
-        match status {
-            Ok(bytes) => {
-                let curr = self.stat.value() + bytes;
-                self.stat = self.stat.set(curr);
-
-                if curr >= self.batch_size {
-                    self.sender.update(Ok(self.stat.clone()))?;
-                    self.stat = self.stat.set(0);
-                }
-            }
-            Err(e) => {
-                self.sender.update(Err(e))?;
-            }
-        }
-        Ok(())
-    }
-}
-
-
-impl Updater<Result<StatusUpdate>> for mpsc::Sender<Result<StatusUpdate>> {
-    fn update(&mut self, update: Result<StatusUpdate>) -> Result<()> {
-        Ok(self.send(update)?)
-    }
-}
-
-
-struct NopUpdater {}
-
-impl Updater<Result<StatusUpdate>> for NopUpdater {
-    fn update(&mut self, _update: Result<StatusUpdate>) -> Result<()> {
-        Ok(())
-    }
-}
-
-
-struct ProgressUpdater {
-    pb: ProgressBar,
-    written: u64,
-}
-
-impl Updater<Result<StatusUpdate>> for ProgressUpdater {
-    fn update(&mut self, update: Result<StatusUpdate>) -> Result<()> {
-        if let Ok(StatusUpdate::Copied(bytes)) = update {
-            self.written += bytes;
-            self.pb.set_position(self.written);
-        }
-        Ok(())
-    }
 }
 
 
@@ -193,12 +109,9 @@ fn tree_walker(
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 
-    let sourcedir = source
-        .components()
-        .last()
-        .ok_or(XcpError::InvalidSource {
-            msg: "Failed to find source directory name.",
-        })?;
+    let sourcedir = source.components().last().ok_or(XcpError::InvalidSource {
+        msg: "Failed to find source directory name.",
+    })?;
 
     let target_base = if opts.dest.exists() {
         opts.dest.join(sourcedir)
@@ -347,7 +260,6 @@ pub fn copy_single_file(source: &PathBuf, opts: &Opts) -> Result<()> {
             stat: StatusUpdate::Copied(0),
             batch_size: usize::max_value() as u64,
         }
-
     } else {
         let size = source.metadata()?.len();
         BatchUpdater {

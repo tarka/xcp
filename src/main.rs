@@ -4,7 +4,7 @@ mod os;
 mod progress;
 mod utils;
 
-use log::{info};
+use log::info;
 use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger};
 use std::io::ErrorKind as IOKind;
 use std::path::PathBuf;
@@ -46,9 +46,7 @@ pub struct Opts {
     #[structopt(long = "no-progress")]
     noprogress: bool,
 
-    #[structopt(
-        raw(required="true", min_values="1")
-    )]
+    #[structopt(raw(required = "true", min_values = "1"))]
     source_list: Vec<String>,
 
     #[structopt(parse(from_os_str))]
@@ -80,7 +78,8 @@ fn main() -> Result<()> {
     if opts.source_list.len() > 1 && !opts.dest.is_dir() {
         return Err(XcpError::InvalidDestination {
             msg: "Multiple sources and destination is not a directory.",
-        }.into())
+        }
+        .into());
     }
 
     let sources = expand_globs(&opts.source_list)?;
@@ -96,14 +95,14 @@ fn main() -> Result<()> {
 
         if source.is_file() {
             copy_single_file(&source, &opts)?;
-
         } else if source.is_dir() {
             match opts.recursive {
                 true => check_and_copy_tree(source.to_path_buf(), &opts)?,
                 false => {
                     return Err(XcpError::InvalidSource {
                         msg: "Source is directory and --recursive not specified.",
-                    }.into())
+                    }
+                    .into())
                 }
             }
         }

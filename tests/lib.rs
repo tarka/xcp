@@ -165,8 +165,7 @@ fn file_copy_multiple() -> Result<(), Error> {
     let dest = dir.join("dest");
     create_dir_all(&dest)?;
 
-    let (f1, f2) = (dir.join("file1.txt"),
-                    dir.join("file2.txt"));
+    let (f1, f2) = (dir.join("file1.txt"), dir.join("file2.txt"));
     create_file(&f1, "test")?;
     create_file(&f2, "test")?;
 
@@ -174,7 +173,8 @@ fn file_copy_multiple() -> Result<(), Error> {
         "-vv",
         f1.to_str().unwrap(),
         f2.to_str().unwrap(),
-        dest.to_str().unwrap()])?;
+        dest.to_str().unwrap(),
+    ])?;
 
     assert!(out.status.success());
     assert!(dest.join("file1.txt").exists());
@@ -415,7 +415,11 @@ fn dir_copy_containing_symlinks() -> Result<(), Error> {
     assert!(out.status.success());
     assert!(dest_file.exists());
     assert!(dest_rlink.symlink_metadata()?.file_type().is_symlink());
-    assert!(dest_base.join("hosts").symlink_metadata()?.file_type().is_symlink());
+    assert!(dest_base
+        .join("hosts")
+        .symlink_metadata()?
+        .file_type()
+        .is_symlink());
 
     Ok(())
 }
@@ -510,14 +514,14 @@ fn copy_with_glob() -> Result<(), Error> {
     let dest = dir.join("dest");
     create_dir_all(&dest)?;
 
-    let (f1, f2) = (dir.join("file1.txt"),
-                    dir.join("file2.txt"));
+    let (f1, f2) = (dir.join("file1.txt"), dir.join("file2.txt"));
     create_file(&f1, "test")?;
     create_file(&f2, "test")?;
 
     let out = run(&[
         dir.join("file*.txt").to_str().unwrap(),
-        dest.to_str().unwrap()])?;
+        dest.to_str().unwrap(),
+    ])?;
 
     assert!(out.status.success());
     assert!(dest.join("file1.txt").exists());
@@ -533,14 +537,14 @@ fn glob_pattern_error() -> Result<(), Error> {
     let dest = dir.join("dest");
     create_dir_all(&dest)?;
 
-    let (f1, f2) = (dir.join("file1.txt"),
-                    dir.join("file2.txt"));
+    let (f1, f2) = (dir.join("file1.txt"), dir.join("file2.txt"));
     create_file(&f1, "test")?;
     create_file(&f2, "test")?;
 
     let out = run(&[
         dir.join("file***.txt").to_str().unwrap(),
-        dest.to_str().unwrap()])?;
+        dest.to_str().unwrap(),
+    ])?;
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr)?;
@@ -548,4 +552,3 @@ fn glob_pattern_error() -> Result<(), Error> {
 
     Ok(())
 }
-
