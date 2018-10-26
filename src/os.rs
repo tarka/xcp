@@ -105,6 +105,8 @@ mod tests {
 
     #[test]
     fn test_sparse_detection() {
+        assert!(!probably_sparse(&PathBuf::from("Cargo.toml")).unwrap());
+
         let dir = tempdir().unwrap();
         let file = dir.path().join("sparse.bin");
 
