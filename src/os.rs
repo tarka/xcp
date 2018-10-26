@@ -47,6 +47,13 @@ mod ffi {
     }
 }
 
+fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
+    match result {
+        -1 => Err(io::Error::last_os_error().into()),
+        _ => Ok(retval),
+    }
+}
+
 /// Full mapping of copy_file_range(2). Not used directly, as we
 /// always want to copy the same range to the same offset. See
 /// wrappers below.
@@ -64,10 +71,7 @@ pub fn copy_file_range(infd: &File, mut in_off: i64,
             0,
         )
     };
-    match r {
-        -1 => Err(io::Error::last_os_error().into()),
-        _ => Ok(r as u64),
-    }
+    result_or_errno(r as i64, r as u64)
 }
 
 /// Version of copy_file_range(2) that copies the give range to the
@@ -91,10 +95,7 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
             0,
         )
     };
-    match r {
-        -1 => Err(io::Error::last_os_error().into()),
-        _ => Ok(r as u64),
-    }
+    result_or_errno(r as i64, r as u64)
 }
 
 pub fn fstat(fd: &File) -> Result<libc::stat> {
