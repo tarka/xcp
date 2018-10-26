@@ -92,6 +92,8 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
     use std::process::{Command, Output};
+    use std::fs::{write};
+    use std::io::{Read, Write};
 
     #[test]
     fn test_stat() {
@@ -112,6 +114,11 @@ mod tests {
             .unwrap();
         assert!(out.status.success());
 
+        assert!(probably_sparse(&file).unwrap());
+        {
+            let mut fd = File::open(&file).unwrap();
+            write!(fd, "{}", "test");
+        }
         assert!(probably_sparse(&file).unwrap());
     }
 
