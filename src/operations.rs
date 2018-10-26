@@ -60,7 +60,13 @@ fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Re
         match op {
             Operation::Copy(from, to) => {
                 info!("Worker: Copy {:?} -> {:?}", from, to);
-                let _res = copy_file(&from, &to, &mut updates);
+                // copy_file sends back its own updates, but we
+                // should send back any errors as they may have
+                // occured before the copy started..
+                let r = copy_file(&from, &to, &mut updates);
+                if r.is_err() {
+                    updates.update(r)?;
+                }
             }
 
             Operation::Link(from, to) => {
