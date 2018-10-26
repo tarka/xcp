@@ -1,6 +1,6 @@
 use libc;
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::mem;
 use std::io;
 use std::os::unix::io::AsRawFd;
@@ -97,7 +97,7 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
     }
 }
 
-pub fn stat(path: &PathBuf) -> Result<libc::stat> {
+pub fn stat(path: &Path) -> Result<libc::stat> {
     let pbytes = path.as_os_str().as_bytes();
 
     let mut stat: libc::stat = unsafe { mem::uninitialized() };
@@ -116,7 +116,7 @@ pub fn stat(path: &PathBuf) -> Result<libc::stat> {
 // Guestimate if file is sparse; if it has less blocks that would be
 // expected for its stated size. This is the same test used by
 // coreutils `cp`.
-pub fn probably_sparse(fd: &PathBuf) -> Result<bool> {
+pub fn probably_sparse(fd: &Path) -> Result<bool> {
     let st = stat(fd)?;
     Ok(st.st_blocks < st.st_size / st.st_blksize)
 }
@@ -128,7 +128,7 @@ mod tests {
     use tempfile::tempdir;
     use std::fs::{read, OpenOptions};
     use std::process::Command;
-    use std::io::{Read, Write};
+    use std::io::Write;
 
     #[test]
     fn test_stat() {
@@ -227,6 +227,7 @@ mod tests {
         assert!(bytes[offset+1] == b'e');
         assert!(bytes[offset+2] == b's');
         assert!(bytes[offset+3] == b't');
+        assert!(bytes[offset+data.len()] == 0);
     }
 
 }
