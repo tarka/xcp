@@ -97,14 +97,9 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
     }
 }
 
-pub fn stat(path: &Path) -> Result<libc::stat> {
-    let pbytes = path.as_os_str().as_bytes();
-
+pub fn fstat(fd: &File) -> Result<libc::stat> {
     let mut stat: libc::stat = unsafe { mem::uninitialized() };
-    let r = unsafe {
-        let cstr: &[i8] = &*(pbytes as *const [u8] as *const [i8]);
-        libc::stat(cstr.as_ptr(), &mut stat)
-    };
+    let r = unsafe { libc::fstat(fd.as_raw_fd(), &mut stat) };
 
     match r {
         -1 => Err(io::Error::last_os_error().into()),
@@ -116,8 +111,8 @@ pub fn stat(path: &Path) -> Result<libc::stat> {
 // Guestimate if file is sparse; if it has less blocks that would be
 // expected for its stated size. This is the same test used by
 // coreutils `cp`.
-pub fn probably_sparse(fd: &Path) -> Result<bool> {
-    let st = stat(fd)?;
+pub fn probably_sparse(fd: &File) -> Result<bool> {
+    let st = fstat(fd)?;
     Ok(st.st_blocks < st.st_size / st.st_blksize)
 }
 
@@ -131,103 +126,112 @@ mod tests {
     use std::io::Write;
 
     #[test]
-    fn test_stat() {
-        let hosts = PathBuf::from("/etc/hosts");
-        let hsize = hosts.metadata().unwrap().len() as i64;
-        let hstat = stat(&hosts).unwrap();
+    fn test_stat() -> Result<()> {
+        let hosts = File::open("/etc/hosts")?;
+        let hsize = hosts.metadata()?.len() as i64;
+        let hstat = fstat(&hosts)?;
         assert!(hsize == hstat.st_size);
+
+        Ok(())
     }
 
     #[test]
-    fn test_sparse_detection() {
-        assert!(!probably_sparse(&PathBuf::from("Cargo.toml")).unwrap());
+    fn test_sparse_detection() -> Result<()> {
+        assert!(!probably_sparse(&File::open("Cargo.toml")?)?);
 
-        let dir = tempdir().unwrap();
+        let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
-
         let out = Command::new("/usr/bin/truncate")
             .args(&["-s", "1M", file.to_str().unwrap()])
             .output()
-            .unwrap();
+            ?;
         assert!(out.status.success());
 
-        assert!(probably_sparse(&file).unwrap());
+        let fd = File::open(&file)?;
+
+        assert!(probably_sparse(&fd)?);
         {
-            let mut fd = File::open(&file).unwrap();
+            let mut fd = File::open(&file)?;
             write!(fd, "{}", "test");
         }
-        assert!(probably_sparse(&file).unwrap());
+        assert!(probably_sparse(&fd)?);
+
+        Ok(())
     }
 
     #[test]
-    fn test_copy_range_sparse() {
-        let dir = tempdir().unwrap();
+    fn test_copy_range_sparse() -> Result<()> {
+        let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
         let data = "test data";
 
         {
-            let mut fd = File::create(&from).unwrap();
+            let mut fd = File::create(&from)?;
             write!(fd, "{}", data);
         }
 
         let out = Command::new("/usr/bin/truncate")
             .args(&["-s", "1M", file.to_str().unwrap()])
             .output()
-            .unwrap();
+            ?;
         assert!(out.status.success());
 
         {
-            let infd = File::open(&from).unwrap();
+            let infd = File::open(&from)?;
             let outfd: File = OpenOptions::new()
                 .write(true)
                 .append(false)
-                .open(&file).unwrap();
-            copy_file_bytes(&infd, &outfd, data.len() as u64).unwrap();
+                .open(&file)?;
+            copy_file_bytes(&infd, &outfd, data.len() as u64)?;
         }
 
-        assert!(probably_sparse(&file).unwrap());
+        assert!(probably_sparse(&File::open(file)?)?);
+
+        Ok(())
     }
 
     #[test]
-    fn test_sparse_copy_middle() {
-        let dir = tempdir().unwrap();
+    fn test_sparse_copy_middle() -> Result<()> {
+        let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
         let data = "test data";
 
         {
-            let mut fd = File::create(&from).unwrap();
+            let mut fd = File::create(&from)?;
             write!(fd, "{}", data);
         }
 
         let out = Command::new("/usr/bin/truncate")
             .args(&["-s", "1M", file.to_str().unwrap()])
             .output()
-            .unwrap();
+            ?;
         assert!(out.status.success());
 
         let offset: usize = 512*1024;
         {
-            let infd = File::open(&from).unwrap();
+            let infd = File::open(&from)?;
             let outfd: File = OpenOptions::new()
                 .write(true)
                 .append(false)
-                .open(&file).unwrap();
+                .open(&file)?;
             copy_file_range(&infd, 0,
                             &outfd, offset as i64,
-                            data.len() as u64).unwrap();
+                            data.len() as u64)?;
         }
 
-        assert!(probably_sparse(&file).unwrap());
+        assert!(probably_sparse(&File::open(&file)?)?);
 
-        let bytes = read(&file).unwrap();
+        let bytes = read(&file)?;
         assert!(bytes.len() == 1024*1024);
         assert!(bytes[offset] == b't');
         assert!(bytes[offset+1] == b'e');
         assert!(bytes[offset+2] == b's');
         assert!(bytes[offset+3] == b't');
         assert!(bytes[offset+data.len()] == 0);
+
+        Ok(())
     }
 
 }
