@@ -105,10 +105,11 @@ fn dest_file_exists() -> Result<(), Error> {
 fn dest_file_in_dir_exists() -> Result<(), Error> {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
 
     {
         File::create(&source_path)?;
-        File::create(&dir.path().join("dest.txt"))?;
+        File::create(&dest_path)?;
     }
 
     let out = run(&[

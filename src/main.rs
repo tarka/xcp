@@ -75,6 +75,8 @@ fn main() -> Result<()> {
     TermLogger::init(log_level, Config::default())
         .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
+    // Do this check before expansion otherwise it could result in
+    // unexpected behaviour when the a glob expands to a single file.
     if opts.source_list.len() > 1 && !opts.dest.is_dir() {
         return Err(XcpError::InvalidDestination {
             msg: "Multiple sources and destination is not a directory.",
@@ -85,26 +87,26 @@ fn main() -> Result<()> {
     let sources = expand_globs(&opts.source_list)?;
     if sources.is_empty() {
         return Err(io_err(IOKind::NotFound, "No source files found."));
-    }
 
-    for source in sources {
-        info!("Copying source {:?} to {:?}", source, opts.dest);
-        if !source.exists() {
-            return Err(io_err(IOKind::NotFound, "Source does not exist."));
-        }
+    } else if sources.len() == 1 && opts.dest.is_file() {
+        // Special case; rename/overwrite.
+        info!("Copying file {:?} to {:?}", sources[0], opts.dest);
+        copy_single_file(&sources[0], &opts)?;
 
-        if source.is_file() {
-            copy_single_file(&source, &opts)?;
-        } else if source.is_dir() {
-            match opts.recursive {
-                true => check_and_copy_tree(source.to_path_buf(), &opts)?,
-                false => {
-                    return Err(XcpError::InvalidSource {
-                        msg: "Source is directory and --recursive not specified.",
-                    }
-                    .into())
-                }
+    } else {
+        for source in sources {
+            info!("Copying source {:?} to {:?}", source, opts.dest);
+            if !source.exists() {
+                return Err(io_err(IOKind::NotFound, "Source does not exist."));
             }
+
+            if source.is_dir() && !opts.recursive {
+                return Err(XcpError::InvalidSource {
+                    msg: "Source is directory and --recursive not specified.",
+                }.into())
+            }
+
+            check_and_copy_tree(source.to_path_buf(), &opts)?;
         }
     }
 

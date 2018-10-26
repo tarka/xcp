@@ -18,7 +18,7 @@ pub enum XcpError {
     InvalidDestination { msg: &'static str },
 
     #[fail(display = "Destination Exists: {:?}", path)]
-    DestinationExists { path: PathBuf },
+    DestinationExists { msg: &'static str, path: PathBuf },
 
     #[fail(display = "Early shutdown: {:?}", msg)]
     EarlyShutdown { msg: &'static str },

@@ -19,8 +19,6 @@ use crate::utils::{FileType, ToFileType};
 use crate::Opts;
 
 
-/* **** Progress operations **** */
-
 #[derive(Debug)]
 enum Operation {
     Copy(PathBuf, PathBuf),
@@ -29,8 +27,6 @@ enum Operation {
     End,
 }
 
-
-/* **** File operations **** */
 
 fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> {
     let infd = File::open(from)?;
@@ -100,6 +96,9 @@ fn ignore_filter(entry: &DirEntry, ignore: &Option<Gitignore>) -> bool {
     }
 }
 
+fn empty(path: &Path) -> bool {
+    *path == PathBuf::new()
+}
 
 fn tree_walker(
     source: PathBuf,
@@ -118,7 +117,7 @@ fn tree_walker(
     } else {
         opts.dest.clone()
     };
-
+    debug!("Target base is {:?}", target_base);
 
     let gitignore = if opts.gitignore {
         let mut builder = GitignoreBuilder::new(&source);
@@ -129,21 +128,25 @@ fn tree_walker(
         None
     };
 
-    let witer = WalkDir::new(&source)
-        .into_iter()
-        .filter_entry(|e| ignore_filter(e, &gitignore));
-
-    for entry in witer {
+    for entry in WalkDir::new(&source).into_iter()
+        .filter_entry(|e| ignore_filter(e, &gitignore))
+    {
         debug!("Got tree entry {:?}", entry);
         let e = entry?;
         let from = e.into_path();
         let meta = from.symlink_metadata()?;
         let path = from.strip_prefix(&source)?;
-        let target = target_base.join(&path);
+        let target = if !empty(&path) {
+            target_base.join(&path)
+        } else {
+            target_base.clone()
+        };
 
         if target.exists() && opts.noclobber {
             work_tx.send(Operation::End)?;
-            updates.update(Err(XcpError::DestinationExists { path: target }.into()))?;
+            updates.update(Err(XcpError::DestinationExists {
+                msg: "Destination file exists and --no-clobber is set.",
+                path: target }.into()))?;
             return Err(XcpError::EarlyShutdown {
                 msg: "Path exists and --no-clobber set.",
             }
@@ -235,9 +238,6 @@ pub fn copy_tree(source: PathBuf, opts: &Opts) -> Result<()> {
 }
 
 
-// FIXME: This could be changed to use copy_tree, but involves some
-// special cases, e.g. when target file is a different name from the
-// source.
 pub fn copy_single_file(source: &PathBuf, opts: &Opts) -> Result<()> {
     let dest = if opts.dest.is_dir() {
         let fname = source.file_name().ok_or(XcpError::UnknownFilename)?;
@@ -249,7 +249,7 @@ pub fn copy_single_file(source: &PathBuf, opts: &Opts) -> Result<()> {
     if dest.is_file() && opts.noclobber {
         return Err(io_err(
             IOKind::AlreadyExists,
-            "Destination file exists and no-clobber is set.",
+            "Destination file exists and --no-clobber is set.",
         ));
     }
 
