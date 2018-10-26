@@ -102,10 +102,26 @@ pub fn fstat(fd: &File) -> Result<libc::stat> {
     let mut stat: libc::stat = unsafe { mem::uninitialized() };
     let r = unsafe { libc::fstat(fd.as_raw_fd(), &mut stat) };
 
-    match r {
-        -1 => Err(io::Error::last_os_error().into()),
-        _ => Ok(stat),
-    }
+    result_or_errno(r as i64, stat)
+}
+
+/// Corresponds to lseek(2) `wence`
+pub enum Wence {
+    Set = libc::SEEK_SET as isize,
+    Cur = libc::SEEK_CUR as isize,
+    End = libc::SEEK_END as isize,
+    Data = libc::SEEK_DATA as isize,
+    Hole = libc::SEEK_HOLE as isize,
+}
+
+pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<libc::off_t> {
+    let r = unsafe {
+        libc::lseek(
+            fd.as_raw_fd(),
+            off,
+            wence as libc::c_int
+        ) };
+    result_or_errno(r as i64, r)
 }
 
 
@@ -231,6 +247,43 @@ mod tests {
         assert!(bytes[offset+2] == b's');
         assert!(bytes[offset+3] == b't');
         assert!(bytes[offset+data.len()] == 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_lseek_data() -> Result<()> {
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
+        let from = dir.path().join("from.txt");
+        let data = "test data";
+        let offset: usize = 512*1024;
+
+        {
+            let mut fd = File::create(&from)?;
+            write!(fd, "{}", data);
+        }
+
+        let out = Command::new("/usr/bin/truncate")
+            .args(&["-s", "1M", file.to_str().unwrap()])
+            .output()
+            ?;
+        assert!(out.status.success());
+        {
+            let infd = File::open(&from)?;
+            let outfd: File = OpenOptions::new()
+                .write(true)
+                .append(false)
+                .open(&file)?;
+            copy_file_range(&infd, 0,
+                            &outfd, offset as i64,
+                            data.len() as u64)?;
+        }
+
+        assert!(probably_sparse(&File::open(&file)?)?);
+
+        let off = lseek(&File::open(&file)?, 0, Wence::Data)?;
+        assert!(off == offset as i64);
 
         Ok(())
     }
