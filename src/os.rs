@@ -1,7 +1,10 @@
 use libc;
 use std::fs::File;
+use std::path::PathBuf;
+use std::mem;
 use std::io;
 use std::os::unix::io::AsRawFd;
+use std::os::unix::ffi::OsStrExt;
 use std::ptr::null_mut;
 
 use crate::errors::Result;
@@ -57,4 +60,59 @@ pub fn r_copy_file_range(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
         -1 => Err(io::Error::last_os_error().into()),
         _ => Ok(r as u64),
     }
+}
+
+
+pub fn stat(path: &PathBuf) -> Result<libc::stat> {
+    let pbytes = path.as_os_str().as_bytes();
+
+    let mut stat: libc::stat = unsafe { mem::uninitialized() };
+    let r = unsafe {
+        let cstr: &[i8] = &*(pbytes as *const [u8] as *const [i8]);
+        libc::stat(cstr.as_ptr(), &mut stat)
+    };
+
+    match r {
+        -1 => Err(io::Error::last_os_error().into()),
+        _ => Ok(stat),
+    }
+}
+
+
+// Guestimate if file is sparse but working out if it has less blocks
+// that would be expected. This is the same test used by coreutils `cp`.
+pub fn probably_sparse(fd: &PathBuf) -> Result<bool> {
+    let st = stat(fd)?;
+    Ok(st.st_blocks < st.st_size / st.st_blksize)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::process::{Command, Output};
+
+    #[test]
+    fn test_stat() {
+        let hosts = PathBuf::from("/etc/hosts");
+        let hsize = hosts.metadata().unwrap().len() as i64;
+        let hstat = stat(&hosts).unwrap();
+        assert!(hsize == hstat.st_size);
+    }
+
+    #[test]
+    fn test_sparse_detection() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("sparse.bin");
+
+        let out = Command::new("/usr/bin/truncate")
+            .args(&["-s", "1M", file.to_str().unwrap()])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+
+        assert!(probably_sparse(&file).unwrap());
+    }
+
 }
