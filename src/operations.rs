@@ -10,7 +10,7 @@ use std::thread;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::errors::{io_err, Result, XcpError};
-use crate::os::r_copy_file_range;
+use crate::os::copy_file_bytes;
 use crate::progress::{
     iprogress_bar, BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
     BATCH_DEFAULT,
@@ -39,7 +39,7 @@ fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> 
     let mut written = 0u64;
     while written < len {
         let bytes_to_copy = cmp::min(len - written, updates.batch_size);
-        let result = r_copy_file_range(&infd, &outfd, bytes_to_copy)?;
+        let result = copy_file_bytes(&infd, &outfd, bytes_to_copy)?;
         written += result;
         updates.update(Ok(result))?;
     }
