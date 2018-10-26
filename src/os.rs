@@ -79,8 +79,9 @@ pub fn stat(path: &PathBuf) -> Result<libc::stat> {
 }
 
 
-// Guestimate if file is sparse but working out if it has less blocks
-// that would be expected. This is the same test used by coreutils `cp`.
+// Guestimate if file is sparse; if it has less blocks that would be
+// expected for its stated size. This is the same test used by
+// coreutils `cp`.
 pub fn probably_sparse(fd: &PathBuf) -> Result<bool> {
     let st = stat(fd)?;
     Ok(st.st_blocks < st.st_size / st.st_blksize)
@@ -91,9 +92,9 @@ pub fn probably_sparse(fd: &PathBuf) -> Result<bool> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
-    use std::process::{Command, Output};
-    use std::fs::{write};
-    use std::io::{Read, Write};
+    use std::fs::OpenOptions;
+    use std::process::Command;
+    use std::io::Write;
 
     #[test]
     fn test_stat() {
@@ -121,6 +122,36 @@ mod tests {
             let mut fd = File::open(&file).unwrap();
             write!(fd, "{}", "test");
         }
+        assert!(probably_sparse(&file).unwrap());
+    }
+
+    #[test]
+    fn test_copy_range_sparse() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("sparse.bin");
+        let from = dir.path().join("from.txt");
+        let data = "test data";
+
+        {
+            let mut fd = File::create(&from).unwrap();
+            write!(fd, "{}", data);
+        }
+
+        let out = Command::new("/usr/bin/truncate")
+            .args(&["-s", "1M", file.to_str().unwrap()])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+
+        {
+            let infd = File::open(&from).unwrap();
+            let outfd: File = OpenOptions::new()
+                .write(true)
+                .append(false)
+                .open(&file).unwrap();
+            r_copy_file_range(&infd, &outfd, 4).unwrap();
+        }
+
         assert!(probably_sparse(&file).unwrap());
     }
 
