@@ -1,6 +1,5 @@
 use libc;
 use std::fs::File;
-use std::path::{Path, PathBuf};
 use std::mem;
 use std::io;
 use std::os::unix::io::AsRawFd;
@@ -75,6 +74,7 @@ pub fn copy_file_range(infd: &File, mut in_off: i64,
 
 /// Version of copy_file_range(2) that copies the give range to the
 /// same place in the target file.
+#[allow(dead_code)]
 pub fn copy_file_chunk(infd: &File, outfd: &File,
                        off: i64, bytes: u64) -> Result<u64>
 {
@@ -105,6 +105,7 @@ pub fn fstat(fd: &File) -> Result<libc::stat> {
 }
 
 /// Corresponds to lseek(2) `wence`
+#[allow(dead_code)]
 pub enum Wence {
     Set = libc::SEEK_SET as isize,
     Cur = libc::SEEK_CUR as isize,
@@ -157,7 +158,7 @@ pub fn probably_sparse(fd: &File) -> Result<bool> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
-    use std::fmt::format;
+    use std::path::{PathBuf};
     use std::fs::{read, OpenOptions};
     use std::process::Command;
     use std::io::{Seek, SeekFrom, Write};

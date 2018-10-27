@@ -61,8 +61,8 @@ fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Result<
     while pos < len {
         let (next_data, next_hole) = get_next(infd, pos)?;
 
-        lseek(infd, next_data as i64, Wence::Set)?;  // FIXME: EOF
-        lseek(outfd, next_data as i64, Wence::Set)?;  // FIXME: EOF
+        lseek(infd, next_data as i64, Wence::Set)?;  // FIXME: EOF (but shouldn't happen)
+        lseek(outfd, next_data as i64, Wence::Set)?;
         let _written = copy_range(infd, outfd, next_hole - next_data, updates)?;
         pos = next_hole;
     }
