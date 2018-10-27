@@ -44,11 +44,13 @@ fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
     Ok(buf == text)
 }
 
-fn create_sparse(file: &Path) -> TResult {
+fn create_sparse(file: &Path, head: u64, tail: u64) -> TResult {
     let data = "c00lc0d3";
 
     {
         let mut fd = File::create(&file)?;
+
+        fd.seek(SeekFrom::Start(head))?;
         write!(fd, "{}", data);
 
         fd.seek(SeekFrom::Start(1024*4096))?;
@@ -56,6 +58,8 @@ fn create_sparse(file: &Path) -> TResult {
 
         fd.seek(SeekFrom::Start(4096*4096 - data.len() as u64))?;
         write!(fd, "{}", data);
+
+        fd.seek(SeekFrom::Start(4096*4096 + tail))?;
     }
 
     Ok(())
@@ -601,12 +605,64 @@ fn glob_pattern_error() -> TResult {
 
 
 #[test]
-fn test_sparse_rust_seek() -> TResult {
+fn test_sparse() -> TResult {
     let dir = tempdir()?;
     let from = dir.path().join("sparse.bin");
     let to = dir.path().join("target.bin");
 
-    create_sparse(&from)?;
+    create_sparse(&from, 0, 0)?;
+    assert!(probably_sparse(&from)?);
+
+    let out = run(&[
+        from.to_str().unwrap(),
+        to.to_str().unwrap(),
+    ])?;
+    assert!(out.status.success());
+
+    assert!(probably_sparse(&to)?);
+
+    assert_eq!(quickstat(&from)?, quickstat(&to)?);
+
+    let from_data = read(&from)?;
+    let to_data = read(&to)?;
+    assert_eq!(from_data, to_data);
+
+    Ok(())
+}
+
+#[test]
+fn test_sparse_leading_gap() -> TResult {
+    let dir = tempdir()?;
+    let from = dir.path().join("sparse.bin");
+    let to = dir.path().join("target.bin");
+
+    create_sparse(&from, 1024, 0)?;
+    assert!(probably_sparse(&from)?);
+
+    let out = run(&[
+        from.to_str().unwrap(),
+        to.to_str().unwrap(),
+    ])?;
+    assert!(out.status.success());
+
+    assert!(probably_sparse(&to)?);
+
+    assert_eq!(quickstat(&from)?, quickstat(&to)?);
+
+    let from_data = read(&from)?;
+    let to_data = read(&to)?;
+    assert_eq!(from_data, to_data);
+
+    Ok(())
+}
+
+#[test]
+fn test_sparse_trailng_gap() -> TResult {
+    let dir = tempdir()?;
+    let from = dir.path().join("sparse.bin");
+    let to = dir.path().join("target.bin");
+
+    create_sparse(&from, 1024, 1024)?;
     assert!(probably_sparse(&from)?);
 
     let out = run(&[
