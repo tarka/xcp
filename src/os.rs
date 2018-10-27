@@ -69,9 +69,9 @@ pub fn copy_file_range(infd: &File, mut in_off: i64,
             &mut out_off as *mut i64,
             bytes as usize,
             0,
-        )
+        ) as i64
     };
-    result_or_errno(r as i64, r as u64)
+    result_or_errno(r, r as u64)
 }
 
 /// Version of copy_file_range(2) that copies the give range to the
@@ -93,9 +93,9 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
             null_mut(),
             bytes as usize,
             0,
-        )
+        ) as i64
     };
-    result_or_errno(r as i64, r as u64)
+    result_or_errno(r, r as u64)
 }
 
 pub fn fstat(fd: &File) -> Result<libc::stat> {
@@ -114,14 +114,14 @@ pub enum Wence {
     Hole = libc::SEEK_HOLE as isize,
 }
 
-pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<libc::off_t> {
+pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<i64> {
     let r = unsafe {
-        libc::lseek(
+        libc::lseek64(
             fd.as_raw_fd(),
             off,
             wence as libc::c_int
         ) };
-    result_or_errno(r as i64, r)
+    result_or_errno(r, r)
 }
 
 
