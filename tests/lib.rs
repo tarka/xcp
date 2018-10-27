@@ -2,12 +2,16 @@ use failure::Error;
 
 use escargot::CargoBuild;
 use std::fs::{create_dir_all, write, File};
-use std::io::{Read, Write};
+use std::io::{Seek, SeekFrom, Read, Write};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::result;
 use tempfile::tempdir;
 use uuid::Uuid;
+
+
+pub type TResult = result::Result<(), Error>;
 
 fn get_command() -> Result<Command, Error> {
     let cmd = CargoBuild::new().run()?.command();
@@ -40,8 +44,43 @@ fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
     Ok(buf == text)
 }
 
+fn create_sparse(file: &Path) -> TResult {
+    let data = "c00lc0d3";
+
+    {
+        let mut fd = File::create(&file)?;
+        write!(fd, "{}", data);
+
+        fd.seek(SeekFrom::Start(1024*4096))?;
+        write!(fd, "{}", data);
+
+        fd.seek(SeekFrom::Start(4096*4096 - data.len() as u64))?;
+        write!(fd, "{}", data);
+    }
+
+    Ok(())
+}
+
+fn probably_sparse(file: &Path) -> Result<bool, Error> { 
+    let out = Command::new("stat")
+        .args(&["--format", "%s %b %B",
+                file.to_str().unwrap()])
+        .output()?;
+    assert!(out.status.success());
+
+    let stdout = String::from_utf8(out.stdout)?;
+    let stats = stdout
+        .split_whitespace()
+        .map(|s| s.parse::<i32>().unwrap())
+        .collect::<Vec<i32>>();
+    let (size, blocks, blksize) = (stats[0], stats[1], stats[2]);
+
+    Ok(blocks < size / blksize)
+}
+
+
 #[test]
-fn basic_help() -> Result<(), Error> {
+fn basic_help() -> TResult {
     let out = run(&["--help"])?;
 
     assert!(out.status.success());
@@ -53,7 +92,7 @@ fn basic_help() -> Result<(), Error> {
 }
 
 #[test]
-fn no_args() -> Result<(), Error> {
+fn no_args() -> TResult {
     let out = run(&[])?;
 
     assert!(!out.status.success());
@@ -66,7 +105,7 @@ fn no_args() -> Result<(), Error> {
 }
 
 #[test]
-fn source_missing() -> Result<(), Error> {
+fn source_missing() -> TResult {
     let out = run(&["/this/should/not/exist", "/dev/null"])?;
 
     assert!(!out.status.success());
@@ -79,7 +118,7 @@ fn source_missing() -> Result<(), Error> {
 }
 
 #[test]
-fn dest_file_exists() -> Result<(), Error> {
+fn dest_file_exists() -> TResult {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
@@ -102,7 +141,7 @@ fn dest_file_exists() -> Result<(), Error> {
 }
 
 #[test]
-fn dest_file_in_dir_exists() -> Result<(), Error> {
+fn dest_file_in_dir_exists() -> TResult {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
@@ -126,7 +165,7 @@ fn dest_file_in_dir_exists() -> Result<(), Error> {
 }
 
 #[test]
-fn file_copy() -> Result<(), Error> {
+fn file_copy() -> TResult {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
@@ -143,7 +182,7 @@ fn file_copy() -> Result<(), Error> {
 }
 
 #[test]
-fn file_copy_rel() -> Result<(), Error> {
+fn file_copy_rel() -> TResult {
     let dir = tempdir_rel()?;
     let source_path = dir.join("source.txt");
     let dest_path = dir.join("dest.txt");
@@ -161,7 +200,7 @@ fn file_copy_rel() -> Result<(), Error> {
 
 
 #[test]
-fn file_copy_multiple() -> Result<(), Error> {
+fn file_copy_multiple() -> TResult {
     let dir = tempdir_rel()?;
     let dest = dir.join("dest");
     create_dir_all(&dest)?;
@@ -186,7 +225,7 @@ fn file_copy_multiple() -> Result<(), Error> {
 
 
 #[test]
-fn copy_empty_dir() -> Result<(), Error> {
+fn copy_empty_dir() -> TResult {
     let dir = tempdir()?;
 
     let source_path = dir.path().join("mydir");
@@ -210,7 +249,7 @@ fn copy_empty_dir() -> Result<(), Error> {
 }
 
 #[test]
-fn copy_all_dirs() -> Result<(), Error> {
+fn copy_all_dirs() -> TResult {
     let dir = tempdir()?;
 
     let source_path = dir.path().join("mydir");
@@ -235,7 +274,7 @@ fn copy_all_dirs() -> Result<(), Error> {
 }
 
 #[test]
-fn copy_all_dirs_rel() -> Result<(), Error> {
+fn copy_all_dirs_rel() -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -260,7 +299,7 @@ fn copy_all_dirs_rel() -> Result<(), Error> {
 }
 
 #[test]
-fn copy_dirs_files() -> Result<(), Error> {
+fn copy_dirs_files() -> TResult {
     let dir = tempdir()?;
 
     let source_path = dir.path().join("mydir");
@@ -292,7 +331,7 @@ fn copy_dirs_files() -> Result<(), Error> {
 }
 
 #[test]
-fn copy_dirs_overwrites() -> Result<(), Error> {
+fn copy_dirs_overwrites() -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -329,7 +368,7 @@ fn copy_dirs_overwrites() -> Result<(), Error> {
 }
 
 #[test]
-fn dir_copy_to_nonexistent_is_rename() -> Result<(), Error> {
+fn dir_copy_to_nonexistent_is_rename() -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -354,7 +393,7 @@ fn dir_copy_to_nonexistent_is_rename() -> Result<(), Error> {
 }
 
 #[test]
-fn dir_overwrite_with_noclobber() -> Result<(), Error> {
+fn dir_overwrite_with_noclobber() -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -392,7 +431,7 @@ fn dir_overwrite_with_noclobber() -> Result<(), Error> {
 
 
 #[test]
-fn dir_copy_containing_symlinks() -> Result<(), Error> {
+fn dir_copy_containing_symlinks() -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -427,7 +466,7 @@ fn dir_copy_containing_symlinks() -> Result<(), Error> {
 
 
 #[test]
-fn dir_copy_with_hidden_file() -> Result<(), Error> {
+fn dir_copy_with_hidden_file() -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -452,7 +491,7 @@ fn dir_copy_with_hidden_file() -> Result<(), Error> {
 }
 
 #[test]
-fn dir_copy_with_hidden_dir() -> Result<(), Error> {
+fn dir_copy_with_hidden_dir() -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir/.hidden");
@@ -478,7 +517,7 @@ fn dir_copy_with_hidden_dir() -> Result<(), Error> {
 
 
 #[test]
-fn dir_with_gitignore() -> Result<(), Error> {
+fn dir_with_gitignore() -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -510,7 +549,7 @@ fn dir_with_gitignore() -> Result<(), Error> {
 
 
 #[test]
-fn copy_with_glob() -> Result<(), Error> {
+fn copy_with_glob() -> TResult {
     let dir = tempdir_rel()?;
     let dest = dir.join("dest");
     create_dir_all(&dest)?;
@@ -533,7 +572,7 @@ fn copy_with_glob() -> Result<(), Error> {
 
 
 #[test]
-fn glob_pattern_error() -> Result<(), Error> {
+fn glob_pattern_error() -> TResult {
     let dir = tempdir_rel()?;
     let dest = dir.join("dest");
     create_dir_all(&dest)?;
@@ -550,6 +589,18 @@ fn glob_pattern_error() -> Result<(), Error> {
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr)?;
     assert!(stderr.contains("PatternError"));
+
+    Ok(())
+}
+
+
+#[test]
+fn test_sparse_rust_seek() -> TResult {
+    let dir = tempdir()?;
+    let file = dir.path().join("sparse.bin");
+
+    create_sparse(&file)?;
+    assert!(probably_sparse(&file)?);
 
     Ok(())
 }
