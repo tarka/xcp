@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use std::mem;
 use std::io;
 use std::os::unix::io::AsRawFd;
-use std::os::unix::ffi::OsStrExt;
 use std::ptr::null_mut;
 
 use crate::errors::Result;
@@ -120,7 +119,8 @@ pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<i64> {
             fd.as_raw_fd(),
             off,
             wence as libc::c_int
-        ) };
+        )
+    };
     result_or_errno(r, r)
 }
 
@@ -138,9 +138,10 @@ pub fn probably_sparse(fd: &File) -> Result<bool> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+    use std::fmt::format;
     use std::fs::{read, OpenOptions};
     use std::process::Command;
-    use std::io::Write;
+    use std::io::{Seek, SeekFrom, Write};
 
     #[test]
     fn test_stat() -> Result<()> {
@@ -222,8 +223,7 @@ mod tests {
 
         let out = Command::new("/usr/bin/truncate")
             .args(&["-s", "1M", file.to_str().unwrap()])
-            .output()
-            ?;
+            .output()?;
         assert!(out.status.success());
 
         let offset: usize = 512*1024;
@@ -266,8 +266,7 @@ mod tests {
 
         let out = Command::new("/usr/bin/truncate")
             .args(&["-s", "1M", file.to_str().unwrap()])
-            .output()
-            ?;
+            .output()?;
         assert!(out.status.success());
         {
             let infd = File::open(&from)?;
@@ -284,6 +283,39 @@ mod tests {
 
         let off = lseek(&File::open(&file)?, 0, Wence::Data)?;
         assert!(off == offset as i64);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sparse_rust_seek() -> Result<()> {
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
+
+        let data = "c00lc0d3";
+
+        {
+            let mut fd = File::create(&file)?;
+            write!(fd, "{}", data);
+
+            fd.seek(SeekFrom::Start(1024*4096))?;
+            write!(fd, "{}", data);
+
+            fd.seek(SeekFrom::Start(4096*4096 - data.len() as u64))?;
+            write!(fd, "{}", data);
+        }
+
+        assert!(probably_sparse(&File::open(&file)?)?);
+
+        let bytes = read(&file)?;
+        assert!(bytes.len() == 4096*4096);
+
+        let offset = 1024 * 4096;
+        assert!(bytes[offset] == b'c');
+        assert!(bytes[offset+1] == b'0');
+        assert!(bytes[offset+2] == b'0');
+        assert!(bytes[offset+3] == b'l');
+        assert!(bytes[offset+data.len()] == 0);
 
         Ok(())
     }
