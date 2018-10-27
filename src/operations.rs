@@ -10,7 +10,7 @@ use std::thread;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::errors::{io_err, Result, XcpError};
-use crate::os::copy_file_bytes;
+use crate::os::{copy_file_bytes, probably_sparse, lseek, Wence, SeekOff};
 use crate::progress::{
     iprogress_bar, BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
     BATCH_DEFAULT,
@@ -28,14 +28,8 @@ enum Operation {
 }
 
 
-fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> {
-    let infd = File::open(from)?;
-    let outfd = File::create(to)?;
-    let (perm, len) = {
-        let metadata = infd.metadata()?;
-        (metadata.permissions(), metadata.len())
-    };
-
+/// Copy len bytes from whereever the descriptor cursors are set.
+fn copy_range(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
     let mut written = 0u64;
     while written < len {
         let bytes_to_copy = cmp::min(len - written, updates.batch_size);
@@ -43,8 +37,54 @@ fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> 
         written += result;
         updates.update(Ok(result))?;
     }
-    outfd.set_permissions(perm)?;
+
     Ok(written)
+}
+
+fn get_next(fd: &File, pos: u64) -> Result<(u64, u64)> {
+    let next_data = match lseek(fd, pos as i64, Wence::Data)? {
+        SeekOff::Offset(off) => off,
+        SeekOff::EOF => fd.metadata()?.len()
+    };
+    let next_hole = match lseek(fd, next_data as i64, Wence::Hole)? {
+        SeekOff::Offset(off) => off,
+        SeekOff::EOF => fd.metadata()?.len()
+    };
+
+    Ok((next_data, next_hole))
+}
+
+fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Result<u64> {
+    let len = infd.metadata()?.len();
+    let mut pos = 0;
+
+    while pos < len {
+        let (next_data, next_hole) = get_next(infd, pos)?;
+
+        lseek(infd, next_data as i64, Wence::Set)?;  // FIXME: EOF
+        lseek(outfd, next_data as i64, Wence::Set)?;  // FIXME: EOF
+        let _written = copy_range(infd, outfd, next_hole - next_data, updates)?;
+        pos = next_hole;
+    }
+
+    Ok(len)
+}
+
+fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> {
+    let infd = File::open(from)?;
+    let outfd = File::create(to)?;
+
+    let total = if probably_sparse(&infd)? {
+        debug!("File {:?} is sparse", from);
+        copy_sparse(&infd, &outfd, updates)?
+
+    } else {
+        let len = infd.metadata()?.len();
+        copy_range(&infd, &outfd, len, updates)?
+    };
+
+    outfd.set_permissions(infd.metadata()?.permissions())?;
+    Ok(total)
 }
 
 
@@ -53,16 +93,16 @@ fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Re
     for op in work {
         debug!("Received operation {:?}", op);
 
-        // FIXME: If we implement parallel copies (which may
-        // improve performance on some SSD configurations) we
-        // should also created the parent directory, and the
-        // dir-create operation could be out of order.
+        // FIXME: If we implement parallel copies (which may improve
+        // performance on some SSD configurations) we should also
+        // created the parent directory, and the dir-create operation
+        // could be out of order.
         match op {
             Operation::Copy(from, to) => {
                 info!("Worker: Copy {:?} -> {:?}", from, to);
-                // copy_file sends back its own updates, but we
-                // should send back any errors as they may have
-                // occured before the copy started..
+                // copy_file sends back its own updates, but we should
+                // send back any errors as they may have occured
+                // before the copy started..
                 let r = copy_file(&from, &to, &mut updates);
                 if r.is_err() {
                     updates.update(r)?;
@@ -71,7 +111,7 @@ fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Re
 
             Operation::Link(from, to) => {
                 info!("Worker: Symlink {:?} -> {:?}", from, to);
-                let _res = symlink(&from, &to);
+                let _r = symlink(&from, &to);
             }
 
             Operation::CreateDir(dir) => {

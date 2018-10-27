@@ -597,10 +597,19 @@ fn glob_pattern_error() -> TResult {
 #[test]
 fn test_sparse_rust_seek() -> TResult {
     let dir = tempdir()?;
-    let file = dir.path().join("sparse.bin");
+    let from = dir.path().join("sparse.bin");
+    let to = dir.path().join("target.bin");
 
-    create_sparse(&file)?;
-    assert!(probably_sparse(&file)?);
+    create_sparse(&from)?;
+    assert!(probably_sparse(&from)?);
+
+    let out = run(&[
+        from.to_str().unwrap(),
+        to.to_str().unwrap(),
+    ])?;
+    assert!(out.status.success());
+
+    assert!(probably_sparse(&to)?);
 
     Ok(())
 }

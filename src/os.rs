@@ -113,7 +113,13 @@ pub enum Wence {
     Hole = libc::SEEK_HOLE as isize,
 }
 
-pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<i64> {
+#[derive(PartialEq, Debug)]
+pub enum SeekOff {
+    Offset(u64),
+    EOF
+}
+
+pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<SeekOff> {
     let r = unsafe {
         libc::lseek64(
             fd.as_raw_fd(),
@@ -121,7 +127,20 @@ pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<i64> {
             wence as libc::c_int
         )
     };
-    result_or_errno(r, r)
+
+    if r == -1 {
+        let err = io::Error::last_os_error();
+        match err.raw_os_error() {
+            Some(errno) if errno == libc::ENXIO => {
+                Ok(SeekOff::EOF)
+            }
+            _ => Err(err.into())
+        }
+
+    } else {
+        Ok(SeekOff::Offset(r as u64))
+    }
+
 }
 
 
@@ -257,7 +276,7 @@ mod tests {
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
         let data = "test data";
-        let offset: usize = 512*1024;
+        let offset = 512*1024;
 
         {
             let mut fd = File::create(&from)?;
@@ -282,15 +301,16 @@ mod tests {
         assert!(probably_sparse(&File::open(&file)?)?);
 
         let off = lseek(&File::open(&file)?, 0, Wence::Data)?;
-        assert!(off == offset as i64);
+        assert_eq!(off, SeekOff::Offset(offset));
 
         Ok(())
     }
 
     #[test]
     fn test_sparse_rust_seek() -> Result<()> {
-        let dir = tempdir()?;
-        let file = dir.path().join("sparse.bin");
+        //let dir = tempdir()?;
+        let dir = PathBuf::from("target");
+        let file = dir.join("sparse.bin");
 
         let data = "c00lc0d3";
 
@@ -316,6 +336,25 @@ mod tests {
         assert!(bytes[offset+2] == b'0');
         assert!(bytes[offset+3] == b'l');
         assert!(bytes[offset+data.len()] == 0);
+
+        Ok(())
+    }
+
+
+    #[test]
+    fn test_lseek_no_data() -> Result<()> {
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
+
+        let out = Command::new("/usr/bin/truncate")
+            .args(&["-s", "1M", file.to_str().unwrap()])
+            .output()?;
+        assert!(out.status.success());
+        assert!(probably_sparse(&File::open(&file)?)?);
+
+        let fd = File::open(&file)?;
+        let off = lseek(&fd, 0, Wence::Data)?;
+        assert!(off == SeekOff::EOF);
 
         Ok(())
     }
