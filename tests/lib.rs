@@ -1,7 +1,7 @@
 use failure::Error;
 
 use escargot::CargoBuild;
-use std::fs::{create_dir_all, write, File};
+use std::fs::{create_dir_all, read, write, File};
 use std::io::{Seek, SeekFrom, Read, Write};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -61,7 +61,7 @@ fn create_sparse(file: &Path) -> TResult {
     Ok(())
 }
 
-fn probably_sparse(file: &Path) -> Result<bool, Error> { 
+fn quickstat(file: &Path) -> Result<(i32, i32, i32), Error> {
     let out = Command::new("stat")
         .args(&["--format", "%s %b %B",
                 file.to_str().unwrap()])
@@ -74,6 +74,12 @@ fn probably_sparse(file: &Path) -> Result<bool, Error> {
         .map(|s| s.parse::<i32>().unwrap())
         .collect::<Vec<i32>>();
     let (size, blocks, blksize) = (stats[0], stats[1], stats[2]);
+
+    Ok((size, blocks, blksize))
+}
+
+fn probably_sparse(file: &Path) -> Result<bool, Error> {
+    let (size, blocks, blksize) = quickstat(file)?;
 
     Ok(blocks < size / blksize)
 }
@@ -610,6 +616,12 @@ fn test_sparse_rust_seek() -> TResult {
     assert!(out.status.success());
 
     assert!(probably_sparse(&to)?);
+
+    assert_eq!(quickstat(&from)?, quickstat(&to)?);
+
+    let from_data = read(&from)?;
+    let to_data = read(&to)?;
+    assert_eq!(from_data, to_data);
 
     Ok(())
 }
