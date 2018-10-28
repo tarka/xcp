@@ -24,7 +24,8 @@ automatically.
 * Uses the Linux `copy_file_range` call to copy files. This is the most
   efficient method of file-copying under Linux; in particular it is
   filesystem-aware, and can massively speed-up copies on network mounts by
-  performing the copy operations server-side. However, see Anti-Features below.
+  performing the copy operations server-side. However, unlike `copy_file_range`
+  sparse files are detected and handled appropriately.
 * Optionally understands `.gitignore` files to limit the copied directories.
 * Optimised for 'modern' systems (i.e. multiple cores, copious RAM, and
   solid-state disks, especially ones connected into the main system bus,
@@ -35,14 +36,14 @@ automatically.
 * Optional aggressive parallelism for systems with parallel IO. Quick
   experiments on a modern laptop suggest there may be benefits to parallel
   copies on NVMe disks. This is obviously highly system-dependent.
+* Conversion of files to sparse where appropriate, as with `cp`'s
+  `--sparse=always` flag.
+* Aggressive sparseness detection with `lseek`.
 
 ### Anti-Features
 
 * Currently only supports Linux, specifically kernels 4.5 and onwards. Other
   Unix-like OS's may be added later.
-* Reportedly `copy_file_range` does not understand sparse files, and will expand
-  any 'holes' on disk. One common use of sparse files is virtual disks
-  (e.g. from Virtualbox). Better sparse-file handling may be added later.
 * Assumes a 'modern' system with lots of RAM and fast, solid-state disks. In
   particular it is likely to thrash on spinning disks as it attempts to gather
   metadata and perform copies at the same time.
