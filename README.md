@@ -5,6 +5,9 @@ full replacement, but as a companion utility with some more user-friendly
 feedback and some optimisations that make sense under certain tasks (see
 below).
 
+[![Pipelines build status](https://img.shields.io/bitbucket/pipelines/tarkasteve/xcp.svg)](https://bitbucket.org/tarkasteve/xcp/addon/pipelines/home#!/)
+[![Crates.io](https://img.shields.io/crates/v/xcp.svg)](https://crates.io/crates/xcp)
+
 *Warning*: `xcp` is currently pre-alpha level software and almost certainly contains
 bugs and unexpected or inconsistent behaviour. It probably shouldn't be used for
 anything critical yet.
@@ -62,17 +65,17 @@ performance interference.
 ### Local copy
 
 * Single 4.1GB file copy, with the kernel cache dropped each run:
-** `cp`: ~6.2s
-** `xcp`: ~4.2s
+ * `cp`: ~6.2s
+ * `xcp`: ~4.2s
 * Single 4.1GB file copy, warmed cache (3 runs each):
-** `cp`: ~1.85s
-** `xcp`: ~1.7x
+ * `cp`: ~1.85s
+ * `xcp`: ~1.7x
 * Directory copy, kernel cache dropped each run:
-** `cp`: ~48s
-** `xcp`: ~56x
+ * `cp`: ~48s
+ * `xcp`: ~56x
 * Directory copy, warmed cache (3 runs each):
-** `cp`: ~6.9s
-** `xcp`: ~7.4s
+ * `cp`: ~6.9s
+ * `xcp`: ~7.4s
 
 ### NFS copy
 
@@ -81,5 +84,5 @@ in the copy occurring server-side rather than transferring across the network. F
 large files this can be a significant win:
 
 * Single 4.1GB file on NFSv4 mount
-** `cp`: 378s
-** `xcp`: ~37s
+ * `cp`: 378s
+ * `xcp`: ~37s
