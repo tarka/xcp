@@ -1,5 +1,6 @@
 [package]
 name = "xcp"
+description = "xcp is a (partial) clone of the Unix `cp` command with some more user-friendly feedback and some optimisations."
 version = "0.1.0"
 edition = "2018"
 
