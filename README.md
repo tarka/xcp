@@ -65,17 +65,17 @@ performance interference.
 ### Local copy
 
 * Single 4.1GB file copy, with the kernel cache dropped each run:
- * `cp`: ~6.2s
- * `xcp`: ~4.2s
+    * `cp`: ~6.2s
+    * `xcp`: ~4.2s
 * Single 4.1GB file copy, warmed cache (3 runs each):
- * `cp`: ~1.85s
- * `xcp`: ~1.7x
+    * `cp`: ~1.85s
+    * `xcp`: ~1.7x
 * Directory copy, kernel cache dropped each run:
- * `cp`: ~48s
- * `xcp`: ~56x
+    * `cp`: ~48s
+    * `xcp`: ~56x
 * Directory copy, warmed cache (3 runs each):
- * `cp`: ~6.9s
- * `xcp`: ~7.4s
+    * `cp`: ~6.9s
+    * `xcp`: ~7.4s
 
 ### NFS copy
 
@@ -84,5 +84,5 @@ in the copy occurring server-side rather than transferring across the network. F
 large files this can be a significant win:
 
 * Single 4.1GB file on NFSv4 mount
- * `cp`: 378s
- * `xcp`: ~37s
+    * `cp`: 378s
+    * `xcp`: ~37s
