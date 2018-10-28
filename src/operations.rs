@@ -10,7 +10,7 @@ use std::thread;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::errors::{io_err, Result, XcpError};
-use crate::os::{copy_file_bytes, probably_sparse, lseek, Wence, SeekOff};
+use crate::os::{allocate_file, copy_file_bytes, probably_sparse, lseek, Wence, SeekOff};
 use crate::progress::{
     iprogress_bar, BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
     BATCH_DEFAULT,
@@ -41,7 +41,7 @@ fn copy_range(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdater) -
     Ok(written)
 }
 
-fn get_next(fd: &File, pos: u64) -> Result<(u64, u64)> {
+fn next_sparse_segments(fd: &File, pos: u64) -> Result<(u64, u64)> {
     let next_data = match lseek(fd, pos as i64, Wence::Data)? {
         SeekOff::Offset(off) => off,
         SeekOff::EOF => fd.metadata()?.len()
@@ -56,13 +56,15 @@ fn get_next(fd: &File, pos: u64) -> Result<(u64, u64)> {
 
 fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Result<u64> {
     let len = infd.metadata()?.len();
+    allocate_file(&outfd, len)?;
+
     let mut pos = 0;
 
     while pos < len {
-        let (next_data, next_hole) = get_next(infd, pos)?;
-
+        let (next_data, next_hole) = next_sparse_segments(infd, pos)?;
         lseek(infd, next_data as i64, Wence::Set)?;  // FIXME: EOF (but shouldn't happen)
         lseek(outfd, next_data as i64, Wence::Set)?;
+
         let _written = copy_range(infd, outfd, next_hole - next_data, updates)?;
         pos = next_hole;
     }

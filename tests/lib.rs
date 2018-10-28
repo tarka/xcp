@@ -690,3 +690,32 @@ fn test_sparse_trailng_gap() -> TResult {
 
     Ok(())
 }
+
+#[test]
+fn test_empty_sparse() -> TResult {
+    let dir = tempdir()?;
+    let from = dir.path().join("sparse.bin");
+    let to = dir.path().join("target.bin");
+
+    let out = Command::new("/usr/bin/truncate")
+        .args(&["-s", "1M", from.to_str().unwrap()])
+        .output()?;
+    assert!(out.status.success());
+    assert_eq!(from.metadata()?.len(), 1024*1024);
+
+    let out = run(&[
+        from.to_str().unwrap(),
+        to.to_str().unwrap(),
+    ])?;
+    assert!(out.status.success());
+    assert_eq!(to.metadata()?.len(), 1024*1024);
+
+    assert!(probably_sparse(&to)?);
+    assert_eq!(quickstat(&from)?, quickstat(&to)?);
+
+    let from_data = read(&from)?;
+    let to_data = read(&to)?;
+    assert_eq!(from_data, to_data);
+
+    Ok(())
+}

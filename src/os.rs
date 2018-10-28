@@ -104,6 +104,14 @@ pub fn fstat(fd: &File) -> Result<libc::stat> {
     result_or_errno(r as i64, stat)
 }
 
+pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
+    let r = unsafe {
+        libc::ftruncate(fd.as_raw_fd(), len as i64)
+    };
+    result_or_errno(r as i64, ())
+}
+
+
 /// Corresponds to lseek(2) `wence`
 #[allow(dead_code)]
 pub enum Wence {
@@ -360,4 +368,20 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_allocate_file_is_sparse() -> Result<()> {
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
+        let len = 32 * 1024 * 1024;
+
+        {
+            let fd = File::create(&file)?;
+            allocate_file(&fd, len)?;
+        }
+
+        assert_eq!(len, file.metadata()?.len());
+        assert!(probably_sparse(&File::open(&file)?)?);
+
+        Ok(())
+    }
 }
