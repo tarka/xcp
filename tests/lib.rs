@@ -1,7 +1,7 @@
 use failure::Error;
 
 use escargot::CargoBuild;
-use std::fs::{create_dir_all, read, write, File};
+use std::fs::{create_dir_all, read, write, File, OpenOptions};
 use std::io::{Seek, SeekFrom, Read, Write};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -44,25 +44,31 @@ fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
     Ok(buf == text)
 }
 
-fn create_sparse(file: &Path, head: u64, tail: u64) -> TResult {
+fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
     let data = "c00lc0d3";
+    let len = 4096u64 * 4096 + data.len() as u64 + tail;
 
-    {
-        let mut fd = File::create(&file)?;
+    let out = Command::new("/usr/bin/truncate")
+        .args(&["-s", len.to_string().as_str(),
+                file.to_str().unwrap()])
+        .output()?;
+    assert!(out.status.success());
 
-        fd.seek(SeekFrom::Start(head))?;
-        write!(fd, "{}", data);
+    let mut fd = OpenOptions::new()
+        .write(true)
+        .append(false)
+        .open(&file)?;
 
-        fd.seek(SeekFrom::Start(1024*4096))?;
-        write!(fd, "{}", data);
+    fd.seek(SeekFrom::Start(head))?;
+    write!(fd, "{}", data);
 
-        fd.seek(SeekFrom::Start(4096*4096 - data.len() as u64))?;
-        write!(fd, "{}", data);
+    fd.seek(SeekFrom::Start(1024*4096))?;
+    write!(fd, "{}", data);
 
-        fd.seek(SeekFrom::Start(4096*4096 + tail))?;
-    }
+    fd.seek(SeekFrom::Start(4096*4096))?;
+    write!(fd, "{}", data);
 
-    Ok(())
+    Ok(len as u64)
 }
 
 fn quickstat(file: &Path) -> Result<(i32, i32, i32), Error> {
@@ -610,7 +616,8 @@ fn test_sparse() -> TResult {
     let from = dir.path().join("sparse.bin");
     let to = dir.path().join("target.bin");
 
-    create_sparse(&from, 0, 0)?;
+    let slen = create_sparse(&from, 0, 0)?;
+    assert_eq!(slen, from.metadata()?.len());
     assert!(probably_sparse(&from)?);
 
     let out = run(&[
@@ -636,7 +643,8 @@ fn test_sparse_leading_gap() -> TResult {
     let from = dir.path().join("sparse.bin");
     let to = dir.path().join("target.bin");
 
-    create_sparse(&from, 1024, 0)?;
+    let slen = create_sparse(&from, 1024, 0)?;
+    assert_eq!(slen, from.metadata()?.len());
     assert!(probably_sparse(&from)?);
 
     let out = run(&[
@@ -662,7 +670,8 @@ fn test_sparse_trailng_gap() -> TResult {
     let from = dir.path().join("sparse.bin");
     let to = dir.path().join("target.bin");
 
-    create_sparse(&from, 1024, 1024)?;
+    let slen = create_sparse(&from, 1024, 1024)?;
+    assert_eq!(slen, from.metadata()?.len());
     assert!(probably_sparse(&from)?);
 
     let out = run(&[
