@@ -10,7 +10,7 @@ readme = "README.md"
 
 keywords = ["coreutils", "cp", "files", "filesystem"]
 categories =["command-line-utilities"]
-license = "GPL-3.0"
+license = " GPL-3.0-only"
 
 [features]
 default = ["kernel_copy_file_range"]
