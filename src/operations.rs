@@ -148,13 +148,12 @@ fn empty(path: &Path) -> bool {
     *path == PathBuf::new()
 }
 
-fn tree_walker(
-    source: PathBuf,
-    opts: Opts,
-    work_tx: mpsc::Sender<Operation>,
-    mut updates: BatchUpdater,
+fn copy_source(
+    source: &PathBuf,
+    opts: &Opts,
+    work_tx: &mpsc::Sender<Operation>,
+    updates: &mut BatchUpdater,
 ) -> Result<()> {
-    debug!("Starting walk worker {:?}", thread::current().id());
 
     let sourcedir = source.components().last().ok_or(XcpError::InvalidSource {
         msg: "Failed to find source directory name.",
@@ -198,7 +197,7 @@ fn tree_walker(
             return Err(XcpError::EarlyShutdown {
                 msg: "Path exists and --no-clobber set.",
             }
-            .into());
+                       .into());
         }
 
         match meta.file_type().to_enum() {
@@ -228,12 +227,28 @@ fn tree_walker(
         };
     }
 
+    Ok(())
+}
+
+
+fn tree_walker(
+    sources: Vec<PathBuf>,
+    opts: Opts,
+    work_tx: mpsc::Sender<Operation>,
+    mut updates: BatchUpdater,
+) -> Result<()> {
+    debug!("Starting walk worker {:?}", thread::current().id());
+
+    for source in sources {
+        copy_source(&source, &opts, &work_tx, &mut updates)?;
+    }
     work_tx.send(Operation::End)?;
     debug!("Walk-worker finished: {:?}", thread::current().id());
     Ok(())
 }
 
-pub fn copy_tree(source: PathBuf, opts: &Opts) -> Result<()> {
+
+pub fn copy_all(sources: Vec<PathBuf>, opts: &Opts) -> Result<()> {
     let (work_tx, work_rx) = mpsc::channel();
     let (stat_tx, stat_rx) = mpsc::channel();
 
@@ -242,7 +257,6 @@ pub fn copy_tree(source: PathBuf, opts: &Opts) -> Result<()> {
     } else {
         (iprogress_bar(0), BATCH_DEFAULT)
     };
-
 
     let _copy_worker = {
         let copy_stat = BatchUpdater {
@@ -259,7 +273,7 @@ pub fn copy_tree(source: PathBuf, opts: &Opts) -> Result<()> {
             stat: StatusUpdate::Size(0),
             batch_size: batch_size,
         };
-        thread::spawn(move || tree_walker(source, topts, work_tx, size_stat))
+        thread::spawn(move || tree_walker(sources, topts, work_tx, size_stat))
     };
 
     let mut copied = 0;
@@ -280,7 +294,7 @@ pub fn copy_tree(source: PathBuf, opts: &Opts) -> Result<()> {
     // FIXME: We should probably join the threads and consume any errors.
 
     pb.end();
-    debug!("Copy-tree complete");
+    debug!("Copy complete");
 
     Ok(())
 }

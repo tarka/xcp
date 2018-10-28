@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use crate::errors::{io_err, Result, XcpError};
-use crate::operations::{copy_single_file, copy_tree};
+use crate::operations::{copy_single_file, copy_all};
 use crate::utils::expand_globs;
 
 
@@ -53,16 +53,6 @@ pub struct Opts {
     dest: PathBuf,
 }
 
-fn check_and_copy_tree(source: PathBuf, opts: &Opts) -> Result<()> {
-    if opts.dest.exists() && !opts.dest.is_dir() {
-        return Err(XcpError::InvalidDestination {
-            msg: "Source is directory but target exists and is not a directory",
-        }
-        .into());
-    }
-    copy_tree(source, opts)
-}
-
 fn main() -> Result<()> {
     let opts = Opts::from_args();
 
@@ -94,7 +84,9 @@ fn main() -> Result<()> {
         copy_single_file(&sources[0], &opts)?;
 
     } else {
-        for source in sources {
+
+        // Sanity-check all sources up-front
+        for source in &sources {
             info!("Copying source {:?} to {:?}", source, opts.dest);
             if !source.exists() {
                 return Err(io_err(IOKind::NotFound, "Source does not exist."));
@@ -106,8 +98,14 @@ fn main() -> Result<()> {
                 }.into())
             }
 
-            check_and_copy_tree(source.to_path_buf(), &opts)?;
+            if opts.dest.exists() && !opts.dest.is_dir() {
+                return Err(XcpError::InvalidDestination {
+                    msg: "Source is directory but target exists and is not a directory",
+                }.into());
+            }
         }
+
+        copy_all(sources, &opts)?;
     }
 
     Ok(())
