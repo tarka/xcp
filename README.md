@@ -69,10 +69,10 @@ performance interference.
     * `xcp`: ~4.2s
 * Single 4.1GB file copy, warmed cache (3 runs each):
     * `cp`: ~1.85s
-    * `xcp`: ~1.7x
+    * `xcp`: ~1.7s
 * Directory copy, kernel cache dropped each run:
     * `cp`: ~48s
-    * `xcp`: ~56x
+    * `xcp`: ~56s
 * Directory copy, warmed cache (3 runs each):
     * `cp`: ~6.9s
     * `xcp`: ~7.4s
