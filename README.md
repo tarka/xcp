@@ -5,7 +5,6 @@ full replacement, but as a companion utility with some more user-friendly
 feedback and some optimisations that make sense under certain tasks (see
 below).
 
-[![Pipelines build status](https://img.shields.io/bitbucket/pipelines/tarkasteve/xcp.svg?logo=bitbucket&colorA=777777)](https://bitbucket.org/tarkasteve/xcp/addon/pipelines/home#!/)
 [![Crates.io](https://img.shields.io/crates/v/xcp.svg?colorA=777777)](https://crates.io/crates/xcp)
 
 *Warning*: `xcp` is currently pre-alpha level software and almost certainly contains
