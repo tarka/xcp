@@ -5,13 +5,13 @@ version = "0.1.1-alpha.2"
 edition = "2018"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
-homepage = "https://bitbucket.org/tarkasteve/xcp/"
-repository = "https://bitbucket.org/tarkasteve/xcp/"
+homepage = "https://github.com/tarka/xcp/"
+repository = "https://github.com/tarka/xcp/"
 readme = "README.md"
 
 keywords = ["coreutils", "cp", "files", "filesystem"]
 categories =["command-line-utilities"]
-license = " GPL-3.0-only"
+license = "GPL-3.0-only"
 
 [features]
 default = ["kernel_copy_file_range"]
