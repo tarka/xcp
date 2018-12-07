@@ -209,14 +209,18 @@ mod tests {
             ?;
         assert!(out.status.success());
 
-        let fd = File::open(&file)?;
-
-        assert!(probably_sparse(&fd)?);
         {
-            let mut fd = File::open(&file)?;
-            write!(fd, "{}", "test");
+            let fd = File::open(&file)?;
+            assert!(probably_sparse(&fd)?);
         }
-        assert!(probably_sparse(&fd)?);
+        {
+            let mut fd = OpenOptions::new()
+                .write(true)
+                .append(false)
+                .open(&file)?;
+            write!(fd, "{}", "test")?;
+            assert!(probably_sparse(&fd)?);
+        }
 
         Ok(())
     }
@@ -230,7 +234,7 @@ mod tests {
 
         {
             let mut fd = File::create(&from)?;
-            write!(fd, "{}", data);
+            write!(fd, "{}", data)?;
         }
 
         let out = Command::new("/usr/bin/truncate")
@@ -262,7 +266,7 @@ mod tests {
 
         {
             let mut fd = File::create(&from)?;
-            write!(fd, "{}", data);
+            write!(fd, "{}", data)?;
         }
 
         let out = Command::new("/usr/bin/truncate")
@@ -305,7 +309,7 @@ mod tests {
 
         {
             let mut fd = File::create(&from)?;
-            write!(fd, "{}", data);
+            write!(fd, "{}", data)?;
         }
 
         let out = Command::new("/usr/bin/truncate")
@@ -341,13 +345,13 @@ mod tests {
 
         {
             let mut fd = File::create(&file)?;
-            write!(fd, "{}", data);
+            write!(fd, "{}", data)?;
 
             fd.seek(SeekFrom::Start(1024*4096))?;
-            write!(fd, "{}", data);
+            write!(fd, "{}", data)?;
 
             fd.seek(SeekFrom::Start(4096*4096 - data.len() as u64))?;
-            write!(fd, "{}", data);
+            write!(fd, "{}", data)?;
         }
 
         assert!(probably_sparse(&File::open(&file)?)?);
