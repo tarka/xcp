@@ -16,8 +16,8 @@
 
 use libc;
 use std::fs::File;
-use std::mem;
 use std::io;
+use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::ptr::null_mut;
 
@@ -113,13 +113,6 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
     result_or_errno(r, r as u64)
 }
 
-pub fn fstat(fd: &File) -> Result<libc::stat> {
-    let mut stat: libc::stat = unsafe { mem::uninitialized() };
-    let r = unsafe { libc::fstat(fd.as_raw_fd(), &mut stat) };
-
-    result_or_errno(r as i64, stat)
-}
-
 pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
     let r = unsafe {
         libc::ftruncate(fd.as_raw_fd(), len as i64)
@@ -173,8 +166,8 @@ pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<SeekOff> {
 // expected for its stated size. This is the same test used by
 // coreutils `cp`.
 pub fn probably_sparse(fd: &File) -> Result<bool> {
-    let st = fstat(fd)?;
-    Ok(st.st_blocks < st.st_size / st.st_blksize)
+    let stat = fd.metadata()?;
+    Ok(stat.st_blocks() < stat.st_size() / stat.st_blksize())
 }
 
 
@@ -186,16 +179,6 @@ mod tests {
     use std::fs::{read, OpenOptions};
     use std::process::Command;
     use std::io::{Seek, SeekFrom, Write};
-
-    #[test]
-    fn test_stat() -> Result<()> {
-        let hosts = File::open("/etc/hosts")?;
-        let hsize = hosts.metadata()?.len() as i64;
-        let hstat = fstat(&hosts)?;
-        assert!(hsize == hstat.st_size);
-
-        Ok(())
-    }
 
     #[test]
     fn test_sparse_detection() -> Result<()> {
