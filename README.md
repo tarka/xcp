@@ -17,6 +17,17 @@ This is due for release December 2018. You will need a recent beta of the Rust
 toolchain to compile this code; if you are using `rustup` it will install it
 automatically.
 
+## Installation
+
+### Arch Linux
+
+[`xcp`](https://aur.archlinux.org/packages/xcp/) is available on the Arch Linux User Repository. If you use an AUR helper, you can execute a command such as this:
+```
+yay -S xcp
+```
+
+
+
 ## Features and Anti-Features
 
 ### Features
