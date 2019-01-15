@@ -48,7 +48,7 @@ fn tempdir_rel() -> Result<PathBuf, Error> {
 
 fn create_file(path: &Path, text: &str) -> Result<(), Error> {
     let file = File::create(&path)?;
-    write!(&file, "{}", text);
+    write!(&file, "{}", text)?;
     Ok(())
 }
 
@@ -76,13 +76,13 @@ fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
         .open(&file)?;
 
     fd.seek(SeekFrom::Start(head))?;
-    write!(fd, "{}", data);
+    write!(fd, "{}", data)?;
 
     fd.seek(SeekFrom::Start(1024*4096))?;
-    write!(fd, "{}", data);
+    write!(fd, "{}", data)?;
 
     fd.seek(SeekFrom::Start(4096*4096))?;
-    write!(fd, "{}", data);
+    write!(fd, "{}", data)?;
 
     Ok(len as u64)
 }
