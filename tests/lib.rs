@@ -60,6 +60,7 @@ fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
     Ok(buf == text)
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
     let data = "c00lc0d3";
     let len = 4096u64 * 4096 + data.len() as u64 + tail;
@@ -626,6 +627,7 @@ fn glob_pattern_error() -> TResult {
 }
 
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
 fn test_sparse() -> TResult {
     let dir = tempdir()?;
@@ -653,6 +655,7 @@ fn test_sparse() -> TResult {
     Ok(())
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
 fn test_sparse_leading_gap() -> TResult {
     let dir = tempdir()?;
@@ -680,6 +683,7 @@ fn test_sparse_leading_gap() -> TResult {
     Ok(())
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
 fn test_sparse_trailng_gap() -> TResult {
     let dir = tempdir()?;
@@ -707,6 +711,7 @@ fn test_sparse_trailng_gap() -> TResult {
     Ok(())
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
 fn test_empty_sparse() -> TResult {
     let dir = tempdir()?;
