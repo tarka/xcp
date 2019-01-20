@@ -26,19 +26,19 @@ automatically.
 yay -S xcp
 ```
 
-
-
 ## Features and Anti-Features
 
 ### Features
 
 * Displays a progress-bar, both for directory and single file copies. This can
   be disabled with `--no-progress`.
-* Uses the Linux `copy_file_range` call to copy files. This is the most
+* On Linux it uses `copy_file_range` call to copy files. This is the most
   efficient method of file-copying under Linux; in particular it is
   filesystem-aware, and can massively speed-up copies on network mounts by
   performing the copy operations server-side. However, unlike `copy_file_range`
   sparse files are detected and handled appropriately.
+* Non-Linux Unix-like OSs (OS X, *BSD) are supported via fall-back operation
+  (although sparse-files are not supported).
 * Optionally understands `.gitignore` files to limit the copied directories.
 * Optimised for 'modern' systems (i.e. multiple cores, copious RAM, and
   solid-state disks, especially ones connected into the main system bus,
@@ -55,8 +55,9 @@ yay -S xcp
 
 ### Anti-Features
 
-* Currently only supports Linux, specifically kernels 4.5 and onwards. Other
-  Unix-like OS's may be added later.
+* On Linux it requires a kernel version of 4.5 and onwards.
+* On non-Linux OSs sparse-files are not supported (although could be added is
+  supported by the OS).
 * Assumes a 'modern' system with lots of RAM and fast, solid-state disks. In
   particular it is likely to thrash on spinning disks as it attempts to gather
   metadata and perform copies at the same time.
