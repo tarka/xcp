@@ -39,7 +39,7 @@ yay -S xcp
   performing the copy operations server-side. However, unlike `copy_file_range`
   sparse files are detected and handled appropriately.
 * Non-Linux Unix-like OSs (OS X, *BSD) are supported via fall-back operation
-  (although sparse-files are not supported).
+  (although sparse-files are not yet supported in this case).
 * Optionally understands `.gitignore` files to limit the copied directories.
 * Optimised for 'modern' systems (i.e. multiple cores, copious RAM, and
   solid-state disks, especially ones connected into the main system bus,
@@ -56,8 +56,9 @@ yay -S xcp
 
 ### Anti-Features
 
-* On Linux it requires a kernel version of 4.5 and onwards.
-* On non-Linux OSs sparse-files are not supported (although could be added is
+* On Linux `copy_file_range()` requires a kernel version of 4.5 and onwards; if
+  it is missing `xcp` will fall-back to user-space copy.
+* On non-Linux OSs sparse-files are not supported (although could be added if
   supported by the OS).
 * Assumes a 'modern' system with lots of RAM and fast, solid-state disks. In
   particular it is likely to thrash on spinning disks as it attempts to gather
