@@ -1,18 +1,3 @@
-/*
- * Copyright © 2018, Steve Smith <tarkasteve@gmail.com>
- *
- * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License version
- * 3 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 
 use libc;
 use std::fs::File;
@@ -21,12 +6,15 @@ use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::ptr::null_mut;
 
+use crate::os::{SeekOff, Wence};
+use crate::os::common::result_or_errno;
 use crate::errors::Result;
+
 
 /* **** Low level operations **** */
 
+// Assumes Linux kernel >= 4.5.
 mod ffi {
-    // Assumes Linux kernel >= 4.5.
     #[cfg(feature = "kernel_copy_file_range")]
     pub unsafe fn copy_file_range(
         fd_in: libc::c_int,
@@ -61,16 +49,27 @@ mod ffi {
     }
 }
 
-fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
-    match result {
-        -1 => Err(io::Error::last_os_error().into()),
-        _ => Ok(retval),
-    }
+/// Version of copy_file_range that defers offset-management to the
+/// syscall. see copy_file_range(2) for details.
+pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
+    let r = unsafe {
+        ffi::copy_file_range(
+            infd.as_raw_fd(),
+            null_mut(),
+            outfd.as_raw_fd(),
+            null_mut(),
+            bytes as usize,
+            0,
+        ) as i64
+    };
+    result_or_errno(r, r as u64)
 }
+
 
 /// Full mapping of copy_file_range(2). Not used directly, as we
 /// always want to copy the same range to the same offset. See
 /// wrappers below.
+#[allow(dead_code)]
 pub fn copy_file_range(infd: &File, mut in_off: i64,
                        outfd: &File, mut out_off: i64,
                        bytes: u64) -> Result<u64>
@@ -88,30 +87,6 @@ pub fn copy_file_range(infd: &File, mut in_off: i64,
     result_or_errno(r, r as u64)
 }
 
-/// Version of copy_file_range(2) that copies the give range to the
-/// same place in the target file.
-#[allow(dead_code)]
-pub fn copy_file_chunk(infd: &File, outfd: &File,
-                       off: i64, bytes: u64) -> Result<u64>
-{
-    copy_file_range(infd, off, outfd, off, bytes)
-}
-
-/// Version of copy_file_range that defers offset-management to the
-/// syscall. see copy_file_range(2) for details.
-pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
-    let r = unsafe {
-        ffi::copy_file_range(
-            infd.as_raw_fd(),
-            null_mut(),
-            outfd.as_raw_fd(),
-            null_mut(),
-            bytes as usize,
-            0,
-        ) as i64
-    };
-    result_or_errno(r, r as u64)
-}
 
 pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
     let r = unsafe {
@@ -121,21 +96,15 @@ pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
 }
 
 
-/// Corresponds to lseek(2) `wence`
-#[allow(dead_code)]
-pub enum Wence {
-    Set = libc::SEEK_SET as isize,
-    Cur = libc::SEEK_CUR as isize,
-    End = libc::SEEK_END as isize,
-    Data = libc::SEEK_DATA as isize,
-    Hole = libc::SEEK_HOLE as isize,
+// Guestimate if file is sparse; if it has less blocks that would be
+// expected for its stated size. This is the same test used by
+// coreutils `cp`.
+pub fn probably_sparse(fd: &File) -> Result<bool> {
+    let stat = fd.metadata()?;
+    Ok(stat.st_blocks() < stat.st_size() / stat.st_blksize())
 }
 
-#[derive(PartialEq, Debug)]
-pub enum SeekOff {
-    Offset(u64),
-    EOF
-}
+
 
 pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<SeekOff> {
     let r = unsafe {
@@ -159,15 +128,6 @@ pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<SeekOff> {
         Ok(SeekOff::Offset(r as u64))
     }
 
-}
-
-
-// Guestimate if file is sparse; if it has less blocks that would be
-// expected for its stated size. This is the same test used by
-// coreutils `cp`.
-pub fn probably_sparse(fd: &File) -> Result<bool> {
-    let stat = fd.metadata()?;
-    Ok(stat.st_blocks() < stat.st_size() / stat.st_blksize())
 }
 
 
