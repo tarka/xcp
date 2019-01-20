@@ -20,25 +20,8 @@ use cfg_if::cfg_if;
 cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
         mod linux;
-        pub use linux::{allocate_file, copy_file_bytes, probably_sparse, lseek};
+        pub use linux::{allocate_file, copy_file_bytes, probably_sparse, next_sparse_segments};
     } else {
-        pub use common::{allocate_file, copy_file_bytes, probably_sparse, lseek};
+        pub use common::{allocate_file, copy_file_bytes, probably_sparse, next_sparse_segments};
     }
-}
-
-
-/// Corresponds to lseek(2) `wence`
-#[allow(dead_code)]
-pub enum Wence {
-    Set = libc::SEEK_SET as isize,
-    Cur = libc::SEEK_CUR as isize,
-    End = libc::SEEK_END as isize,
-    Data = libc::SEEK_DATA as isize,
-    Hole = libc::SEEK_HOLE as isize,
-}
-
-#[derive(PartialEq, Debug)]
-pub enum SeekOff {
-    Offset(u64),
-    EOF
 }

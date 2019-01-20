@@ -6,7 +6,6 @@ use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::ptr::null_mut;
 
-use crate::os::{SeekOff, Wence};
 use crate::os::common::result_or_errno;
 use crate::errors::Result;
 
@@ -105,6 +104,21 @@ pub fn probably_sparse(fd: &File) -> Result<bool> {
 }
 
 
+/// Corresponds to lseek(2) `wence`
+#[allow(dead_code)]
+pub enum Wence {
+    Set = libc::SEEK_SET as isize,
+    Cur = libc::SEEK_CUR as isize,
+    End = libc::SEEK_END as isize,
+    Data = libc::SEEK_DATA as isize,
+    Hole = libc::SEEK_HOLE as isize,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum SeekOff {
+    Offset(u64),
+    EOF
+}
 
 pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<SeekOff> {
     let r = unsafe {
@@ -126,6 +140,22 @@ pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<SeekOff> {
     } else {
         Ok(SeekOff::Offset(r as u64))
     }
+}
+
+pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64, u64)> {
+    let next_data = match lseek(infd, pos as i64, Wence::Data)? {
+        SeekOff::Offset(off) => off,
+        SeekOff::EOF => infd.metadata()?.len()
+    };
+    let next_hole = match lseek(infd, next_data as i64, Wence::Hole)? {
+        SeekOff::Offset(off) => off,
+        SeekOff::EOF => infd.metadata()?.len()
+    };
+
+    lseek(infd, next_data as i64, Wence::Set)?;  // FIXME: EOF (but shouldn't happen)
+    lseek(outfd, next_data as i64, Wence::Set)?;
+
+    Ok((next_data, next_hole))
 }
 
 

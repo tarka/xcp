@@ -20,7 +20,6 @@ use std::fs::File;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::mem;
 
-use crate::os::{SeekOff, Wence};
 use crate::errors::{Result, XcpError};
 
 
@@ -74,15 +73,9 @@ pub fn probably_sparse(_fd: &File) -> Result<bool> {
 }
 
 #[allow(dead_code)]
-pub fn allocate_file(_fd: &File, _len: u64) -> Result<()> {
+pub fn next_sparse_segments(_infd: &File, _outfd: &File, _pos: u64) -> Result<(u64, u64)> {
     Err(XcpError::UnsupportedOperation {}.into())
 }
-
-#[allow(dead_code)]
-pub fn lseek(_fd: &File, _off: i64, _wence: Wence) -> Result<SeekOff> {
-    Err(XcpError::UnsupportedOperation {}.into())
-}
-
 
 
 #[cfg(test)]
