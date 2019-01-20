@@ -13,6 +13,13 @@ anything critical yet.
 
 ## Installation
 
+### Cargo
+
+`xcp` can be installed directly from `crates.io` with:
+```
+cargo install xcp
+```
+
 ### Arch Linux
 
 [`xcp`](https://aur.archlinux.org/packages/xcp/) is available on the Arch Linux User Repository. If you use an AUR helper, you can execute a command such as this:
