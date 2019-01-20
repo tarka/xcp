@@ -15,9 +15,16 @@
  */
 
 mod common;
-mod linux;
 
-pub use linux::{allocate_file, copy_file_bytes, probably_sparse, lseek};
+use cfg_if::cfg_if;
+cfg_if! {
+    if #[cfg(any(target_os = "linux", target_os = "android"))] {
+        mod linux;
+        pub use linux::{allocate_file, copy_file_bytes, probably_sparse, lseek};
+    } else {
+        pub use common::{allocate_file, copy_file_bytes, probably_sparse, lseek};
+    }
+}
 
 
 /// Corresponds to lseek(2) `wence`

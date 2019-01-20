@@ -70,6 +70,7 @@ fn next_sparse_segments(fd: &File, pos: u64) -> Result<(u64, u64)> {
     Ok((next_data, next_hole))
 }
 
+// FIXME: Assumes sparse-copy works the same everywhere, may not be true.
 fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Result<u64> {
     let len = infd.metadata()?.len();
     allocate_file(&outfd, len)?;
@@ -113,7 +114,7 @@ fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Re
 
         // FIXME: If we implement parallel copies (which may improve
         // performance on some SSD configurations) we should also
-        // created the parent directory, and the dir-create operation
+        // create the parent directory, and the dir-create operation
         // could be out of order.
         match op {
             Operation::Copy(from, to) => {
@@ -212,8 +213,7 @@ fn copy_source(
                 path: target }.into()))?;
             return Err(XcpError::EarlyShutdown {
                 msg: "Path exists and --no-clobber set.",
-            }
-                       .into());
+            }.into());
         }
 
         match meta.file_type().to_enum() {

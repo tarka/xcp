@@ -817,6 +817,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "xcp"
 version = "0.1.1-alpha.3"
 dependencies = [
+ "cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "escargot 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",

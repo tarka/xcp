@@ -123,11 +123,9 @@ pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<SeekOff> {
             }
             _ => Err(err.into())
         }
-
     } else {
         Ok(SeekOff::Offset(r as u64))
     }
-
 }
 
 

@@ -38,6 +38,9 @@ pub enum XcpError {
 
     #[fail(display = "Early shutdown: {:?}", msg)]
     EarlyShutdown { msg: &'static str },
+
+    #[fail(display = "Unsupported operation; this function should never be called on this OS.")]
+    UnsupportedOperation { },
 }
 
 pub fn io_err(kind: IOKind, desc: &str) -> Error {
