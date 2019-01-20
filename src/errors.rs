@@ -36,6 +36,9 @@ pub enum XcpError {
     #[fail(display = "Destination Exists: {:?}", path)]
     DestinationExists { msg: &'static str, path: PathBuf },
 
+    #[fail(display = "IO Error: {:?}", err)]
+    IOError { err: IOError },
+
     #[fail(display = "Early shutdown: {:?}", msg)]
     EarlyShutdown { msg: &'static str },
 

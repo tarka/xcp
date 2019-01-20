@@ -17,7 +17,7 @@
 use std::cmp;
 use std::io;
 use std::fs::File;
-use std::io::{Error, ErrorKind, Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::mem;
 
 use crate::errors::{Result, XcpError};
@@ -32,8 +32,7 @@ pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
 
 
 // Slightly modified version of io::copy() that only copies a set amount of bytes.
-#[allow(dead_code)]
-fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> io::Result<u64> {
+pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<u64> {
     const BLKSIZE: usize = 4 * 1024;  // Assume 4k blocks on disk.
     let mut buf = unsafe {
         let buf: [u8; BLKSIZE] = mem::uninitialized();
@@ -44,11 +43,10 @@ fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> io:
     while written < nbytes {
         let next = cmp::min(nbytes - written, BLKSIZE);
         let len = match reader.read(&mut buf[..next]) {
-            Ok(0) => return Err(Error::new(ErrorKind::InvalidData,
-                                           "Source file ended prematurely.")),
+            Ok(0) => return Err(XcpError::InvalidSource { msg: "Source file ended prematurely."}.into()),
             Ok(len) => len,
             Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
-            Err(e) => return Err(e),
+            Err(e) => return Err(XcpError::IOError { err: e}.into()),
         };
         writer.write_all(&buf[..len])?;
         written += len;

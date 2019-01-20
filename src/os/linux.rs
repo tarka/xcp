@@ -1,12 +1,13 @@
 
 use libc;
+use std::cell::RefCell;
 use std::fs::File;
 use std::io;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
-use std::ptr::null_mut;
+use std::ptr;
 
-use crate::os::common::result_or_errno;
+use crate::os::common::{copy_bytes_uspace, result_or_errno};
 use crate::errors::Result;
 
 
@@ -48,44 +49,57 @@ mod ffi {
     }
 }
 
+
+// Wrapper for copy_file_range(2) that defers file offset tracking to
+// the underlying call. See the manpage for details.
+fn copy_bytes_kernel(reader: &File, writer: &File, nbytes: u64) -> i64 {
+    unsafe {
+        ffi::copy_file_range(reader.as_raw_fd(),
+                        ptr::null_mut(),
+                        writer.as_raw_fd(),
+                        ptr::null_mut(),
+                        nbytes as usize,
+                        0) as i64
+    }
+}
+
+
+// Kernels prior to 4.5 don't have copy_file_range, and it may not
+// work across fs mounts, so we store the fallback to userspace in a
+// thread-local flag to avoid unnecessary syscalls.
+thread_local! {
+    static USE_CFR: RefCell<bool> = RefCell::new(true);
+}
+
 /// Version of copy_file_range that defers offset-management to the
 /// syscall. see copy_file_range(2) for details.
 pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
-    let r = unsafe {
-        ffi::copy_file_range(
-            infd.as_raw_fd(),
-            null_mut(),
-            outfd.as_raw_fd(),
-            null_mut(),
-            bytes as usize,
-            0,
-        ) as i64
-    };
-    result_or_errno(r, r as u64)
+    USE_CFR.with(|cfr| {
+        if *cfr.borrow() {
+            let r = copy_bytes_kernel(infd, outfd, bytes);
+            if r == -1 {
+                let errno = io::Error::last_os_error();
+                match errno.raw_os_error() {
+                    Some(libc::ENOSYS) |
+                    Some(libc::EPERM) |
+                    Some(libc::EXDEV) => {
+                        // Flag as unavailable and fallback to userspace.
+                        *cfr.borrow_mut() = false;
+                        copy_bytes_uspace(infd, outfd, bytes as usize)
+                    }
+                    _ => {
+                        Err(errno.into())
+                    }
+                }
+            } else {
+                Ok(r as u64)
+            }
+        } else {
+            copy_bytes_uspace(infd, outfd, bytes as usize)
+        }
+    })
+
 }
-
-
-/// Full mapping of copy_file_range(2). Not used directly, as we
-/// always want to copy the same range to the same offset. See
-/// wrappers below.
-#[allow(dead_code)]
-pub fn copy_file_range(infd: &File, mut in_off: i64,
-                       outfd: &File, mut out_off: i64,
-                       bytes: u64) -> Result<u64>
-{
-    let r = unsafe {
-        ffi::copy_file_range(
-            infd.as_raw_fd(),
-            &mut in_off as *mut i64,
-            outfd.as_raw_fd(),
-            &mut out_off as *mut i64,
-            bytes as usize,
-            0,
-        ) as i64
-    };
-    result_or_errno(r, r as u64)
-}
-
 
 pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
     let r = unsafe {
@@ -167,6 +181,23 @@ mod tests {
     use std::fs::{read, OpenOptions};
     use std::process::Command;
     use std::io::{Seek, SeekFrom, Write};
+
+    pub fn copy_file_range(infd: &File, mut in_off: i64,
+                           outfd: &File, mut out_off: i64,
+                           bytes: u64) -> Result<u64>
+    {
+        let r = unsafe {
+            ffi::copy_file_range(
+                infd.as_raw_fd(),
+                &mut in_off as *mut i64,
+                outfd.as_raw_fd(),
+                &mut out_off as *mut i64,
+                bytes as usize,
+                0,
+            ) as i64
+        };
+        result_or_errno(r, r as u64)
+    }
 
     #[test]
     fn test_sparse_detection() -> Result<()> {
