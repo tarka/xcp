@@ -17,7 +17,7 @@
 use failure::Error;
 
 use escargot::CargoBuild;
-use std::fs::{create_dir_all, read, write, File, OpenOptions};
+use std::fs::{create_dir_all, write, File};
 use std::io::{Seek, SeekFrom, Read, Write};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -62,6 +62,7 @@ fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
+    use std::fs::OpenOptions;
     let data = "c00lc0d3";
     let len = 4096u64 * 4096 + data.len() as u64 + tail;
 
@@ -88,6 +89,7 @@ fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
     Ok(len as u64)
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn quickstat(file: &Path) -> Result<(i32, i32, i32), Error> {
     let out = Command::new("stat")
         .args(&["--format", "%s %b %B",
@@ -105,6 +107,7 @@ fn quickstat(file: &Path) -> Result<(i32, i32, i32), Error> {
     Ok((size, blocks, blksize))
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn probably_sparse(file: &Path) -> Result<bool, Error> {
     let (size, blocks, blksize) = quickstat(file)?;
 
@@ -630,6 +633,8 @@ fn glob_pattern_error() -> TResult {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
 fn test_sparse() -> TResult {
+    use std::fs::read;
+
     let dir = tempdir()?;
     let from = dir.path().join("sparse.bin");
     let to = dir.path().join("target.bin");
@@ -658,6 +663,8 @@ fn test_sparse() -> TResult {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
 fn test_sparse_leading_gap() -> TResult {
+    use std::fs::read;
+
     let dir = tempdir()?;
     let from = dir.path().join("sparse.bin");
     let to = dir.path().join("target.bin");
@@ -686,6 +693,8 @@ fn test_sparse_leading_gap() -> TResult {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
 fn test_sparse_trailng_gap() -> TResult {
+    use std::fs::read;
+
     let dir = tempdir()?;
     let from = dir.path().join("sparse.bin");
     let to = dir.path().join("target.bin");
@@ -714,6 +723,8 @@ fn test_sparse_trailng_gap() -> TResult {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
 fn test_empty_sparse() -> TResult {
+    use std::fs::read;
+
     let dir = tempdir()?;
     let from = dir.path().join("sparse.bin");
     let to = dir.path().join("target.bin");
