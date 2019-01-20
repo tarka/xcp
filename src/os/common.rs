@@ -73,6 +73,11 @@ pub fn probably_sparse(_fd: &File) -> Result<bool> {
 }
 
 #[allow(dead_code)]
+pub fn allocate_file(_fd: &File, _len: u64) -> Result<()> {
+    Err(XcpError::UnsupportedOperation {}.into())
+}
+
+#[allow(dead_code)]
 pub fn next_sparse_segments(_infd: &File, _outfd: &File, _pos: u64) -> Result<(u64, u64)> {
     Err(XcpError::UnsupportedOperation {}.into())
 }
