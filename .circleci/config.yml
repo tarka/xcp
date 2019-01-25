@@ -1,11 +1,13 @@
 version: 2
 jobs:
   build:
+    # Use a recent machine image as we need a kernel >= 4.5
     machine:
       image: circleci/classic:201808-01
-    # docker:
-    #   - image: rust
     steps:
+      - restore_cache:
+          key: rust-cache
+
       - run:
           name: Install rustup
           command: |
@@ -17,3 +19,10 @@ jobs:
       - run: ~/.cargo/bin/rustup update
       - checkout
       - run: ~/.cargo/bin/cargo test --color never
+
+      - save_cache:
+          key: rust-cache
+          paths:
+            - ./target/
+            - ~/.cargo/
+            - ~/.rustup/
