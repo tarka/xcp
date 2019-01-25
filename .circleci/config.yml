@@ -9,9 +9,13 @@ jobs:
       - run:
           name: Install rustup
           command: |
-            curl https://sh.rustup.rs -sSf > /tmp/rustup-init.sh
-            chmod +x /tmp/rustup-init.sh
-             /tmp/rustup-init.sh -y
-      - checkout
+            if [ ! -f ~/.cargo/bin/rustup ]; then
+              curl https://sh.rustup.rs -sSf > /tmp/rustup-init.sh
+              chmod +x /tmp/rustup-init.sh
+              /tmp/rustup-init.sh -y
+              echo 'export PATH=$HOME/.cargo/bin:$PATH' >> ~/.bashrc
+              . /home/circleci/.bashrc
+            fi
       - run: rustup update
+      - checkout
       - run: cargo test --color never
