@@ -5,7 +5,7 @@ full replacement, but as a companion utility with some more user-friendly
 feedback and some optimisations that make sense under certain tasks (see
 below).
 
-[![Crates.io](https://img.shields.io/crates/v/xcp.svg?colorA=777777)](https://crates.io/crates/xcp) [![CircleCI](https://circleci.com/gh/tarka/xcp.svg?style=svg)](https://circleci.com/gh/tarka/xcp)
+[![Crates.io](https://img.shields.io/crates/v/xcp.svg?colorA=777777)](https://crates.io/crates/xcp) [![CircleCI](https://circleci.com/gh/tarka/xcp.svg?style=shield)](https://circleci.com/gh/tarka/xcp)
 
 *Warning*: `xcp` is currently pre-alpha level software and almost certainly contains
 bugs and unexpected or inconsistent behaviour. It probably shouldn't be used for
