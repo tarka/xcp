@@ -1,10 +1,15 @@
 version: 2
 jobs:
   build:
-    docker:
-      - image: rust
+    machine:
+      image: circleci/classic:201808-01
+    # docker:
+    #   - image: rust
     steps:
       - checkout
-      - run: uname -a
+      - run: echo $PATH
+      - run: pwd
+      - run: ls -al /home/circleci/bin/
+      - run: rustup update
       - run: cargo test --color never
 
