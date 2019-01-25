@@ -13,9 +13,7 @@ jobs:
               curl https://sh.rustup.rs -sSf > /tmp/rustup-init.sh
               chmod +x /tmp/rustup-init.sh
               /tmp/rustup-init.sh -y
-              echo 'export PATH=$HOME/.cargo/bin:$PATH' >> ~/.bashrc
-              . /home/circleci/.bashrc
             fi
-      - run: rustup update
+      - run: ~/.cargo/rustup update
       - checkout
-      - run: cargo test --color never
+      - run: ~/.cargo/bin/cargo test --color never
