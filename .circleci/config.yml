@@ -6,10 +6,12 @@ jobs:
     # docker:
     #   - image: rust
     steps:
+      - run:
+          name: Install rustup
+          command: |
+            curl https://sh.rustup.rs -sSf > /tmp/rustup-init.sh
+            chmod +x /tmp/rustup-init.sh
+             /tmp/rustup-init.sh -y
       - checkout
-      - run: echo $PATH
-      - run: pwd
-      - run: ls -al /home/circleci/bin/
       - run: rustup update
       - run: cargo test --color never
-
