@@ -5,9 +5,10 @@ jobs:
     machine:
       image: circleci/classic:201808-01
     steps:
+      - checkout
+
       - restore_cache:
           key: rust-cache
-
       - run:
           name: Install and update Rust
           command: |
@@ -19,7 +20,6 @@ jobs:
               ~/.cargo/bin/rustup update
             fi
 
-      - checkout
       - run:
           name: Run tests
           command: ~/.cargo/bin/cargo test --color never
