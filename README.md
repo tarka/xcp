@@ -7,7 +7,7 @@ below).
 
 [![Crates.io](https://img.shields.io/crates/v/xcp.svg?colorA=777777)](https://crates.io/crates/xcp) [![CircleCI](https://circleci.com/gh/tarka/xcp.svg?style=shield)](https://circleci.com/gh/tarka/xcp) [![OSX Build Status](https://travis-ci.org/tarka/xcp.svg?branch=master)](https://travis-ci.org/tarka/xcp)
 
-*Warning*: `xcp` is currently pre-alpha level software and almost certainly contains
+*Warning*: `xcp` is currently beta-level software and almost certainly contains
 bugs and unexpected or inconsistent behaviour. It probably shouldn't be used for
 anything critical yet.
 
