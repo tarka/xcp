@@ -148,6 +148,21 @@ fn source_missing() -> TResult {
     assert!(out.status.code().unwrap() == 1);
 
     let stderr = String::from_utf8(out.stderr)?;
+    assert!(stderr.contains("Source does not exist"));
+
+    Ok(())
+}
+
+#[test]
+fn source_missing_globbed() -> TResult {
+    let out = run(&["-g",
+                    "/this/should/not/exist/*.txt",
+                    "/dev/null"])?;
+
+    assert!(!out.status.success());
+    assert!(out.status.code().unwrap() == 1);
+
+    let stderr = String::from_utf8(out.stderr)?;
     assert!(stderr.contains("No source files found"));
 
     Ok(())
@@ -595,6 +610,7 @@ fn copy_with_glob() -> TResult {
     create_file(&f2, "test")?;
 
     let out = run(&[
+        "--glob",
         dir.join("file*.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
     ])?;
@@ -605,6 +621,27 @@ fn copy_with_glob() -> TResult {
 
     Ok(())
 }
+
+#[test]
+fn copy_pattern_no_glob() -> TResult {
+    let dir = tempdir_rel()?;
+    let dest = dir.join("dest");
+    create_dir_all(&dest)?;
+
+    let f1 = dir.join("a [b] c.txt");
+    create_file(&f1, "test")?;
+
+    let out = run(&[
+        dir.join("a [b] c.txt").to_str().unwrap(),
+        dest.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(dest.join("a [b] c.txt").exists());
+
+    Ok(())
+}
+
 
 
 #[test]
@@ -618,6 +655,7 @@ fn glob_pattern_error() -> TResult {
     create_file(&f2, "test")?;
 
     let out = run(&[
+        "--glob",
         dir.join("file***.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
     ])?;

@@ -20,6 +20,7 @@ use std::result;
 
 use glob::{glob, Paths};
 
+use crate::options::Opts;
 use crate::errors::Result;
 
 pub enum FileType {
@@ -78,3 +79,16 @@ pub fn expand_globs(patterns: &Vec<String>) -> Result<Vec<PathBuf>> {
 
     Ok(paths)
 }
+
+pub fn to_pathbufs(opts: &Opts) -> Result<Vec<PathBuf>> {
+    if opts.glob {
+        expand_globs(&opts.source_list)
+    } else {
+        let vec = opts.source_list
+            .iter()
+            .map(PathBuf::from)
+            .collect::<Vec<PathBuf>>();
+        Ok(vec)
+    }
+}
+

@@ -16,6 +16,7 @@
 
 mod errors;
 mod operations;
+mod options;
 mod os;
 mod progress;
 mod utils;
@@ -23,51 +24,12 @@ mod utils;
 use log::info;
 use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger};
 use std::io::ErrorKind as IOKind;
-use std::path::PathBuf;
 use structopt::StructOpt;
 
+
 use crate::errors::{io_err, Result, XcpError};
+use crate::options::Opts;
 use crate::operations::{copy_single_file, copy_all};
-use crate::utils::expand_globs;
-
-
-#[derive(Clone, Debug, StructOpt)]
-#[structopt(
-    name = "xcp",
-    about = "Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY.",
-    raw(setting = "structopt::clap::AppSettings::ColoredHelp")
-)]
-pub struct Opts {
-    /// Explain what is being done. Can be specified multiple times to
-    /// increase logging.
-    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
-    verbose: u64,
-
-    /// Copy directories recursively
-    #[structopt(short = "r", long = "recursive")]
-    recursive: bool,
-
-    /// Do not overwrite an existing file
-    #[structopt(short = "n", long = "no-clobber")]
-    noclobber: bool,
-
-    /// Use .gitignore if present. NOTE: This is fairly basic at the
-    /// moment, and only honours a .gitignore in the directory root
-    /// for directory copies; global or sub-directory ignores are
-    /// skipped.
-    #[structopt(long = "gitignore")]
-    gitignore: bool,
-
-    /// Disable progress bar.
-    #[structopt(long = "no-progress")]
-    noprogress: bool,
-
-    #[structopt(raw(required = "true", min_values = "1"))]
-    source_list: Vec<String>,
-
-    #[structopt(parse(from_os_str))]
-    dest: PathBuf,
-}
 
 fn main() -> Result<()> {
     let opts = Opts::from_args();
@@ -90,7 +52,7 @@ fn main() -> Result<()> {
         .into());
     }
 
-    let sources = expand_globs(&opts.source_list)?;
+    let sources = utils::to_pathbufs(&opts)?;
     if sources.is_empty() {
         return Err(io_err(IOKind::NotFound, "No source files found."));
 

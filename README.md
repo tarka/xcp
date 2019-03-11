@@ -44,6 +44,7 @@ yay -S xcp
 * Optimised for 'modern' systems (i.e. multiple cores, copious RAM, and
   solid-state disks, especially ones connected into the main system bus,
   e.g. M.2).
+* Optional native file-globbing.
   
 ### (Possible) future features
 
