@@ -67,11 +67,6 @@ pub struct Opts {
 
 // StructOpt handles optional flags with optional values as nested Options.
 pub fn num_workers(opts: &Opts) -> u64 {
-    println!("WORKDERS: {:?}", opts.workers);
-    println!("WORKDERS: {:?}",     opts.workers
-        .unwrap_or(Some(1))
-        .unwrap_or(num_cpus::get() as u64)
-);
     opts.workers
         .unwrap_or(Some(1))
         .unwrap_or(num_cpus::get() as u64)
