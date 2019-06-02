@@ -38,6 +38,9 @@ yay -S xcp
   filesystem-aware, and can massively speed-up copies on network mounts by
   performing the copy operations server-side. However, unlike `copy_file_range`
   sparse files are detected and handled appropriately.
+* Optional aggressive parallelism for systems with parallel IO. Quick
+  experiments on a modern laptop suggest there may be benefits to parallel
+  copies on NVMe disks. This is obviously highly system-dependent.
 * Non-Linux Unix-like OSs (OS X, *BSD) are supported via fall-back operation
   (although sparse-files are not yet supported in this case).
 * Optionally understands `.gitignore` files to limit the copied directories.
@@ -48,9 +51,6 @@ yay -S xcp
   
 ### (Possible) future features
 
-* Optional aggressive parallelism for systems with parallel IO. Quick
-  experiments on a modern laptop suggest there may be benefits to parallel
-  copies on NVMe disks. This is obviously highly system-dependent.
 * Conversion of files to sparse where appropriate, as with `cp`'s
   `--sparse=always` flag.
 * Aggressive sparseness detection with `lseek`.
