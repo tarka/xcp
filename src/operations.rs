@@ -32,14 +32,13 @@ use crate::progress::{
     BATCH_DEFAULT,
 };
 use crate::utils::{FileType, ToFileType};
-use crate::Opts;
+use crate::options::{Opts, num_workers};
 
 
 #[derive(Debug)]
 enum Operation {
     Copy(PathBuf, PathBuf),
     Link(PathBuf, PathBuf),
-    CreateDir(PathBuf),
     End,
 }
 
@@ -116,12 +115,6 @@ fn copy_worker(work: cbc::Receiver<Operation>, mut updates: BatchUpdater) -> Res
             Operation::Link(from, to) => {
                 info!("Worker: Symlink {:?} -> {:?}", from, to);
                 let _r = symlink(&from, &to);
-            }
-
-            Operation::CreateDir(dir) => {
-                info!("Worker: Creating directory: {:?}", dir);
-                create_dir_all(&dir)?;
-                updates.update(Ok(dir.metadata()?.len()))?;
             }
 
             Operation::End => {
@@ -215,9 +208,8 @@ fn copy_source(
             }
 
             FileType::Dir => {
-                debug!("Send create-dir operation {:?} to {:?}", from, target);
-                work_tx.send(Operation::CreateDir(target))?;
-                updates.update(Ok(from.metadata()?.len()))?;
+                debug!("Creating target directory {:?}", target);
+                create_dir_all(&target)?;
             }
 
             FileType::Unknown => {
@@ -259,14 +251,17 @@ pub fn copy_all(sources: Vec<PathBuf>, opts: &Opts) -> Result<()> {
         (iprogress_bar(0), BATCH_DEFAULT)
     };
 
-    let _copy_worker = {
-        let copy_stat = BatchUpdater {
-            sender: Box::new(stat_tx.clone()),
-            stat: StatusUpdate::Copied(0),
-            batch_size: batch_size,
+    for _ in 0..num_workers(&opts) {
+        let _copy_worker = {
+            let copy_stat = BatchUpdater {
+                sender: Box::new(stat_tx.clone()),
+                stat: StatusUpdate::Copied(0),
+                batch_size: batch_size,
+            };
+            let wrx = work_rx.clone();
+            thread::spawn(|| copy_worker(wrx, copy_stat))
         };
-        thread::spawn(move || copy_worker(work_rx, copy_stat))
-    };
+    }
     let _walk_worker = {
         let topts = opts.clone();
         let size_stat = BatchUpdater {

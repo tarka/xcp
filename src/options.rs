@@ -14,6 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use num_cpus;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -32,6 +33,11 @@ pub struct Opts {
     /// Copy directories recursively
     #[structopt(short = "r", long = "recursive")]
     pub recursive: bool,
+
+    /// Number of parallel workers for recursive copies. Default is 1;
+    /// if no value supplied it uses the number for logical CPUs.
+    #[structopt(short = "w", long = "workers")]
+    pub workers: Option<Option<u64>>,
 
     /// Do not overwrite an existing file
     #[structopt(short = "n", long = "no-clobber")]
@@ -57,4 +63,16 @@ pub struct Opts {
 
     #[structopt(parse(from_os_str))]
     pub dest: PathBuf,
+}
+
+// StructOpt handles optional flags with optional values as nested Options.
+pub fn num_workers(opts: &Opts) -> u64 {
+    println!("WORKDERS: {:?}", opts.workers);
+    println!("WORKDERS: {:?}",     opts.workers
+        .unwrap_or(Some(1))
+        .unwrap_or(num_cpus::get() as u64)
+);
+    opts.workers
+        .unwrap_or(Some(1))
+        .unwrap_or(num_cpus::get() as u64)
 }
