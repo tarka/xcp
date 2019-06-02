@@ -24,6 +24,7 @@ kernel_copy_file_range = []
 [dependencies]
 cfg-if = "0.1"
 clap = "2"
+crossbeam-channel = "0.3"
 failure = "0.1"
 glob = "0.2"
 ignore = "0.4"

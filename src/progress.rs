@@ -14,7 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::mpsc;
+use crossbeam_channel as cbc;
 
 use indicatif;
 
@@ -75,7 +75,7 @@ impl Updater<Result<u64>> for BatchUpdater {
 }
 
 
-impl Updater<Result<StatusUpdate>> for mpsc::Sender<Result<StatusUpdate>> {
+impl Updater<Result<StatusUpdate>> for cbc::Sender<Result<StatusUpdate>> {
     fn update(&mut self, update: Result<StatusUpdate>) -> Result<()> {
         Ok(self.send(update)?)
     }

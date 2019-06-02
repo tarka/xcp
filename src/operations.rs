@@ -14,6 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crossbeam_channel as cbc;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use log::{debug, error, info};
 use std::cmp;
@@ -21,7 +22,6 @@ use std::fs::{create_dir_all, read_link, File};
 use std::io::ErrorKind as IOKind;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
 use std::thread;
 use walkdir::{DirEntry, WalkDir};
 
@@ -92,7 +92,7 @@ fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> 
 }
 
 
-fn copy_worker(work: mpsc::Receiver<Operation>, mut updates: BatchUpdater) -> Result<()> {
+fn copy_worker(work: cbc::Receiver<Operation>, mut updates: BatchUpdater) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
         debug!("Received operation {:?}", op);
@@ -153,7 +153,7 @@ fn empty(path: &Path) -> bool {
 fn copy_source(
     source: &PathBuf,
     opts: &Opts,
-    work_tx: &mpsc::Sender<Operation>,
+    work_tx: &cbc::Sender<Operation>,
     updates: &mut BatchUpdater,
 ) -> Result<()> {
 
@@ -235,7 +235,7 @@ fn copy_source(
 fn tree_walker(
     sources: Vec<PathBuf>,
     opts: Opts,
-    work_tx: mpsc::Sender<Operation>,
+    work_tx: cbc::Sender<Operation>,
     mut updates: BatchUpdater,
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
@@ -250,8 +250,8 @@ fn tree_walker(
 
 
 pub fn copy_all(sources: Vec<PathBuf>, opts: &Opts) -> Result<()> {
-    let (work_tx, work_rx) = mpsc::channel();
-    let (stat_tx, stat_rx) = mpsc::channel();
+    let (work_tx, work_rx) = cbc::unbounded();
+    let (stat_tx, stat_rx) = cbc::unbounded();
 
     let (pb, batch_size) = if opts.noprogress {
         (ProgressBar::Nop, usize::max_value() as u64)
