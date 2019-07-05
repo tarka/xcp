@@ -34,9 +34,8 @@ pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
 // Slightly modified version of io::copy() that only copies a set amount of bytes.
 pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<u64> {
     const BLKSIZE: usize = 4 * 1024;  // Assume 4k blocks on disk.
-    let mut buf = unsafe {
-        let buf: [u8; BLKSIZE] = mem::uninitialized();
-        buf
+    let mut buf: [u8; BLKSIZE] = unsafe {
+        mem::MaybeUninit::uninit().assume_init()
     };
 
     let mut written = 0;
