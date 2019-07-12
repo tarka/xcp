@@ -16,6 +16,7 @@
 
 mod errors;
 mod operations;
+mod drivers;
 mod options;
 mod os;
 mod progress;
@@ -29,7 +30,8 @@ use structopt::StructOpt;
 
 use crate::errors::{io_err, Result, XcpError};
 use crate::options::Opts;
-use crate::operations::{copy_single_file, copy_all};
+use crate::operations::CopyDriver;
+use crate::drivers::simple::SimpleDriver;
 
 fn main() -> Result<()> {
     let opts = Opts::from_args();
@@ -52,6 +54,10 @@ fn main() -> Result<()> {
         .into());
     }
 
+    let driver = SimpleDriver {
+        opts: &opts
+    };
+
     let sources = utils::to_pathbufs(&opts)?;
     if sources.is_empty() {
         return Err(io_err(IOKind::NotFound, "No source files found."));
@@ -59,7 +65,7 @@ fn main() -> Result<()> {
     } else if sources.len() == 1 && opts.dest.is_file() {
         // Special case; rename/overwrite.
         info!("Copying file {:?} to {:?}", sources[0], opts.dest);
-        copy_single_file(&sources[0], &opts)?;
+        driver.copy_single(&sources[0])?;
 
     } else {
 
@@ -83,7 +89,7 @@ fn main() -> Result<()> {
             }
         }
 
-        copy_all(sources, &opts)?;
+        driver.copy_all(sources)?;
     }
 
     Ok(())

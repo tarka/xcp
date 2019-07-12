@@ -1,5 +1,5 @@
 /*
- * Copyright © 2018, Steve Smith <tarkasteve@gmail.com>
+ * Copyright © 2018-2019, Steve Smith <tarkasteve@gmail.com>
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -14,13 +14,4 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::{Path, PathBuf};
-
-use crate::errors::{Result};
-use crate::options::{Opts};
-
-
-pub trait CopyDriver {
-    fn copy_all(&self, sources: Vec<PathBuf>) -> Result<()>;
-    fn copy_single(&self, source: &PathBuf) -> Result<()>;
-}
+pub mod simple;
