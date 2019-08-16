@@ -48,7 +48,7 @@ pub trait Updater<T> {
 }
 
 pub struct BatchUpdater {
-    pub sender: Box<Updater<Result<StatusUpdate>> + Send>,
+    pub sender: Box<dyn Updater<Result<StatusUpdate>> + Send>,
     pub stat: StatusUpdate,
     pub batch_size: u64,
 }
