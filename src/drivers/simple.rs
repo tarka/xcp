@@ -35,12 +35,8 @@ use crate::progress::{
 use crate::utils::{FileType, ToFileType};
 use crate::options::{Opts, num_workers};
 
-#[derive(Debug)]
-enum Operation {
-    Copy(PathBuf, PathBuf),
-    Link(PathBuf, PathBuf),
-    End,
-}
+
+// ********************************************************************** //
 
 #[allow(dead_code)] // Fixme: make pickable at runtime
 pub struct SimpleDriver<'a>  {
@@ -57,6 +53,15 @@ impl CopyDriver for SimpleDriver<'_> {
     }
 }
 
+// ********************************************************************** //
+
+
+#[derive(Debug)]
+enum Operation {
+    Copy(PathBuf, PathBuf),
+    Link(PathBuf, PathBuf),
+    End,
+}
 
 /// Copy len bytes from whereever the descriptor cursors are set.
 fn copy_range(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
