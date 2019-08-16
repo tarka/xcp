@@ -31,7 +31,7 @@ use structopt::StructOpt;
 use crate::errors::{io_err, Result, XcpError};
 use crate::options::Opts;
 use crate::operations::CopyDriver;
-use crate::drivers::simple::SimpleDriver;
+use crate::drivers::parblock::Driver;
 
 fn main() -> Result<()> {
     let opts = Opts::from_args();
@@ -54,7 +54,7 @@ fn main() -> Result<()> {
         .into());
     }
 
-    let driver = SimpleDriver {
+    let driver = Driver {
         opts: &opts
     };
 

@@ -35,19 +35,14 @@ use crate::progress::{
 use crate::utils::{FileType, ToFileType};
 use crate::options::{Opts, num_workers};
 
-#[derive(Debug)]
-enum Operation {
-    Copy(PathBuf, PathBuf),
-    Link(PathBuf, PathBuf),
-    End,
-}
 
-#[allow(dead_code)] // Fixme: make pickable at runtime
-pub struct SimpleDriver<'a>  {
+// ********************************************************************** //
+
+pub struct Driver<'a>  {
     pub opts: &'a Opts
 }
 
-impl CopyDriver for SimpleDriver<'_> {
+impl CopyDriver for Driver<'_> {
     fn copy_all(&self, sources: Vec<PathBuf>) -> Result<()> {
         copy_all(sources, self.opts)
     }
@@ -57,6 +52,23 @@ impl CopyDriver for SimpleDriver<'_> {
     }
 }
 
+
+// ********************************************************************** //
+
+#[derive(Debug)]
+struct CopyOp {
+    src: PathBuf,
+    dest: PathBuf,
+    off: u64,
+    len: u64
+}
+
+#[derive(Debug)]
+enum Operation {
+    Copy(CopyOp),
+    Link(PathBuf, PathBuf),
+    End,
+}
 
 /// Copy len bytes from whereever the descriptor cursors are set.
 fn copy_range(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
@@ -116,12 +128,12 @@ fn copy_worker(work: cbc::Receiver<Operation>, mut updates: BatchUpdater) -> Res
         // create the parent directory, and the dir-create operation
         // could be out of order.
         match op {
-            Operation::Copy(from, to) => {
-                info!("Worker: Copy {:?} -> {:?}", from, to);
+            Operation::Copy(op) => {
+                info!("Worker: Copy {:?} -> {:?}", op.src, op.dest);
                 // copy_file sends back its own updates, but we should
                 // send back any errors as they may have occured
                 // before the copy started..
-                let r = copy_file(&from, &to, &mut updates);
+                let r = copy_file(&op.src, &op.dest, &mut updates);
                 if r.is_err() {
                     updates.update(r)?;
                 }
@@ -213,7 +225,7 @@ fn copy_source(
             FileType::File => {
                 debug!("Send copy operation {:?} to {:?}", from, target);
                 updates.update(Ok(meta.len()))?;
-                work_tx.send(Operation::Copy(from, target))?;
+                work_tx.send(Operation::Copy(CopyOp { src: from, dest: target, off: 0, len: 0 }))?;
             }
 
             FileType::Symlink => {
