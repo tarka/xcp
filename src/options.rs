@@ -43,9 +43,9 @@ pub struct Opts {
     pub recursive: bool,
 
     /// Number of parallel workers for recursive copies. Default is 1;
-    /// if no value supplied it uses the number for logical CPUs.
-    #[structopt(short = "w", long = "workers")]
-    pub workers: Option<Option<u64>>,
+    /// if the value is negetive or 0 it uses the number of logical CPUs.
+    #[structopt(short = "w", long = "workers",  default_value = "1")]
+    pub workers: i64,
 
     /// Do not overwrite an existing file
     #[structopt(short = "n", long = "no-clobber")]
@@ -75,9 +75,11 @@ pub struct Opts {
 
 // StructOpt handles optional flags with optional values as nested Options.
 pub fn num_workers(opts: &Opts) -> u64 {
-    opts.workers
-        .unwrap_or(Some(1))
-        .unwrap_or(num_cpus::get() as u64)
+    if opts.workers <= 0 {
+        num_cpus::get() as u64
+    } else {
+        opts.workers as u64
+    }
 }
 
 
