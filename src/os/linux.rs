@@ -23,7 +23,7 @@ use std::os::unix::io::AsRawFd;
 use std::ptr;
 
 use crate::os::common::{copy_bytes_uspace, result_or_errno};
-use crate::errors::Result;
+use crate::errors::{Result};
 
 
 /* **** Low level operations **** */
@@ -65,18 +65,13 @@ mod ffi {
 }
 
 
-// Wrapper for copy_file_range(2) that defers file offset tracking to
-// the underlying call. See the manpage for details.
-fn copy_bytes_kernel(reader: &File, writer: &File, nbytes: u64) -> i64 {
-    unsafe {
-        ffi::copy_file_range(reader.as_raw_fd(),
-                        ptr::null_mut(),
-                        writer.as_raw_fd(),
-                        ptr::null_mut(),
-                        nbytes as usize,
-                        0) as i64
-    }
-}
+macro_rules! ptr_or_null(
+    ($e:expr) =>
+        (match $e {
+            Some(mut o) =>  &mut o as *mut i64,
+            None => ptr::null_mut()
+        })
+);
 
 
 // Kernels prior to 4.5 don't have copy_file_range, and it may not
@@ -86,35 +81,72 @@ thread_local! {
     static USE_CFR: RefCell<bool> = RefCell::new(true);
 }
 
+fn copy_file_range(infd: &File, in_off: Option<i64>,
+                   outfd: &File, out_off: Option<i64>,
+                   bytes: u64) -> Option<Result<u64>>
+{
+    USE_CFR.with(|cfr| {
+        if *cfr.borrow() {
+
+            let r = unsafe {
+                ffi::copy_file_range(
+                    infd.as_raw_fd(),
+                    ptr_or_null!(in_off),
+                    outfd.as_raw_fd(),
+                    ptr_or_null!(out_off),
+                    bytes as usize,
+                    0,
+                ) as i64
+            };
+
+            match r {
+                -1 => {
+                    let errno = io::Error::last_os_error();
+                    match errno.raw_os_error() {
+                        Some(libc::ENOSYS) |
+                        Some(libc::EPERM) |
+                        Some(libc::EXDEV) => {
+                            // Flag as unavailable and fallback to userspace.
+                            *cfr.borrow_mut() = false;
+                            None
+                        }
+                        _ => {
+                            Some(Err(errno.into()))
+                        }
+                    }
+                },
+                _ => {
+                    Some(Ok(r as u64))
+                }
+            }
+        } else {
+            None
+        }
+    })
+}
+
+
+// Wrapper for copy_file_range(2) that defers file offset tracking to
+// the underlying call. See the manpage for details.
+fn copy_bytes_kernel(infd: &File, outfd: &File, nbytes: u64) -> Option<Result<u64>> {
+    copy_file_range(infd, None, outfd, None, nbytes)
+}
+
+
+// Wrapper for copy_file_range(2) that copies to the same position in
+// the target file.
+fn copy_range_kernel(infd: &File, outfd: &File, nbytes: u64, off: i64) -> Option<Result<u64>> {
+    copy_file_range(infd, Some(off), outfd, Some(off), nbytes)
+}
+
+
 /// Version of copy_file_range that defers offset-management to the
 /// syscall. see copy_file_range(2) for details.
 pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
-    USE_CFR.with(|cfr| {
-        if *cfr.borrow() {
-            let r = copy_bytes_kernel(infd, outfd, bytes);
-            if r == -1 {
-                let errno = io::Error::last_os_error();
-                match errno.raw_os_error() {
-                    Some(libc::ENOSYS) |
-                    Some(libc::EPERM) |
-                    Some(libc::EXDEV) => {
-                        // Flag as unavailable and fallback to userspace.
-                        *cfr.borrow_mut() = false;
-                        copy_bytes_uspace(infd, outfd, bytes as usize)
-                    }
-                    _ => {
-                        Err(errno.into())
-                    }
-                }
-            } else {
-                Ok(r as u64)
-            }
-        } else {
-            copy_bytes_uspace(infd, outfd, bytes as usize)
-        }
-    })
-
+    copy_bytes_kernel(infd, outfd, bytes)
+        .unwrap_or_else(|| copy_bytes_uspace(infd, outfd, bytes as usize))
 }
+
 
 pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
     let r = unsafe {
@@ -197,23 +229,6 @@ mod tests {
     use std::process::Command;
     use std::io::{Seek, SeekFrom, Write};
 
-    pub fn copy_file_range(infd: &File, mut in_off: i64,
-                           outfd: &File, mut out_off: i64,
-                           bytes: u64) -> Result<u64>
-    {
-        let r = unsafe {
-            ffi::copy_file_range(
-                infd.as_raw_fd(),
-                &mut in_off as *mut i64,
-                outfd.as_raw_fd(),
-                &mut out_off as *mut i64,
-                bytes as usize,
-                0,
-            ) as i64
-        };
-        result_or_errno(r, r as u64)
-    }
-
     #[test]
     fn test_sparse_detection() -> Result<()> {
         assert!(!probably_sparse(&File::open("Cargo.toml")?)?);
@@ -243,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn test_copy_range_sparse() -> Result<()> {
+    fn test_copy_bytes_sparse() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -274,6 +289,7 @@ mod tests {
         Ok(())
     }
 
+
     #[test]
     fn test_sparse_copy_middle() -> Result<()> {
         let dir = tempdir()?;
@@ -298,20 +314,68 @@ mod tests {
                 .write(true)
                 .append(false)
                 .open(&file)?;
-            copy_file_range(&infd, 0,
-                            &outfd, offset as i64,
-                            data.len() as u64)?;
+            let copied = copy_file_range(&infd, Some(0),
+                                         &outfd, Some(offset as i64),
+                                         data.len() as u64).unwrap()?;
+            assert_eq!(copied as usize, data.len());
         }
 
         assert!(probably_sparse(&File::open(&file)?)?);
 
         let bytes = read(&file)?;
+                    println!("BYTES IS {}", data);
+
         assert!(bytes.len() == 1024*1024);
         assert!(bytes[offset] == b't');
         assert!(bytes[offset+1] == b'e');
         assert!(bytes[offset+2] == b's');
         assert!(bytes[offset+3] == b't');
         assert!(bytes[offset+data.len()] == 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_copy_range_middle() -> Result<()> {
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
+        let from = dir.path().join("from.txt");
+        let data = "test data";
+        let offset: usize = 512*1024;
+
+        {
+            let mut fd = File::create(&from)?;
+            fd.seek(SeekFrom::Start(offset as u64))?;
+            write!(fd, "{}", data)?;
+        }
+
+        let out = Command::new("/usr/bin/truncate")
+            .args(&["-s", "1M", file.to_str().unwrap()])
+            .output()?;
+        assert!(out.status.success());
+
+        {
+            let infd = File::open(&from)?;
+            let outfd: File = OpenOptions::new()
+                .write(true)
+                .append(false)
+                .open(&file)?;
+            println!("copy {} to {}", data.len(), offset);
+            let copied = copy_range_kernel(&infd, &outfd,
+                                    data.len() as u64,
+                                    offset as i64).unwrap()?;
+            assert_eq!(copied as usize, data.len());
+        }
+
+        assert!(probably_sparse(&File::open(&file)?)?);
+
+        let bytes = read(&file)?;
+        assert_eq!(bytes.len(), 1024*1024);
+        assert_eq!(bytes[offset], b't');
+        assert_eq!(bytes[offset+1], b'e');
+        assert_eq!(bytes[offset+2], b's');
+        assert_eq!(bytes[offset+3], b't');
+        assert_eq!(bytes[offset+data.len()], 0);
 
         Ok(())
     }
@@ -339,9 +403,10 @@ mod tests {
                 .write(true)
                 .append(false)
                 .open(&file)?;
-            copy_file_range(&infd, 0,
-                            &outfd, offset as i64,
-                            data.len() as u64)?;
+            let copied = copy_file_range(&infd, Some(0),
+                                         &outfd, Some(offset as i64),
+                                         data.len() as u64).unwrap()?;
+            assert_eq!(copied as usize, data.len());
         }
 
         assert!(probably_sparse(&File::open(&file)?)?);
