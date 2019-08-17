@@ -31,7 +31,7 @@ pub trait CopyDriver {
 
 
 /// Copy len bytes from whereever the descriptor cursors are set.
-pub fn copy_range(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
+pub fn copy_bytes(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
     let mut written = 0u64;
     while written < len {
         let bytes_to_copy = cmp::min(len - written, updates.batch_size);
@@ -53,12 +53,13 @@ pub fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Res
     while pos < len {
         let (next_data, next_hole) = next_sparse_segments(infd, outfd, pos)?;
 
-        let _written = copy_range(infd, outfd, next_hole - next_data, updates)?;
+        let _written = copy_bytes(infd, outfd, next_hole - next_data, updates)?;
         pos = next_hole;
     }
 
     Ok(len)
 }
+
 
 pub fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> {
     let infd = File::open(from)?;
@@ -70,7 +71,7 @@ pub fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u
 
     } else {
         let len = infd.metadata()?.len();
-        copy_range(&infd, &outfd, len, updates)?
+        copy_bytes(&infd, &outfd, len, updates)?
     };
 
     outfd.set_permissions(infd.metadata()?.permissions())?;

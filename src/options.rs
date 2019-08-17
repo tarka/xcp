@@ -122,7 +122,6 @@ pub fn to_pathbufs(opts: &Opts) -> Result<Vec<PathBuf>> {
 }
 
 pub fn parse_ignore(source: &PathBuf, opts: &Opts) -> Result<Option<Gitignore>> {
-
     let gitignore = if opts.gitignore {
         let mut builder = GitignoreBuilder::new(&source);
         builder.add(&source.join(".gitignore"));
