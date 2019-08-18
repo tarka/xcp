@@ -53,7 +53,7 @@ fn main() -> Result<()> {
     }
 
     // FIXME: Add ability to choose at runtime
-    let driver = drivers::parblock::Driver {
+    let driver = drivers::simple::Driver {
         opts: &opts
     };
 

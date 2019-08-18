@@ -35,12 +35,11 @@ use crate::options::{Opts, num_workers, parse_ignore, ignore_filter};
 
 // ********************************************************************** //
 
-#[allow(dead_code)] // Fixme: make pickable at runtime
-pub struct SimpleDriver<'a>  {
+pub struct Driver<'a>  {
     pub opts: &'a Opts
 }
 
-impl CopyDriver for SimpleDriver<'_> {
+impl CopyDriver for Driver<'_> {
     fn copy_all(&self, sources: Vec<PathBuf>) -> Result<()> {
         copy_all(sources, self.opts)
     }

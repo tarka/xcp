@@ -58,6 +58,7 @@ fn pwrite(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize>
     result_or_errno(ret as i64, ret as usize)
 }
 
+#[allow(dead_code)]
 pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<u64> {
     let mut buf = get_buffer();
 
@@ -111,6 +112,9 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
     Ok(copy_bytes_uspace(infd, outfd, bytes as usize)?)
 }
 
+// Copy a single file block.
+// TODO: Not used currently, intended for parallel block copy support.
+#[allow(dead_code)]
 pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<u64> {
     copy_range_uspace(infd, outfd, bytes as usize, off as usize)
 }

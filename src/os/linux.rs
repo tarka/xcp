@@ -135,6 +135,7 @@ fn copy_bytes_kernel(infd: &File, outfd: &File, nbytes: u64) -> Option<Result<u6
 
 // Wrapper for copy_file_range(2) that copies to the same position in
 // the target file.
+#[allow(dead_code)]
 fn copy_range_kernel(infd: &File, outfd: &File, nbytes: u64, off: i64) -> Option<Result<u64>> {
     copy_file_range(infd, Some(off), outfd, Some(off), nbytes)
 }
@@ -150,6 +151,7 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
 
 // Wrapper for copy_range_kernel that copies a block . Falls back to userspace if
 // copy_file_range is not available.
+#[allow(dead_code)]
 pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<u64> {
     copy_range_kernel(infd, outfd, bytes, off)
         .unwrap_or_else(|| copy_range_uspace(infd, outfd, bytes as usize, off as usize))
