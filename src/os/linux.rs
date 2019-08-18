@@ -22,7 +22,7 @@ use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::ptr;
 
-use crate::os::common::{copy_bytes_uspace, result_or_errno};
+use crate::os::common::{copy_bytes_uspace, copy_range_uspace, result_or_errno};
 use crate::errors::{Result};
 
 
@@ -140,11 +140,19 @@ fn copy_range_kernel(infd: &File, outfd: &File, nbytes: u64, off: i64) -> Option
 }
 
 
-/// Version of copy_file_range that defers offset-management to the
-/// syscall. see copy_file_range(2) for details.
+// Wrapper for copy_bytes_kernel that falls back to userspace if
+// copy_file_range is not available.
 pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
     copy_bytes_kernel(infd, outfd, bytes)
         .unwrap_or_else(|| copy_bytes_uspace(infd, outfd, bytes as usize))
+}
+
+
+// Wrapper for copy_range_kernel that copies a block . Falls back to userspace if
+// copy_file_range is not available.
+pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<u64> {
+    copy_range_kernel(infd, outfd, bytes, off)
+        .unwrap_or_else(|| copy_range_uspace(infd, outfd, bytes as usize, off as usize))
 }
 
 

@@ -111,6 +111,10 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
     Ok(copy_bytes_uspace(infd, outfd, bytes as usize)?)
 }
 
+pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<u64> {
+    copy_range_uspace(infd, outfd, bytes as usize, off as usize)
+}
+
 
 // No sparse file handling by default, needs to be implemented
 // per-OS. This effectively disables the following operations.
