@@ -15,38 +15,31 @@
  */
 
 use crossbeam_channel as cbc;
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use log::{debug, error, info};
-use std::cmp;
-use std::fs::{create_dir_all, read_link, File};
+use std::fs::{create_dir_all, read_link};
 use std::io::ErrorKind as IOKind;
 use std::os::unix::fs::symlink;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::thread;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::{WalkDir};
 
 use crate::errors::{io_err, Result, XcpError};
-use crate::operations::{CopyDriver};
-use crate::os::{allocate_file, copy_file_bytes, probably_sparse, next_sparse_segments};
+use crate::operations::{CopyDriver, copy_file};
 use crate::progress::{
     iprogress_bar, BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
     BATCH_DEFAULT,
 };
-use crate::utils::{FileType, ToFileType};
-use crate::options::{Opts, num_workers};
+use crate::utils::{FileType, ToFileType, empty};
+use crate::options::{Opts, num_workers, parse_ignore, ignore_filter};
 
-#[derive(Debug)]
-enum Operation {
-    Copy(PathBuf, PathBuf),
-    Link(PathBuf, PathBuf),
-    End,
-}
 
-pub struct SimpleDriver<'a>  {
+// ********************************************************************** //
+
+pub struct Driver<'a>  {
     pub opts: &'a Opts
 }
 
-impl CopyDriver for SimpleDriver<'_> {
+impl CopyDriver for Driver<'_> {
     fn copy_all(&self, sources: Vec<PathBuf>) -> Result<()> {
         copy_all(sources, self.opts)
     }
@@ -56,52 +49,14 @@ impl CopyDriver for SimpleDriver<'_> {
     }
 }
 
-
-/// Copy len bytes from whereever the descriptor cursors are set.
-fn copy_range(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
-    let mut written = 0u64;
-    while written < len {
-        let bytes_to_copy = cmp::min(len - written, updates.batch_size);
-        let result = copy_file_bytes(&infd, &outfd, bytes_to_copy)?;
-        written += result;
-        updates.update(Ok(result))?;
-    }
-
-    Ok(written)
-}
+// ********************************************************************** //
 
 
-fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Result<u64> {
-    let len = infd.metadata()?.len();
-    allocate_file(&outfd, len)?;
-
-    let mut pos = 0;
-
-    while pos < len {
-        let (next_data, next_hole) = next_sparse_segments(infd, outfd, pos)?;
-
-        let _written = copy_range(infd, outfd, next_hole - next_data, updates)?;
-        pos = next_hole;
-    }
-
-    Ok(len)
-}
-
-fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> {
-    let infd = File::open(from)?;
-    let outfd = File::create(to)?;
-
-    let total = if probably_sparse(&infd)? {
-        debug!("File {:?} is sparse", from);
-        copy_sparse(&infd, &outfd, updates)?
-
-    } else {
-        let len = infd.metadata()?.len();
-        copy_range(&infd, &outfd, len, updates)?
-    };
-
-    outfd.set_permissions(infd.metadata()?.permissions())?;
-    Ok(total)
+#[derive(Debug)]
+enum Operation {
+    Copy(PathBuf, PathBuf),
+    Link(PathBuf, PathBuf),
+    End,
 }
 
 
@@ -142,21 +97,6 @@ fn copy_worker(work: cbc::Receiver<Operation>, mut updates: BatchUpdater) -> Res
 }
 
 
-fn ignore_filter(entry: &DirEntry, ignore: &Option<Gitignore>) -> bool {
-    match ignore {
-        None => true,
-        Some(gi) => {
-            let path = entry.path();
-            let m = gi.matched(&path, path.is_dir());
-            !m.is_ignore()
-        }
-    }
-}
-
-fn empty(path: &Path) -> bool {
-    *path == PathBuf::new()
-}
-
 fn copy_source(
     source: &PathBuf,
     opts: &Opts,
@@ -175,14 +115,7 @@ fn copy_source(
     };
     debug!("Target base is {:?}", target_base);
 
-    let gitignore = if opts.gitignore {
-        let mut builder = GitignoreBuilder::new(&source);
-        builder.add(&source.join(".gitignore"));
-        let ignore = builder.build()?;
-        Some(ignore)
-    } else {
-        None
-    };
+    let gitignore = parse_ignore(source, opts)?;
 
     for entry in WalkDir::new(&source).into_iter()
         .filter_entry(|e| ignore_filter(e, &gitignore))

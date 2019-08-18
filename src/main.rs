@@ -29,12 +29,10 @@ use structopt::StructOpt;
 
 
 use crate::errors::{io_err, Result, XcpError};
-use crate::options::Opts;
 use crate::operations::CopyDriver;
-use crate::drivers::simple::SimpleDriver;
 
 fn main() -> Result<()> {
-    let opts = Opts::from_args();
+    let opts = options::Opts::from_args();
 
     let log_level = match opts.verbose {
         0 => LevelFilter::Warn,
@@ -54,11 +52,12 @@ fn main() -> Result<()> {
         .into());
     }
 
-    let driver = SimpleDriver {
+    // FIXME: Add ability to choose at runtime
+    let driver = drivers::simple::Driver {
         opts: &opts
     };
 
-    let sources = utils::to_pathbufs(&opts)?;
+    let sources = options::to_pathbufs(&opts)?;
     if sources.is_empty() {
         return Err(io_err(IOKind::NotFound, "No source files found."));
 
