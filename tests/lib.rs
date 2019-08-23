@@ -507,10 +507,10 @@ fn dir_copy_containing_symlinks() -> TResult {
     assert!(dest_file.exists());
     assert!(dest_rlink.symlink_metadata()?.file_type().is_symlink());
     assert!(dest_base
-        .join("hosts")
-        .symlink_metadata()?
-        .file_type()
-        .is_symlink());
+            .join("hosts")
+            .symlink_metadata()?
+            .file_type()
+            .is_symlink());
 
     Ok(())
 }
@@ -572,14 +572,23 @@ fn dir_with_gitignore() -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
+    create_dir_all(&source_path)?;
+
     let source_file = source_path.join("file.txt");
+    create_file(&source_file, "file content")?;
+
     let ignore_file = source_path.join(".gitignore");
+    create_file(&ignore_file, "/.ignored\n")?;
+
+    let ignored_path = dir.join("mydir/.ignored");
+    let ignored_file = ignored_path.join("file.txt");
+    create_dir_all(&ignored_path)?;
+    create_file(&ignored_file, "ignored content")?;
+
     let hidden_path = dir.join("mydir/.hidden");
     let hidden_file = hidden_path.join("file.txt");
     create_dir_all(&hidden_path)?;
-    create_file(&source_file, "orig")?;
-    create_file(&hidden_file, "orig")?;
-    create_file(&ignore_file, "/.hidden\n")?;
+    create_file(&hidden_file, "hidden content")?;
 
     let dest_base = dir.join("dest");
 
@@ -593,7 +602,11 @@ fn dir_with_gitignore() -> TResult {
     assert!(out.status.success());
     assert!(dest_base.join("file.txt").exists());
     assert!(dest_base.join(".gitignore").exists());
-    assert!(!dest_base.join(".hidden").exists());
+
+    assert!(!dest_base.join(".ignored").exists());
+
+    assert!(dest_base.join(".hidden").exists());
+    assert!(dest_base.join(".hidden/file.txt").exists());
 
     Ok(())
 }
