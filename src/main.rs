@@ -23,7 +23,7 @@ mod progress;
 mod utils;
 
 use log::info;
-use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger};
+use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 use std::io::ErrorKind as IOKind;
 use structopt::StructOpt;
 
@@ -40,7 +40,7 @@ fn main() -> Result<()> {
         2 => LevelFilter::Debug,
         _ => LevelFilter::Trace,
     };
-    TermLogger::init(log_level, Config::default())
+    TermLogger::init(log_level, Config::default(), TerminalMode::Mixed)
         .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
     // Do this check before expansion otherwise it could result in

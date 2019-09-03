@@ -18,7 +18,7 @@ use failure::Error;
 
 use escargot::CargoBuild;
 use std::fs::{create_dir_all, write, File};
-use std::io::{Seek, SeekFrom, Read, Write};
+use std::io::{Read, Write};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -63,6 +63,8 @@ fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
     use std::fs::OpenOptions;
+    use std::io::{Seek, SeekFrom};
+
     let data = "c00lc0d3";
     let len = 4096u64 * 4096 + data.len() as u64 + tail;
 
