@@ -30,7 +30,7 @@ use crate::errors::Result;
 #[structopt(
     name = "xcp",
     about = "Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY.",
-    raw(setting = "structopt::clap::AppSettings::ColoredHelp")
+    setting = structopt::clap::AppSettings::ColoredHelp
 )]
 pub struct Opts {
     /// Explain what is being done. Can be specified multiple times to
@@ -66,7 +66,7 @@ pub struct Opts {
     #[structopt(long = "no-progress")]
     pub noprogress: bool,
 
-    #[structopt(raw(required = "true", min_values = "1"))]
+    #[structopt(required = true, min_values = 1 )]
     pub source_list: Vec<String>,
 
     #[structopt(parse(from_os_str))]
