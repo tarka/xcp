@@ -47,6 +47,7 @@ fn main() -> Result<()> {
     let dopt = opts.driver.unwrap_or(Drivers::Simple);
     let driver: &dyn CopyDriver = match dopt {
         Drivers::Simple => &drivers::simple::Driver{},
+        Drivers::ParBlock => &drivers::parblock::Driver{},
     };
 
     let (dest, source_patterns) = opts.paths

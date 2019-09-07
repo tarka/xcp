@@ -15,6 +15,7 @@
  */
 
 pub mod simple;
+pub mod parblock;
 
 use std::path::{PathBuf};
 use std::result;
@@ -33,6 +34,7 @@ pub trait CopyDriver {
 #[derive(Debug, Clone, Copy)]
 pub enum Drivers {
     Simple,
+    ParBlock,
 }
 
 impl FromStr for Drivers {
@@ -41,6 +43,7 @@ impl FromStr for Drivers {
     fn from_str(s: &str) -> result::Result<Self, Self::Err> {
         match s {
             "simple" => Ok(Drivers::Simple),
+            "parblock" => Ok(Drivers::ParBlock),
             _ => Err(XcpError::UnknownDriver { driver: s.to_owned() }.into()),
         }
     }
