@@ -30,8 +30,7 @@ use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 use structopt::StructOpt;
 
 use crate::errors::{io_err, Result, XcpError};
-use crate::operations::CopyDriver;
-use crate::drivers::Drivers;
+use crate::drivers::{CopyDriver, Drivers};
 
 fn main() -> Result<()> {
     let opts = options::Opts::from_args();

@@ -17,8 +17,18 @@
 pub mod simple;
 
 
+use std::path::{PathBuf};
+use std::result;
 use std::str::FromStr;
-use crate::errors::{XcpError};
+
+use crate::errors::{Result, XcpError};
+
+
+pub trait CopyDriver {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf) -> Result<()>;
+    fn copy_single(&self, source: &PathBuf, dest: PathBuf) -> Result<()>;
+}
+
 
 #[derive(Debug, Clone)]
 pub enum Drivers {
@@ -28,7 +38,7 @@ pub enum Drivers {
 impl FromStr for Drivers {
     type Err = XcpError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
         match s {
             "simple" => Ok(Drivers::Simple),
             _ => Err(XcpError::UnknownDriver { driver: s.to_owned() }.into()),

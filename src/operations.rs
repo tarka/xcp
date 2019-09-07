@@ -14,7 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use std::cmp;
 use std::fs::{File};
 use log::{debug};
@@ -22,12 +22,6 @@ use log::{debug};
 use crate::progress::{BatchUpdater, Updater};
 use crate::os::{allocate_file, copy_file_bytes, probably_sparse, next_sparse_segments};
 use crate::errors::{Result};
-
-
-pub trait CopyDriver {
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf) -> Result<()>;
-    fn copy_single(&self, source: &PathBuf, dest: PathBuf) -> Result<()>;
-}
 
 
 /// Copy len bytes from whereever the descriptor cursors are set.
