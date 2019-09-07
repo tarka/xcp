@@ -24,6 +24,7 @@ use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use glob::{glob, Paths};
 
 use crate::errors::Result;
+use crate::drivers::Drivers;
 
 
 #[derive(Clone, Debug, StructOpt)]
@@ -43,7 +44,7 @@ pub struct Opts {
     pub recursive: bool,
 
     /// Number of parallel workers for recursive copies. Default is 1;
-    /// if the value is negetive or 0 it uses the number of logical CPUs.
+    /// if the value is negative or 0 it uses the number of logical CPUs.
     #[structopt(short = "w", long = "workers",  default_value = "1")]
     pub workers: i64,
 
@@ -66,11 +67,13 @@ pub struct Opts {
     #[structopt(long = "no-progress")]
     pub noprogress: bool,
 
-    #[structopt(required = true, min_values = 1 )]
-    pub source_list: Vec<String>,
+    /// Specify driver.
+    #[structopt(long = "driver")]
+    pub driver: Option<Drivers>,
 
-    #[structopt(parse(from_os_str))]
-    pub dest: PathBuf,
+    #[structopt(required = true, min_values = 2 )]
+    pub paths: Vec<String>,
+
 }
 
 // StructOpt handles optional flags with optional values as nested Options.
@@ -91,7 +94,7 @@ pub fn num_workers(opts: &Opts) -> u64 {
 // FIXME: This currently eats non-existent files that are not
 // globs. Should we convert empty glob results into errors?
 //
-pub fn expand_globs(patterns: &Vec<String>) -> Result<Vec<PathBuf>> {
+pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
     let mut globs = patterns
         .iter()
         .map(|s| glob(&*s.as_str())) // -> Vec<Result<Paths>>
@@ -111,15 +114,18 @@ pub fn expand_globs(patterns: &Vec<String>) -> Result<Vec<PathBuf>> {
     Ok(paths)
 }
 
-pub fn to_pathbufs(opts: &Opts) -> Result<Vec<PathBuf>> {
+pub fn to_pathbufs(paths: &[String]) -> Vec<PathBuf> {
+    paths
+        .iter()
+        .map(PathBuf::from)
+        .collect::<Vec<PathBuf>>()
+}
+
+pub fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
     if opts.glob {
-        expand_globs(&opts.source_list)
+        expand_globs(&source_list)
     } else {
-        let vec = opts.source_list
-            .iter()
-            .map(PathBuf::from)
-            .collect::<Vec<PathBuf>>();
-        Ok(vec)
+        Ok(to_pathbufs(source_list))
     }
 }
 

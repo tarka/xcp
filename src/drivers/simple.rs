@@ -40,12 +40,12 @@ pub struct Driver<'a>  {
 }
 
 impl CopyDriver for Driver<'_> {
-    fn copy_all(&self, sources: Vec<PathBuf>) -> Result<()> {
-        copy_all(sources, self.opts)
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf) -> Result<()> {
+        copy_all(sources, dest, self.opts)
     }
 
-    fn copy_single(&self, source: &PathBuf) -> Result<()> {
-        copy_single_file(source, self.opts)
+    fn copy_single(&self, source: &PathBuf, dest: PathBuf) -> Result<()> {
+        copy_single_file(source, dest, self.opts)
     }
 }
 
@@ -99,6 +99,7 @@ fn copy_worker(work: cbc::Receiver<Operation>, mut updates: BatchUpdater) -> Res
 
 fn copy_source(
     source: &PathBuf,
+    dest: &PathBuf,
     opts: &Opts,
     work_tx: &cbc::Sender<Operation>,
     updates: &mut BatchUpdater,
@@ -108,10 +109,10 @@ fn copy_source(
         msg: "Failed to find source directory name.",
     })?;
 
-    let target_base = if opts.dest.exists() {
-        opts.dest.join(sourcedir)
+    let target_base = if dest.exists() {
+        dest.join(sourcedir)
     } else {
-        opts.dest.clone()
+        dest.clone()
     };
     debug!("Target base is {:?}", target_base);
 
@@ -173,6 +174,7 @@ fn copy_source(
 
 fn tree_walker(
     sources: Vec<PathBuf>,
+    dest: &PathBuf,
     opts: Opts,
     work_tx: cbc::Sender<Operation>,
     mut updates: BatchUpdater,
@@ -180,7 +182,7 @@ fn tree_walker(
     debug!("Starting walk worker {:?}", thread::current().id());
 
     for source in sources {
-        copy_source(&source, &opts, &work_tx, &mut updates)?;
+        copy_source(&source, &dest, &opts, &work_tx, &mut updates)?;
     }
     work_tx.send(Operation::End)?;
     debug!("Walk-worker finished: {:?}", thread::current().id());
@@ -188,7 +190,7 @@ fn tree_walker(
 }
 
 
-pub fn copy_all(sources: Vec<PathBuf>, opts: &Opts) -> Result<()> {
+pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
     let (work_tx, work_rx) = cbc::unbounded();
     let (stat_tx, stat_rx) = cbc::unbounded();
 
@@ -216,7 +218,7 @@ pub fn copy_all(sources: Vec<PathBuf>, opts: &Opts) -> Result<()> {
             stat: StatusUpdate::Size(0),
             batch_size: batch_size,
         };
-        thread::spawn(move || tree_walker(sources, topts, work_tx, size_stat))
+        thread::spawn(move || tree_walker(sources, &dest, topts, work_tx, size_stat))
     };
 
     let mut copied = 0;
@@ -243,12 +245,12 @@ pub fn copy_all(sources: Vec<PathBuf>, opts: &Opts) -> Result<()> {
 }
 
 
-pub fn copy_single_file(source: &PathBuf, opts: &Opts) -> Result<()> {
-    let dest = if opts.dest.is_dir() {
+pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
+    let dest = if dest.is_dir() {
         let fname = source.file_name().ok_or(XcpError::UnknownFilename)?;
-        opts.dest.join(fname)
+        dest.join(fname)
     } else {
-        opts.dest.clone()
+        dest.clone()
     };
 
     if dest.is_file() && opts.noclobber {

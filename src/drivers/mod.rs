@@ -15,3 +15,24 @@
  */
 
 pub mod simple;
+
+
+use std::str::FromStr;
+use crate::errors::{XcpError};
+
+#[derive(Debug, Clone)]
+pub enum Drivers {
+    Simple
+}
+
+impl FromStr for Drivers {
+    type Err = XcpError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "simple" => Ok(Drivers::Simple),
+            _ => Err(XcpError::UnknownDriver { driver: s.to_owned() }.into()),
+        }
+    }
+
+}

@@ -22,14 +22,16 @@ mod os;
 mod progress;
 mod utils;
 
+use std::path::PathBuf;
+use std::io::ErrorKind as IOKind;
+
 use log::info;
 use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
-use std::io::ErrorKind as IOKind;
 use structopt::StructOpt;
-
 
 use crate::errors::{io_err, Result, XcpError};
 use crate::operations::CopyDriver;
+use crate::drivers::Drivers;
 
 fn main() -> Result<()> {
     let opts = options::Opts::from_args();
@@ -43,34 +45,41 @@ fn main() -> Result<()> {
     TermLogger::init(log_level, Config::default(), TerminalMode::Mixed)
         .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
+    let dopt = opts.driver.clone().unwrap_or(Drivers::Simple);
+    let driver = match dopt {
+        Drivers::Simple => drivers::simple::Driver { opts: &opts },
+    };
+
+    let (dest, source_patterns) = opts.paths
+        .split_last()
+        .ok_or(XcpError::InvalidArguments{msg: "Insufficient arguments"})
+        .map(|(d, s)| {
+            (PathBuf::from(d), s)
+        })?;
+
     // Do this check before expansion otherwise it could result in
     // unexpected behaviour when the a glob expands to a single file.
-    if opts.source_list.len() > 1 && !opts.dest.is_dir() {
+    if source_patterns.len() > 1 && !dest.is_dir() {
         return Err(XcpError::InvalidDestination {
             msg: "Multiple sources and destination is not a directory.",
         }
         .into());
     }
 
-    // FIXME: Add ability to choose at runtime
-    let driver = drivers::simple::Driver {
-        opts: &opts
-    };
-
-    let sources = options::to_pathbufs(&opts)?;
+    let sources = options::expand_sources(source_patterns, &opts)?;
     if sources.is_empty() {
         return Err(io_err(IOKind::NotFound, "No source files found."));
 
-    } else if sources.len() == 1 && opts.dest.is_file() {
+    } else if sources.len() == 1 && dest.is_file() {
         // Special case; rename/overwrite.
-        info!("Copying file {:?} to {:?}", sources[0], opts.dest);
-        driver.copy_single(&sources[0])?;
+        info!("Copying file {:?} to {:?}", sources[0], dest);
+        driver.copy_single(&sources[0], dest)?;
 
     } else {
 
         // Sanity-check all sources up-front
         for source in &sources {
-            info!("Copying source {:?} to {:?}", source, opts.dest);
+            info!("Copying source {:?} to {:?}", source, dest);
             if !source.exists() {
                 return Err(io_err(IOKind::NotFound, "Source does not exist."));
             }
@@ -81,14 +90,14 @@ fn main() -> Result<()> {
                 }.into())
             }
 
-            if opts.dest.exists() && !opts.dest.is_dir() {
+            if dest.exists() && !dest.is_dir() {
                 return Err(XcpError::InvalidDestination {
                     msg: "Source is directory but target exists and is not a directory",
                 }.into());
             }
         }
 
-        driver.copy_all(sources)?;
+        driver.copy_all(sources, dest)?;
     }
 
     Ok(())

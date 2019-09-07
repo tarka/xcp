@@ -19,6 +19,7 @@ use failure::Fail;
 use std::io::{Error as IOError, ErrorKind as IOKind};
 use std::path::PathBuf;
 
+
 #[derive(Debug, Fail)]
 pub enum XcpError {
     #[fail(display = "Failed to find filename.")]
@@ -26,6 +27,12 @@ pub enum XcpError {
 
     #[fail(display = "Unknown file-type: {:?}", path)]
     UnknownFiletype { path: PathBuf },
+
+    #[fail(display = "Unknown driver: {:?}", driver)]
+    UnknownDriver { driver: String },
+
+    #[fail(display = "Invalid arguments: {}", msg)]
+    InvalidArguments { msg: &'static str },
 
     #[fail(display = "Invalid source: {}", msg)]
     InvalidSource { msg: &'static str },

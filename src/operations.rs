@@ -25,8 +25,8 @@ use crate::errors::{Result};
 
 
 pub trait CopyDriver {
-    fn copy_all(&self, sources: Vec<PathBuf>) -> Result<()>;
-    fn copy_single(&self, source: &PathBuf) -> Result<()>;
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf) -> Result<()>;
+    fn copy_single(&self, source: &PathBuf, dest: PathBuf) -> Result<()>;
 }
 
 
