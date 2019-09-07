@@ -16,23 +16,23 @@
 
 pub mod simple;
 
-
 use std::path::{PathBuf};
 use std::result;
 use std::str::FromStr;
 
+use crate::options::Opts;
 use crate::errors::{Result, XcpError};
 
 
 pub trait CopyDriver {
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf) -> Result<()>;
-    fn copy_single(&self, source: &PathBuf, dest: PathBuf) -> Result<()>;
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>;
+    fn copy_single(&self, source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()>;
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Drivers {
-    Simple
+    Simple,
 }
 
 impl FromStr for Drivers {

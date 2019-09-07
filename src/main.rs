@@ -44,9 +44,9 @@ fn main() -> Result<()> {
     TermLogger::init(log_level, Config::default(), TerminalMode::Mixed)
         .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
-    let dopt = opts.driver.clone().unwrap_or(Drivers::Simple);
-    let driver = match dopt {
-        Drivers::Simple => drivers::simple::Driver { opts: &opts },
+    let dopt = opts.driver.unwrap_or(Drivers::Simple);
+    let driver: &dyn CopyDriver = match dopt {
+        Drivers::Simple => &drivers::simple::Driver{},
     };
 
     let (dest, source_patterns) = opts.paths
@@ -72,7 +72,7 @@ fn main() -> Result<()> {
     } else if sources.len() == 1 && dest.is_file() {
         // Special case; rename/overwrite.
         info!("Copying file {:?} to {:?}", sources[0], dest);
-        driver.copy_single(&sources[0], dest)?;
+        driver.copy_single(&sources[0], dest, &opts)?;
 
     } else {
 
@@ -96,7 +96,7 @@ fn main() -> Result<()> {
             }
         }
 
-        driver.copy_all(sources, dest)?;
+        driver.copy_all(sources, dest, &opts)?;
     }
 
     Ok(())

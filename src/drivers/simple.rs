@@ -36,17 +36,16 @@ use crate::options::{Opts, num_workers, parse_ignore, ignore_filter};
 
 // ********************************************************************** //
 
-pub struct Driver<'a>  {
-    pub opts: &'a Opts
+pub struct Driver  {
 }
 
-impl CopyDriver for Driver<'_> {
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf) -> Result<()> {
-        copy_all(sources, dest, self.opts)
+impl CopyDriver for Driver {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
+        copy_all(sources, dest, opts)
     }
 
-    fn copy_single(&self, source: &PathBuf, dest: PathBuf) -> Result<()> {
-        copy_single_file(source, dest, self.opts)
+    fn copy_single(&self, source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
+        copy_single_file(source, dest, opts)
     }
 }
 
