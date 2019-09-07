@@ -246,20 +246,6 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
 
 
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
-    let dest = if dest.is_dir() {
-        let fname = source.file_name().ok_or(XcpError::UnknownFilename)?;
-        dest.join(fname)
-    } else {
-        dest.clone()
-    };
-
-    if dest.is_file() && opts.noclobber {
-        return Err(io_err(
-            IOKind::AlreadyExists,
-            "Destination file exists and --no-clobber is set.",
-        ));
-    }
-
 
     let mut copy_stat = if opts.noprogress {
         BatchUpdater {

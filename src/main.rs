@@ -70,10 +70,19 @@ fn main() -> Result<()> {
     if sources.is_empty() {
         return Err(io_err(IOKind::NotFound, "No source files found."));
 
+
     } else if sources.len() == 1 && dest.is_file() {
-        // Special case; rename/overwrite.
+        // Special case; rename/overwrite existing file.
+        if opts.noclobber {
+            return Err(io_err(
+                IOKind::AlreadyExists,
+                "Destination file exists and --no-clobber is set.",
+            ));
+        }
+
         info!("Copying file {:?} to {:?}", sources[0], dest);
         driver.copy_single(&sources[0], dest, &opts)?;
+
 
     } else {
 
