@@ -55,9 +55,9 @@ mod ffi {
     extern "C" {
         pub fn copy_file_range(
             fd_in: libc::c_int,
-            off_in: libc::loff_t,
+            off_in: *mut libc::loff_t,
             fd_out: libc::c_int,
-            off_out: libc::loff_t,
+            off_out: *mut libc::loff_t,
             len: libc::size_t,
             flags: libc::c_uint,
         ) -> libc::ssize_t;
