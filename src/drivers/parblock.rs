@@ -64,10 +64,9 @@ struct CopyOp {
 }
 
 fn copy_worker(work: cbc::Receiver<CopyOp>) -> Result<()> {
-    debug!("Starting copy worker {:?}", thread::current().id());
+    info!("Starting copy worker {:?}", thread::current().id());
     for op in work {
-        debug!("Received operation {:?}", op);
-        info!("Worker: Copy {:?}", op);
+        info!("Worker {:?}: Copy {:?}", thread::current().id(), op);
 
         {
             let from = File::open(&op.from)?;
@@ -81,21 +80,21 @@ fn copy_worker(work: cbc::Receiver<CopyOp>) -> Result<()> {
                 error!("Error copying: {:?}", r);
                 r?;
             }
+
         }
 
     }
-    debug!("Copy worker {:?} shutting down", thread::current().id());
+    info!("Copy worker {:?} shutting down", thread::current().id());
     Ok(())
 }
 
 
 
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
-    debug!("IN SINGLE");
-
     let nworkers = num_workers(&opts);
     let (work_tx, work_rx) = cbc::unbounded();
 
+    info!("Spawning {:?} workers", nworkers);
     let mut thandles = Vec::with_capacity(nworkers as usize);
     for _ in 0..nworkers {
         let worker = {
@@ -110,8 +109,11 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
     let len = source.metadata()?.len();
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
-    let outfd = File::create(&dest)?;
-    allocate_file(&outfd, len)?;
+    // Ensure target file exists up-front.
+    {
+        let outfd = File::create(&dest)?;
+        allocate_file(&outfd, len)?;
+    }
 
     for off in 0..blocks {
         let op = CopyOp {
@@ -120,13 +122,15 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
             start: off * bsize,
             bytes: cmp::min(len - (off * bsize), bsize)
         };
-        //debug!("SENDING {:?}", op);
         work_tx.send(op)?;
     }
+
+    // Close the sender end of the work queue; this will trigger the
+    // workers to shut down when the queue is drained.
     drop(work_tx);
 
     for h in thandles {
-        let _ = h.join();
+        let t = h.join();
     }
 
     Ok(())
