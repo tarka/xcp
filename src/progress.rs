@@ -137,11 +137,11 @@ impl ProgressBar {
 
 
 pub fn iprogress_bar(size: u64) -> ProgressBar {
-    let ipb = indicatif::ProgressBar::new(size);
-    ipb.set_style(
-        indicatif::ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-            .progress_chars("#>-"),
-    );
+    let ipb = indicatif::ProgressBar::new(size)
+        .with_style(
+            indicatif::ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                .progress_chars("#>-"),
+        );
     ProgressBar::Visual(ipb)
 }

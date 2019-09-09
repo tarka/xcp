@@ -21,6 +21,9 @@ travis-ci = { repository = "tarka/xcp" }
 default = ["kernel_copy_file_range"]
 kernel_copy_file_range = []
 
+[profile.release]
+overflow-checks = true
+
 [dependencies]
 cfg-if = "0.1"
 clap = "2"
@@ -28,7 +31,7 @@ crossbeam-channel = "0.3"
 failure = "0.1"
 glob = "0.2"
 ignore = "0.4"
-indicatif = "0.11"
+indicatif = "0.12"
 libc = "0.2"
 log = "0.4"
 num_cpus = "1.0"
