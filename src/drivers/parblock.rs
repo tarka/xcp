@@ -14,8 +14,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crossbeam_channel as cbc;
-use log::{debug, error, info};
 use std::cmp;
 use std::fs::{File, OpenOptions, create_dir_all, read_link};
 use std::io::ErrorKind as IOKind;
@@ -23,6 +21,10 @@ use std::os::unix::fs::symlink;
 use std::path::{PathBuf};
 use std::sync::Arc;
 use std::thread;
+
+use crossbeam_channel as cbc;
+use threadpool::ThreadPool;
+use log::{debug, error, info};
 use walkdir::{WalkDir};
 
 use crate::errors::{io_err, Result, XcpError};
@@ -47,7 +49,6 @@ impl CopyDriver for Driver {
     }
 
     fn copy_single(&self, source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
-        debug!("CALLING SINGLE");
         copy_single_file(source, dest, opts)
     }
 }
@@ -61,43 +62,15 @@ struct CopyHandle {
     to: File,
 }
 
-#[derive(Debug)]
-struct CopyOp {
-    handle: Arc<CopyHandle>,
-    start: u64,
-    bytes: u64,
-}
-
-
-fn copy_worker(work: cbc::Receiver<CopyOp>) -> Result<()> {
-    info!("Starting copy worker {:?}", thread::current().id());
-    for op in work {
-        info!("Worker {:?}: Copy {:?}", thread::current().id(), op);
-
-        let r = copy_file_offset(&op.handle.from, &op.handle.to, op.bytes, op.start as i64);
-        if !r.is_ok() {
-            error!("Error copying: {:?}", r);
-            r?;
-        }
+impl Drop for CopyHandle {
+    fn drop(&mut self) {
+        debug!("Closing {:?}", self);
     }
-    info!("Copy worker {:?} shutting down", thread::current().id());
-    Ok(())
 }
-
 
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
     let nworkers = num_workers(&opts);
-    let (work_tx, work_rx) = cbc::unbounded();
-
-    info!("Spawning {:?} workers", nworkers);
-    let mut thandles = Vec::with_capacity(nworkers as usize);
-    for _ in 0..nworkers {
-        let worker = {
-            let wrx = work_rx.clone();
-            thread::spawn(|| copy_worker(wrx))
-        };
-        thandles.push(worker);
-    }
+    let pool = ThreadPool::new(nworkers as usize);
 
     let bsize = 1024*1024;
 
@@ -118,22 +91,17 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
         // opening the files in the workers would also be valid.)
         let arc = Arc::new(fhandle);
         for off in 0..blocks {
-            let op = CopyOp {
-                handle: arc.clone(),
-                start: off * bsize,
-                bytes: cmp::min(len - (off * bsize), bsize)
-            };
-            work_tx.send(op)?;
+            let handle = arc.clone();
+            pool.execute(move || {
+                let _r = copy_file_offset(&handle.from,
+                                          &handle.to,
+                                          cmp::min(len - (off * bsize), bsize),
+                                          (off * bsize) as i64);
+            });
         }
     }
 
-    // Close the sender end of the work queue; this will trigger the
-    // workers to shut down when the queue is drained.
-    drop(work_tx);
-
-    for h in thandles {
-        let _ = h.join();
-    }
+    pool.join();
 
     Ok(())
 }
