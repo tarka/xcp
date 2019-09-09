@@ -70,37 +70,50 @@ impl Drop for CopyHandle {
 
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
     let nworkers = num_workers(&opts);
+    let (stat_tx, stat_rx) = cbc::unbounded();
     let pool = ThreadPool::new(nworkers as usize);
 
-    let bsize = 1024*1024;
+    let bsize = 1024 * 1024;
 
     let len = source.metadata()?.len();
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
-    {
-        let fhandle = CopyHandle {
-            from: File::open(&source)?,
-            to: File::create(&dest)?,
-        };
-        // Ensure target file exists up-front.
-        allocate_file(&fhandle.to, len)?;
+    let pb = ProgressBar::new(opts, len);
 
+    let fhandle = CopyHandle {
+        from: File::open(&source)?,
+        to: File::create(&dest)?,
+    };
+    // Ensure target file exists up-front.
+    allocate_file(&fhandle.to, len)?;
+
+    {
         // Put the open files in an Arc, which we drop once work has
         // been queued. This will keep them open until all work has
         // been consumed, then close them. (This may be overkill;
         // opening the files in the workers would also be valid.)
         let arc = Arc::new(fhandle);
+
         for off in 0..blocks {
             let handle = arc.clone();
+            let stat = stat_tx.clone();
+
             pool.execute(move || {
-                let _r = copy_file_offset(&handle.from,
-                                          &handle.to,
-                                          cmp::min(len - (off * bsize), bsize),
-                                          (off * bsize) as i64);
+                let r = copy_file_offset(&handle.from,
+                                         &handle.to,
+                                         cmp::min(len - (off * bsize), bsize),
+                                         (off * bsize) as i64);
+                stat.send(r).unwrap(); // Not much we can do if this fails.
             });
         }
     }
 
+    // Gather the results as we go; clouse our end of the channel so
+    // it ends when drained.
+    drop(stat_tx);
+    for r in stat_rx {
+        pb.inc(r?);
+    }
     pool.join();
 
     Ok(())

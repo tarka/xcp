@@ -18,6 +18,7 @@ use crossbeam_channel as cbc;
 
 use indicatif;
 
+use crate::options::Opts;
 use crate::errors::Result;
 
 #[derive(Debug, Clone)]
@@ -113,6 +114,13 @@ pub enum ProgressBar {
 }
 
 impl ProgressBar {
+    pub fn new(opts: &Opts, size: u64) -> ProgressBar {
+        match opts.noprogress {
+            true => ProgressBar::Nop,
+            false => iprogress_bar(size)
+        }
+    }
+
     pub fn set_size(&self, size: u64) {
         match self {
             ProgressBar::Visual(pb) => pb.set_length(size),
@@ -123,6 +131,13 @@ impl ProgressBar {
     pub fn set_position(&self, size: u64) {
         match self {
             ProgressBar::Visual(pb) => pb.set_position(size),
+            ProgressBar::Nop => {}
+        }
+    }
+
+    pub fn inc(&self, size: u64) {
+        match self {
+            ProgressBar::Visual(pb) => pb.inc(size),
             ProgressBar::Nop => {}
         }
     }
