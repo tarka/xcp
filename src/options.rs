@@ -14,14 +14,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use num_cpus;
 use std::path::PathBuf;
 use std::result;
 
-use structopt::StructOpt;
-use walkdir::{DirEntry};
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use glob::{glob, Paths};
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
+use num_cpus;
+use structopt::StructOpt;
+use unbytify::unbytify;
+use walkdir::{DirEntry};
 
 use crate::errors::Result;
 use crate::drivers::Drivers;
@@ -47,6 +48,12 @@ pub struct Opts {
     /// if the value is negative or 0 it uses the number of logical CPUs.
     #[structopt(short = "w", long = "workers",  default_value = "1")]
     pub workers: i64,
+
+    /// Block size for operations. Accepts standard size modifiers
+    /// like "M" and "GB". Actual usage internally depends on the
+    /// driver.
+    #[structopt(long = "block-size",  default_value = "1MB", parse(try_from_str = unbytify))]
+    pub block_size: u64,
 
     /// Do not overwrite an existing file
     #[structopt(short = "n", long = "no-clobber")]
@@ -75,6 +82,7 @@ pub struct Opts {
     pub paths: Vec<String>,
 
 }
+
 
 // StructOpt handles optional flags with optional values as nested Options.
 pub fn num_workers(opts: &Opts) -> u64 {

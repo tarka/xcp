@@ -73,8 +73,8 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
     let (stat_tx, stat_rx) = cbc::unbounded();
     let pool = ThreadPool::new(nworkers as usize);
 
-    let bsize = 1024 * 1024;
 
+    let bsize = opts.block_size;
     let len = source.metadata()?.len();
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
