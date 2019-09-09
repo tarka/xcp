@@ -56,38 +56,33 @@ impl CopyDriver for Driver {
 // ********************************************************************** //
 
 #[derive(Debug)]
+struct CopyHandle {
+    from: File,
+    to: File,
+}
+
+#[derive(Debug)]
 struct CopyOp {
-    from: PathBuf,
-    to: PathBuf,
+    handle: Arc<CopyHandle>,
     start: u64,
     bytes: u64,
 }
+
 
 fn copy_worker(work: cbc::Receiver<CopyOp>) -> Result<()> {
     info!("Starting copy worker {:?}", thread::current().id());
     for op in work {
         info!("Worker {:?}: Copy {:?}", thread::current().id(), op);
 
-        {
-            let from = File::open(&op.from)?;
-            let to = OpenOptions::new()
-                .write(true)
-                .append(false)
-                .open(&&op.to)?;
-
-            let r = copy_file_offset(&from, &to, op.bytes, op.start as i64);
-            if !r.is_ok() {
-                error!("Error copying: {:?}", r);
-                r?;
-            }
-
+        let r = copy_file_offset(&op.handle.from, &op.handle.to, op.bytes, op.start as i64);
+        if !r.is_ok() {
+            error!("Error copying: {:?}", r);
+            r?;
         }
-
     }
     info!("Copy worker {:?} shutting down", thread::current().id());
     Ok(())
 }
-
 
 
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
@@ -109,20 +104,27 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
     let len = source.metadata()?.len();
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
-    // Ensure target file exists up-front.
     {
-        let outfd = File::create(&dest)?;
-        allocate_file(&outfd, len)?;
-    }
-
-    for off in 0..blocks {
-        let op = CopyOp {
-            from: source.clone(),
-            to: dest.clone(),
-            start: off * bsize,
-            bytes: cmp::min(len - (off * bsize), bsize)
+        let fhandle = CopyHandle {
+            from: File::open(&source)?,
+            to: File::create(&dest)?,
         };
-        work_tx.send(op)?;
+        // Ensure target file exists up-front.
+        allocate_file(&fhandle.to, len)?;
+
+        // Put the open files in an Arc, which we drop once work has
+        // been queued. This will keep them open until all work has
+        // been consumed, then close them. (This may be overkill;
+        // opening the files in the workers would also be valid.)
+        let arc = Arc::new(fhandle);
+        for off in 0..blocks {
+            let op = CopyOp {
+                handle: arc.clone(),
+                start: off * bsize,
+                bytes: cmp::min(len - (off * bsize), bsize)
+            };
+            work_tx.send(op)?;
+        }
     }
 
     // Close the sender end of the work queue; this will trigger the
@@ -130,14 +132,14 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
     drop(work_tx);
 
     for h in thandles {
-        let t = h.join();
+        let _ = h.join();
     }
 
     Ok(())
 }
 
 
-pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
+pub fn copy_all(_sources: Vec<PathBuf>, _dest: PathBuf, _opts: &Opts) -> Result<()> {
     panic!()
 }
 
