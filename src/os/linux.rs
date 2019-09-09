@@ -64,11 +64,10 @@ mod ffi {
     }
 }
 
-
-macro_rules! ptr_or_null(
+macro_rules! box_ptr_or_null(
     ($e:expr) =>
         (match $e {
-            Some(mut o) =>  &mut o as *mut i64,
+            Some(b) =>  Box::into_raw(Box::new(b)),
             None => ptr::null_mut()
         })
 );
@@ -87,17 +86,33 @@ fn copy_file_range(infd: &File, in_off: Option<i64>,
 {
     USE_CFR.with(|cfr| {
         if *cfr.borrow() {
+            // copy_file_range(2) takes an optional pointer to an
+            // offset. However, taking pointers to the argument values
+            // interacts badly with the optimiser and can end up
+            // pointing at invalid values. To prevent this we force
+            // the values onto the heap and take a pointer to
+            // that. Note the cleanup below.
+            let in_ptr = box_ptr_or_null!(in_off);
+            let out_ptr = box_ptr_or_null!(out_off);
 
             let r = unsafe {
                 ffi::copy_file_range(
                     infd.as_raw_fd(),
-                    ptr_or_null!(in_off),
+                    in_ptr,
                     outfd.as_raw_fd(),
-                    ptr_or_null!(out_off),
+                    out_ptr,
                     bytes as usize,
                     0,
                 ) as i64
             };
+
+            // Clean-up the allocated memory by pulling it back into a Box.
+            if !in_ptr.is_null() {
+                unsafe { Box::from_raw(in_ptr) };
+            }
+            if !out_ptr.is_null() {
+                unsafe { Box::from_raw(out_ptr) };
+            }
 
             match r {
                 -1 => {
