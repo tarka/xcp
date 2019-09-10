@@ -24,7 +24,7 @@ use crate::os::{allocate_file, copy_file_bytes, probably_sparse, next_sparse_seg
 use crate::errors::{Result};
 
 
-/// Copy len bytes from whereever the descriptor cursors are set.
+/// Copy len bytes from wherever the descriptor cursors are set.
 pub fn copy_bytes(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
     let mut written = 0u64;
     while written < len {
@@ -37,7 +37,7 @@ pub fn copy_bytes(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdate
     Ok(written)
 }
 
-
+/// Wrapper around copy_bytes that looks for sparse blocks and skips them.
 pub fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Result<u64> {
     let len = infd.metadata()?.len();
     allocate_file(&outfd, len)?;
