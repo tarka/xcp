@@ -173,14 +173,6 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
 }
 
 
-pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
-    let r = unsafe {
-        libc::ftruncate(fd.as_raw_fd(), len as i64)
-    };
-    result_or_errno(r as i64, ())
-}
-
-
 // Guestimate if file is sparse; if it has less blocks that would be
 // expected for its stated size. This is the same test used by
 // coreutils `cp`.
@@ -253,6 +245,7 @@ mod tests {
     use std::fs::{read, OpenOptions};
     use std::process::Command;
     use std::io::{Seek, SeekFrom, Write};
+    use crate::os::allocate_file;
 
     #[test]
     fn test_sparse_detection() -> Result<()> {

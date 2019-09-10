@@ -59,6 +59,7 @@ fn pwrite(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize>
 }
 
 #[allow(dead_code)]
+/// Copy a block of bytes at an offset between files. Uses Posix pread/pwrite.
 pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<u64> {
     let mut buf = get_buffer();
 
@@ -85,7 +86,7 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
 }
 
 
-// Slightly modified version of io::copy() that only copies a set amount of bytes.
+/// Slightly modified version of io::copy() that only copies a set amount of bytes.
 pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<u64> {
     let mut buf = get_buffer();
 
@@ -120,16 +121,20 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
 }
 
 
+/// Allocate file space on disk. Uses Posix ftruncate().
+pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
+    let r = unsafe {
+        libc::ftruncate(fd.as_raw_fd(), len as i64)
+    };
+    result_or_errno(r as i64, ())
+}
+
+
 // No sparse file handling by default, needs to be implemented
 // per-OS. This effectively disables the following operations.
 #[allow(dead_code)]
 pub fn probably_sparse(_fd: &File) -> Result<bool> {
     Ok(false)
-}
-
-#[allow(dead_code)]
-pub fn allocate_file(_fd: &File, _len: u64) -> Result<()> {
-    Err(XcpError::UnsupportedOperation {}.into())
 }
 
 #[allow(dead_code)]
