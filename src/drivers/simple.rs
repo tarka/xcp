@@ -109,7 +109,7 @@ fn copy_source(
         msg: "Failed to find source directory name.",
     })?;
 
-    let target_base = if dest.exists() {
+    let target_base = if dest.exists() && !opts.no_target_directory {
         dest.join(sourcedir)
     } else {
         dest.clone()

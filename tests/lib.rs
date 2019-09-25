@@ -421,6 +421,62 @@ fn copy_dirs_overwrites() -> TResult {
 }
 
 #[test]
+/// when source path is a dir and target is a dir,
+/// using the `-no-target-directory` flag will copy the source
+/// dir _onto_ the target directory, instead of _under_ the
+/// target dir (default behavior)
+fn copy_dirs_overwrites_no_target_dir() -> TResult {
+    // First pass default behavior
+    {
+        let dir = tempdir_rel()?;
+
+        let source_path = dir.join("mydir");
+        let source_file = source_path.join("file.txt");
+        create_dir_all(&source_path)?;
+        create_file(&source_file, "orig")?;
+
+        let dest_base = dir.join("dest");
+        create_dir_all(&dest_base)?;
+        let dest_file = dest_base.join("mydir/file.txt");
+
+        let out = run(&[
+            "-r",
+            source_path.to_str().unwrap(),
+            dest_base.to_str().unwrap(),
+        ])?;
+
+        assert!(out.status.success());
+        assert!(file_contains(&dest_file, "orig")?);
+    }
+
+    // Second pass `no target directory`
+    {
+        let dir = tempdir_rel()?;
+
+        let source_path = dir.join("mydir");
+        let source_file = source_path.join("file.txt");
+        create_dir_all(&source_path)?;
+        create_file(&source_file, "new content")?;
+
+        let dest_base = dir.join("dest");
+        create_dir_all(&dest_base)?;
+        let dest_file = dest_base.join("file.txt");
+
+        let out = run(&[
+            "-r",
+            "-T", //-no-target-directory
+            source_path.to_str().unwrap(),
+            dest_base.to_str().unwrap(),
+        ])?;
+
+        assert!(out.status.success());
+        assert!(file_contains(&dest_file, "new content")?);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn dir_copy_to_nonexistent_is_rename() -> TResult {
     let dir = tempdir_rel()?;
 

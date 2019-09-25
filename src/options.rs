@@ -71,6 +71,9 @@ pub struct Opts {
     #[structopt(long = "driver")]
     pub driver: Option<Drivers>,
 
+    #[structopt(short = "T", long = "no-target-directory" )]
+    pub no_target_directory: bool,
+
     #[structopt(required = true, min_values = 2 )]
     pub paths: Vec<String>,
 
