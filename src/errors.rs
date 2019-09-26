@@ -22,6 +22,7 @@ use std::path::PathBuf;
 
 #[derive(Debug, Fail)]
 pub enum XcpError {
+    #[allow(dead_code)]
     #[fail(display = "Failed to find filename.")]
     UnknownFilename,
 

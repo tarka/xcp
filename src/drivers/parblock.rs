@@ -15,27 +15,19 @@
  */
 
 use std::cmp;
-use std::fs::{File, OpenOptions, create_dir_all, read_link};
-use std::io::ErrorKind as IOKind;
-use std::os::unix::fs::symlink;
+use std::fs::{File};
 use std::path::{PathBuf};
 use std::sync::Arc;
-use std::thread;
 
 use crossbeam_channel as cbc;
 use threadpool::ThreadPool;
-use log::{debug, error, info};
-use walkdir::{WalkDir};
+use log::{debug};
 
-use crate::errors::{io_err, Result, XcpError};
+use crate::errors::Result;
 use crate::drivers::{CopyDriver};
 use crate::os::{allocate_file, copy_file_offset};
-use crate::progress::{
-    iprogress_bar, BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
-    BATCH_DEFAULT,
-};
-use crate::utils::{FileType, ToFileType, empty};
-use crate::options::{Opts, num_workers, parse_ignore, ignore_filter};
+use crate::progress::ProgressBar;
+use crate::options::{Opts, num_workers};
 
 
 // ********************************************************************** //

@@ -33,10 +33,9 @@ pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
 
 
 const BLKSIZE: usize = 4 * 1024;  // Assume 4k blocks on disk.
-type Buffer = [u8; BLKSIZE];
 
-fn get_buffer() -> Buffer {
-    let buf: Buffer = unsafe {
+fn get_buffer() -> [u8; BLKSIZE] {
+    let buf: [u8; BLKSIZE] = unsafe {
         mem::MaybeUninit::uninit().assume_init()
     };
     buf

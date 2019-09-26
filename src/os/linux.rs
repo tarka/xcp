@@ -22,7 +22,7 @@ use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::ptr;
 
-use crate::os::common::{copy_bytes_uspace, copy_range_uspace, result_or_errno};
+use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
 use crate::errors::{Result};
 
 

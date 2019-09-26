@@ -17,15 +17,14 @@
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
 use std::fs::{create_dir_all, read_link};
-use std::io::ErrorKind as IOKind;
 use std::os::unix::fs::symlink;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::thread;
-use walkdir::{WalkDir};
+use walkdir::WalkDir;
 
-use crate::errors::{io_err, Result, XcpError};
-use crate::drivers::{CopyDriver};
-use crate::operations::{copy_file};
+use crate::errors::{Result, XcpError};
+use crate::drivers::CopyDriver;
+use crate::operations::copy_file;
 use crate::progress::{
     iprogress_bar, BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
     BATCH_DEFAULT,
