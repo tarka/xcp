@@ -20,7 +20,6 @@ use std::io;
 use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::io::AsRawFd;
-use std::mem;
 
 use crate::errors::{Result, XcpError};
 
@@ -31,15 +30,6 @@ pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
     }
 }
 
-
-const BLKSIZE: usize = 4 * 1024;  // Assume 4k blocks on disk.
-
-fn get_buffer() -> [u8; BLKSIZE] {
-    let buf: [u8; BLKSIZE] = unsafe {
-        mem::MaybeUninit::uninit().assume_init()
-    };
-    buf
-}
 
 fn pread(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize> {
     let ret = unsafe {
@@ -60,11 +50,12 @@ fn pwrite(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize>
 #[allow(dead_code)]
 /// Copy a block of bytes at an offset between files. Uses Posix pread/pwrite.
 pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<u64> {
-    let mut buf = get_buffer();
+    // FIXME: For larger buffers we should use a pre-allocated thread-local?
+    let mut buf = vec!(0; nbytes);
 
     let mut written: usize = 0;
     while written < nbytes {
-        let next = cmp::min(nbytes - written, BLKSIZE);
+        let next = cmp::min(nbytes - written, nbytes);
         let noff = off + written;
 
         let rlen = match pread(reader, &mut buf[..next], next, noff) {
@@ -87,11 +78,11 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
 
 /// Slightly modified version of io::copy() that only copies a set amount of bytes.
 pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<u64> {
-    let mut buf = get_buffer();
+    let mut buf = vec!(0; nbytes);
 
     let mut written = 0;
     while written < nbytes {
-        let next = cmp::min(nbytes - written, BLKSIZE);
+        let next = cmp::min(nbytes - written, nbytes);
         let len = match reader.read(&mut buf[..next]) {
             Ok(0) => return Err(XcpError::InvalidSource { msg: "Source file ended prematurely."}.into()),
             Ok(len) => len,
