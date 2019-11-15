@@ -104,9 +104,8 @@ fn copy_source(
     updates: &mut BatchUpdater,
 ) -> Result<()> {
 
-    let sourcedir = source.components().last().ok_or(XcpError::InvalidSource {
-        msg: "Failed to find source directory name.",
-    })?;
+    let sourcedir = source.components().last()
+        .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
 
     let target_base = if dest.exists() {
         dest.join(sourcedir)
@@ -133,12 +132,9 @@ fn copy_source(
 
         if target.exists() && opts.noclobber {
             work_tx.send(Operation::End)?;
-            updates.update(Err(XcpError::DestinationExists {
-                msg: "Destination file exists and --no-clobber is set.",
-                path: target }.into()))?;
-            return Err(XcpError::EarlyShutdown {
-                msg: "Path exists and --no-clobber set.",
-            }.into());
+            updates.update(Err(XcpError::DestinationExists(
+                "Destination file exists and --no-clobber is set.", target).into()))?;
+            return Err(XcpError::EarlyShutdown("Path exists and --no-clobber set.").into());
         }
 
         match meta.file_type().to_enum() {
@@ -162,7 +158,7 @@ fn copy_source(
             FileType::Unknown => {
                 error!("Unknown filetype found; this should never happen!");
                 work_tx.send(Operation::End)?;
-                updates.update(Err(XcpError::UnknownFiletype { path: target }.into()))?;
+                updates.update(Err(XcpError::UnknownFiletype(target).into()))?;
             }
         };
     }

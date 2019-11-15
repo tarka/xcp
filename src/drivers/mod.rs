@@ -44,7 +44,7 @@ impl FromStr for Drivers {
         match s {
             "simple" => Ok(Drivers::Simple),
             "parblock" => Ok(Drivers::ParBlock),
-            _ => Err(XcpError::UnknownDriver { driver: s.to_owned() }.into()),
+            _ => Err(XcpError::UnknownDriver(s.to_owned()).into()),
         }
     }
 

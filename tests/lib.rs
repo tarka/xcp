@@ -14,8 +14,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use failure::Error;
-
 use escargot::CargoBuild;
 use std::fs::{create_dir_all, write, File};
 use std::io::{Read, Write};
@@ -25,6 +23,7 @@ use std::process::{Command, Output};
 use std::result;
 use tempfile::tempdir;
 use uuid::Uuid;
+use anyhow::Error;
 
 
 pub type TResult = result::Result<(), Error>;
@@ -677,7 +676,7 @@ fn glob_pattern_error() -> TResult {
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr)?;
-    assert!(stderr.contains("PatternError"));
+    assert!(stderr.contains("Pattern syntax error"));
 
     Ok(())
 }

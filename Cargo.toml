@@ -25,10 +25,10 @@ kernel_copy_file_range = []
 overflow-checks = true
 
 [dependencies]
+anyhow = "1.0"
 cfg-if = "0.1"
 clap = "2"
 crossbeam-channel = "0.3"
-failure = "0.1"
 glob = "0.2"
 ignore = "0.4"
 indicatif = "0.12"
@@ -37,6 +37,7 @@ log = "0.4"
 num_cpus = "1.0"
 simplelog = "0.7"
 structopt = "0.3"
+thiserror = "1.0"
 threadpool = "1"
 unbytify = "0.2"
 walkdir = "2"

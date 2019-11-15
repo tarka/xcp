@@ -59,13 +59,13 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
         let noff = off + written;
 
         let rlen = match pread(reader, &mut buf[..next], next, noff) {
-            Ok(0) => return Err(XcpError::InvalidSource { msg: "Source file ended prematurely."}.into()),
+            Ok(0) => return Err(XcpError::InvalidSource("Source file ended prematurely.").into()),
             Ok(len) => len,
             Err(e) => return Err(e),
         };
 
         let _wlen = match pwrite(writer, &mut buf[..rlen], next, noff) {
-            Ok(len) if len < rlen => return Err(XcpError::InvalidSource { msg: "Failed write to file."}.into()),
+            Ok(len) if len < rlen => return Err(XcpError::InvalidSource("Failed write to file.").into()),
             Ok(len) => len,
             Err(e) => return Err(e),
         };
@@ -84,10 +84,10 @@ pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) ->
     while written < nbytes {
         let next = cmp::min(nbytes - written, nbytes);
         let len = match reader.read(&mut buf[..next]) {
-            Ok(0) => return Err(XcpError::InvalidSource { msg: "Source file ended prematurely."}.into()),
+            Ok(0) => return Err(XcpError::InvalidSource("Source file ended prematurely.").into()),
             Ok(len) => len,
             Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
-            Err(e) => return Err(XcpError::IOError { err: e}.into()),
+            Err(e) => return Err(XcpError::IOError(e).into()),
         };
         writer.write_all(&buf[..len])?;
         written += len;
