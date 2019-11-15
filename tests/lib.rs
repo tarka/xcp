@@ -271,6 +271,59 @@ fn dest_file_in_dir_exists(drv: &str) -> TResult {
 
 #[test_case("simple"; "Test with simple driver")]
 //#[test_case("parblock"; "Test with parallel block driver")]
+fn dest_file_exists_overwrites(drv: &str) -> TResult {
+    let dir = tempdir()?;
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+
+    {
+        create_file(&source_path, "falskjdfa;lskdjfa")?;
+        File::create(&dest_path)?;
+    }
+    assert!(!files_match(&source_path, &dest_path));
+
+    let out = run(&[
+        "--driver", drv,
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(files_match(&source_path, &dest_path));
+
+    Ok(())
+}
+
+#[test_case("simple"; "Test with simple driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dest_file_exists_noclobber(drv: &str) -> TResult {
+    let dir = tempdir()?;
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+
+    {
+        create_file(&source_path, "falskjdfa;lskdjfa")?;
+        File::create(&dest_path)?;
+    }
+    assert!(!files_match(&source_path, &dest_path));
+
+    let out = run(&[
+        "--driver", drv,
+        "--no-clobber",
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])?;
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8(out.stderr)?;
+    assert!(stderr.contains("Destination file exists"));
+    assert!(!files_match(&source_path, &dest_path));
+
+    Ok(())
+}
+
+#[test_case("simple"; "Test with simple driver")]
+//#[test_case("parblock"; "Test with parallel block driver")]
 fn file_copy(drv: &str) -> TResult {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
