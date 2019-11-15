@@ -23,7 +23,6 @@ mod progress;
 mod utils;
 
 use std::path::PathBuf;
-use std::io::ErrorKind as IOKind;
 
 use log::info;
 use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};

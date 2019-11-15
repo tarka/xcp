@@ -21,10 +21,10 @@ use std::sync::Arc;
 
 use crossbeam_channel as cbc;
 use threadpool::ThreadPool;
-use log::{debug};
+use log::debug;
 
-use crate::errors::{Result, XcpError};
-use crate::drivers::{CopyDriver};
+use crate::errors::Result;
+use crate::drivers::CopyDriver;
 use crate::os::{allocate_file, copy_file_offset};
 use crate::progress::ProgressBar;
 use crate::options::{Opts, num_workers};

@@ -14,7 +14,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use core::result;
 use std::io::{Error as IOError};
 use std::path::PathBuf;
 
@@ -24,9 +23,6 @@ pub use anyhow::Result;
 
 #[derive(Debug, Error)]
 pub enum XcpError {
-    #[error("Failed to find filename.")]
-    UnknownFilename,
-
     #[error("Unknown file-type: {0}")]
     UnknownFiletype(PathBuf),
 
