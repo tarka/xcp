@@ -100,8 +100,8 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
         }
     }
 
-    // Gather the results as we go; clouse our end of the channel so
-    // it ends when drained.
+    // Gather the results as we go; close our end of the channel so it
+    // ends when drained.
     drop(stat_tx);
     for r in stat_rx {
         pb.inc(r?);
