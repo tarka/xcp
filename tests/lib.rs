@@ -270,7 +270,7 @@ fn dest_file_in_dir_exists(drv: &str) -> TResult {
 }
 
 #[test_case("simple"; "Test with simple driver")]
-//#[test_case("parblock"; "Test with parallel block driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
 fn dest_file_exists_overwrites(drv: &str) -> TResult {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
