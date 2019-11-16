@@ -884,10 +884,9 @@ fn test_sparse_leading_gap(drv: &str) -> TResult {
         from.to_str().unwrap(),
         to.to_str().unwrap(),
     ])?;
+
     assert!(out.status.success());
-
     assert!(probably_sparse(&to)?);
-
     assert_eq!(quickstat(&from)?, quickstat(&to)?);
 
     let from_data = read(&from)?;
@@ -919,7 +918,38 @@ fn test_sparse_trailng_gap(drv: &str) -> TResult {
     assert!(out.status.success());
 
     assert!(probably_sparse(&to)?);
+    assert_eq!(quickstat(&from)?, quickstat(&to)?);
 
+
+    let from_data = read(&from)?;
+    let to_data = read(&to)?;
+    assert_eq!(from_data, to_data);
+
+    Ok(())
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[test_case("simple"; "Test with simple driver")]
+//#[test_case("parblock"; "Test with parallel block driver")]
+fn test_sparse_single_overwrite(drv: &str) -> TResult {
+    use std::fs::read;
+
+    let dir = tempdir()?;
+    let from = dir.path().join("sparse.bin");
+    let to = dir.path().join("target.bin");
+
+    let slen = create_sparse(&from, 1024, 1024)?;
+    create_file(&to, "")?;
+    assert_eq!(slen, from.metadata()?.len());
+    assert!(probably_sparse(&from)?);
+
+    let out = run(&[
+        "--driver", drv,
+        from.to_str().unwrap(),
+        to.to_str().unwrap(),
+    ])?;
+    assert!(out.status.success());
+    assert!(probably_sparse(&to)?);
     assert_eq!(quickstat(&from)?, quickstat(&to)?);
 
     let from_data = read(&from)?;
