@@ -128,6 +128,13 @@ impl ProgressBar {
         }
     }
 
+    pub fn inc_size(&self, size: u64) {
+        match self {
+            ProgressBar::Visual(pb) => pb.inc_length(size),
+            ProgressBar::Nop => {}
+        }
+    }
+
     pub fn set_position(&self, size: u64) {
         match self {
             ProgressBar::Visual(pb) => pb.set_position(size),

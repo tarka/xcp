@@ -123,73 +123,82 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
 
 pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
 {
-    // let pb = ProgressBar::new(opts, len);
+    let pb = ProgressBar::new(opts, 0);
 
-    // let nworkers = num_workers(&opts);
-    // let (stat_tx, stat_rx) = cbc::unbounded();
-    // let pool = ThreadPool::new(nworkers as usize);
+    let nworkers = num_workers(&opts);
+    let (stat_tx, stat_rx) = cbc::unbounded::<Result<u64>>();
+    let pool = ThreadPool::new(nworkers as usize);
 
-    // for source in sources {
+    for source in sources {
 
-    //     let sourcedir = source.components().last()
-    //         .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
+        let sourcedir = source.components().last()
+            .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
 
-    //     let target_base = if dest.exists() {
-    //         dest.join(sourcedir)
-    //     } else {
-    //         dest.clone()
-    //     };
-    //     debug!("Target base is {:?}", target_base);
+        let target_base = if dest.exists() {
+            dest.join(sourcedir)
+        } else {
+            dest.clone()
+        };
+        debug!("Target base is {:?}", target_base);
 
-    //     let gitignore = parse_ignore(&source, &opts)?;
+        let gitignore = parse_ignore(&source, &opts)?;
 
-    //     for entry in WalkDir::new(&source).into_iter()
-    //         .filter_entry(|e| ignore_filter(e, &gitignore))
-    //     {
-    //         debug!("Got tree entry {:?}", entry);
-    //         let e = entry?;
-    //         let from = e.into_path();
-    //         let meta = from.symlink_metadata()?;
-    //         let path = from.strip_prefix(&source)?;
-    //         let target = if !empty(&path) {
-    //             target_base.join(&path)
-    //         } else {
-    //             target_base.clone()
-    //         };
+        for entry in WalkDir::new(&source).into_iter()
+            .filter_entry(|e| ignore_filter(e, &gitignore))
+        {
+            debug!("Got tree entry {:?}", entry);
+            let e = entry?;
+            let from = e.into_path();
+            let meta = from.symlink_metadata()?;
+            let path = from.strip_prefix(&source)?;
+            let target = if !empty(&path) {
+                target_base.join(&path)
+            } else {
+                target_base.clone()
+            };
 
-    //         if target.exists() && opts.noclobber {
-    //             return Err(XcpError::DestinationExists(
-    //                 "Destination file exists and --no-clobber is set.", target).into());
-    //         }
+            if target.exists() && opts.noclobber {
+                return Err(XcpError::DestinationExists(
+                    "Destination file exists and --no-clobber is set.", target).into());
+            }
 
-    //         match meta.file_type().to_enum() {
-    //             FileType::File => {
-    //                 debug!("Send copy operation {:?} to {:?}", from, target);
-    //                 updates.update(Ok(meta.len()))?;
-    //                 work_tx.send(Operation::Copy(from, target))?;
-    //             }
 
-    //             FileType::Symlink => {
-    //                 let lfile = read_link(from)?;
-    //                 debug!("Send symlink operation {:?} to {:?}", lfile, target);
-    //                 work_tx.send(Operation::Link(lfile, target))?;
-    //             }
 
-    //             FileType::Dir => {
-    //                 debug!("Creating target directory {:?}", target);
-    //                 create_dir_all(&target)?;
-    //             }
+            match meta.file_type().to_enum() {
+                FileType::File => {
+                    debug!("Start copy operation {:?} to {:?}", from, target);
+                    queue_file_blocks(&from, target, &pool, &stat_tx, opts)?;
+                    pb.inc_size(meta.len());
+                    // updates.update(Ok(meta.len()))?;
+                    // work_tx.send(Operation::Copy(from, target))?;
+                }
 
-    //             FileType::Unknown => {
-    //                 error!("Unknown filetype found; this should never happen!");
-    //                 return Err(XcpError::DestinationExists(
-    //                     "Destination file exists and --no-clobber is set.", target).into());
-    //             }
-    //         };
-    //     }
-    // }
+                FileType::Symlink => {
+                    let lfile = read_link(from)?;
+                    debug!("Send symlink operation {:?} to {:?}", lfile, target);
+                    // work_tx.send(Operation::Link(lfile, target))?;
+                }
 
-    // Ok(())
-    panic!();
+                FileType::Dir => {
+                    debug!("Creating target directory {:?}", target);
+                    create_dir_all(&target)?;
+                }
+
+                FileType::Unknown => {
+                    error!("Unknown filetype found; this should never happen!");
+                    return Err(XcpError::DestinationExists(
+                        "Destination file exists and --no-clobber is set.", target).into());
+                }
+            };
+        }
+    }
+
+    drop(stat_tx);
+    for r in stat_rx {
+        pb.inc(r?);
+    }
+    pool.join();
+
+    Ok(())
 }
 
