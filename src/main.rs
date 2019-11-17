@@ -45,9 +45,9 @@ fn main() -> Result<()> {
     TermLogger::init(log_level, Config::default(), TerminalMode::Mixed)
         .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
-    let dopt = opts.driver.unwrap_or(Drivers::Simple);
+    let dopt = opts.driver.unwrap_or(Drivers::ParFile);
     let driver: &dyn CopyDriver = match dopt {
-        Drivers::Simple => &drivers::simple::Driver{},
+        Drivers::ParFile => &drivers::parfile::Driver{},
         Drivers::ParBlock => &drivers::parblock::Driver{},
     };
 

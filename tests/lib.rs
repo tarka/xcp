@@ -184,7 +184,7 @@ fn no_args() -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn source_missing(drv: &str) -> TResult {
     let out = run(&[
@@ -200,7 +200,7 @@ fn source_missing(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn source_missing_globbed(drv: &str) -> TResult {
     let out = run(&[
@@ -218,7 +218,7 @@ fn source_missing_globbed(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn dest_file_exists(drv: &str) -> TResult {
     let dir = tempdir()?;
@@ -243,7 +243,7 @@ fn dest_file_exists(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn dest_file_in_dir_exists(drv: &str) -> TResult {
     let dir = tempdir()?;
@@ -269,7 +269,7 @@ fn dest_file_in_dir_exists(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn dest_file_exists_overwrites(drv: &str) -> TResult {
     let dir = tempdir()?;
@@ -294,7 +294,7 @@ fn dest_file_exists_overwrites(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn dest_file_exists_noclobber(drv: &str) -> TResult {
     let dir = tempdir()?;
@@ -322,7 +322,7 @@ fn dest_file_exists_noclobber(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn file_copy(drv: &str) -> TResult {
     let dir = tempdir()?;
@@ -344,7 +344,7 @@ fn file_copy(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn file_copy_rel(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -367,7 +367,7 @@ fn file_copy_rel(drv: &str) -> TResult {
 }
 
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn file_copy_multiple(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -394,7 +394,7 @@ fn file_copy_multiple(drv: &str) -> TResult {
 }
 
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn copy_empty_dir(drv: &str) -> TResult {
     let dir = tempdir()?;
@@ -420,7 +420,7 @@ fn copy_empty_dir(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn copy_all_dirs(drv: &str) -> TResult {
     let dir = tempdir()?;
@@ -447,7 +447,7 @@ fn copy_all_dirs(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn copy_all_dirs_rel(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -474,7 +474,7 @@ fn copy_all_dirs_rel(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn copy_dirs_files(drv: &str) -> TResult {
     let dir = tempdir()?;
@@ -508,7 +508,7 @@ fn copy_dirs_files(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn copy_dirs_overwrites(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -548,7 +548,7 @@ fn copy_dirs_overwrites(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn dir_copy_to_nonexistent_is_rename(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -575,7 +575,7 @@ fn dir_copy_to_nonexistent_is_rename(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn dir_overwrite_with_noclobber(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -617,7 +617,7 @@ fn dir_overwrite_with_noclobber(drv: &str) -> TResult {
 }
 
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn dir_copy_containing_symlinks(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -654,7 +654,7 @@ fn dir_copy_containing_symlinks(drv: &str) -> TResult {
 }
 
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn dir_copy_with_hidden_file(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -682,7 +682,7 @@ fn dir_copy_with_hidden_file(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn dir_copy_with_hidden_dir(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -711,7 +711,7 @@ fn dir_copy_with_hidden_dir(drv: &str) -> TResult {
 }
 
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn dir_with_gitignore(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -758,7 +758,7 @@ fn dir_with_gitignore(drv: &str) -> TResult {
 }
 
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn copy_with_glob(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -783,7 +783,7 @@ fn copy_with_glob(drv: &str) -> TResult {
     Ok(())
 }
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn copy_pattern_no_glob(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -807,7 +807,7 @@ fn copy_pattern_no_glob(drv: &str) -> TResult {
 
 
 
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 fn glob_pattern_error(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
@@ -834,7 +834,7 @@ fn glob_pattern_error(drv: &str) -> TResult {
 
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 //#[test_case("parblock"; "Test with parallel block driver")]
 fn test_sparse(drv: &str) -> TResult {
     use std::fs::read;
@@ -866,7 +866,7 @@ fn test_sparse(drv: &str) -> TResult {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 //#[test_case("parblock"; "Test with parallel block driver")]
 fn test_sparse_leading_gap(drv: &str) -> TResult {
     use std::fs::read;
@@ -897,7 +897,7 @@ fn test_sparse_leading_gap(drv: &str) -> TResult {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 //#[test_case("parblock"; "Test with parallel block driver")]
 fn test_sparse_trailng_gap(drv: &str) -> TResult {
     use std::fs::read;
@@ -929,7 +929,7 @@ fn test_sparse_trailng_gap(drv: &str) -> TResult {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 //#[test_case("parblock"; "Test with parallel block driver")]
 fn test_sparse_single_overwrite(drv: &str) -> TResult {
     use std::fs::read;
@@ -960,7 +960,7 @@ fn test_sparse_single_overwrite(drv: &str) -> TResult {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-#[test_case("simple"; "Test with simple driver")]
+#[test_case("parfile"; "Test with parallel file driver")]
 //#[test_case("parblock"; "Test with parallel block driver")]
 fn test_empty_sparse(drv: &str) -> TResult {
     use std::fs::read;

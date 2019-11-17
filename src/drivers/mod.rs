@@ -14,7 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pub mod simple;
+pub mod parfile;
 pub mod parblock;
 
 use std::path::{PathBuf};
@@ -33,7 +33,7 @@ pub trait CopyDriver {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Drivers {
-    Simple,
+    ParFile,
     ParBlock,
 }
 
@@ -42,7 +42,7 @@ impl FromStr for Drivers {
 
     fn from_str(s: &str) -> result::Result<Self, Self::Err> {
         match s {
-            "simple" => Ok(Drivers::Simple),
+            "parfile" => Ok(Drivers::ParFile),
             "parblock" => Ok(Drivers::ParBlock),
             _ => Err(XcpError::UnknownDriver(s.to_owned()).into()),
         }

@@ -74,7 +74,10 @@ pub struct Opts {
     #[structopt(long = "no-progress")]
     pub noprogress: bool,
 
-    /// Specify driver.
+    /// Specify the driver. Currently there are 2; the default
+    /// "parfile", which parallelises copies across workers at the
+    /// file level, and an experimental "parblock" driver, which
+    /// parellelises at the block level. See also '--block-size'.
     #[structopt(long = "driver")]
     pub driver: Option<Drivers>,
 
