@@ -18,9 +18,10 @@ use std::cmp;
 use std::fs::{File, create_dir_all, read_link};
 use std::path::{PathBuf};
 use std::sync::Arc;
+use std::thread;
 use crossbeam_channel as cbc;
 use threadpool::ThreadPool;
-use log::{debug, error};
+use log::{debug, error, info};
 use walkdir::WalkDir;
 
 use crate::errors::{Result, XcpError};
@@ -55,17 +56,18 @@ struct CopyHandle {
     to: File,
 }
 
-impl Drop for CopyHandle {
-    fn drop(&mut self) {
-        debug!("Closing {:?}", self);
-    }
-}
+// impl Drop for CopyHandle {
+//     fn drop(&mut self) {
+//         drop(&self.from);
+//         drop(&self.to);
+//         info!("Closing {:?}", self);
+//     }
+// }
 
 
-fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &cbc::Sender<Result<u64>>, opts: &Opts) -> Result<()>
+fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &cbc::Sender<Result<u64>>, bsize: u64) -> Result<()>
 {
     let len = source.metadata()?.len();
-    let bsize = opts.block_size;
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
     let fhandle = CopyHandle {
@@ -107,7 +109,7 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
     let len = source.metadata()?.len();
     let pb = ProgressBar::new(opts, len);
 
-    queue_file_blocks(source, dest, &pool, &stat_tx, opts)?;
+    queue_file_blocks(source, dest, &pool, &stat_tx, opts.block_size)?;
 
     // Gather the results as we go; close our end of the channel so it
     // ends when drained.
@@ -120,14 +122,32 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
     Ok(())
 }
 
+struct CopyOp {
+    from: PathBuf,
+    target: PathBuf
+}
+
 
 pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
 {
     let pb = ProgressBar::new(opts, 0);
+    let mut total = 0;
 
-    let nworkers = num_workers(&opts);
+    let nworkers = num_workers(&opts) as usize;
     let (stat_tx, stat_rx) = cbc::unbounded::<Result<u64>>();
-    let pool = ThreadPool::new(nworkers as usize);
+
+    let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
+    let bsize = opts.block_size;
+    let stx = stat_tx.clone();
+    let _dispatcher = thread::spawn(move || {
+        let pool = ThreadPool::new(nworkers);
+        for op in file_rx {
+            info!("Queueing file {:?}", op.from);
+            queue_file_blocks(&op.from, op.target, &pool, &stx, bsize)
+                .unwrap(); // FIXME
+        }
+        pool.join();
+    });
 
     for source in sources {
 
@@ -167,8 +187,11 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             match meta.file_type().to_enum() {
                 FileType::File => {
                     debug!("Start copy operation {:?} to {:?}", from, target);
-                    queue_file_blocks(&from, target, &pool, &stat_tx, opts)?;
-                    pb.inc_size(meta.len());
+                    file_tx.send(CopyOp {
+                        from: from,
+                        target: target
+                    })?;
+                    total += meta.len();
                     // updates.update(Ok(meta.len()))?;
                     // work_tx.send(Operation::Copy(from, target))?;
                 }
@@ -194,10 +217,11 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     }
 
     drop(stat_tx);
+    drop(file_tx);
+    pb.set_size(total);
     for r in stat_rx {
         pb.inc(r?);
     }
-    pool.join();
 
     Ok(())
 }
