@@ -1,3 +1,7 @@
+// NOTE: This is a vendored version of `threadpool` 1.7.1. The main
+// change is a move to crossbeam channels and the addition of the
+// ability to optionally set the queue length.
+
 // Copyright 2014 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
