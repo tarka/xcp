@@ -46,7 +46,7 @@ pub struct Opts {
 
     /// Number of parallel workers for recursive copies. Default is 1;
     /// if the value is negative or 0 it uses the number of logical CPUs.
-    #[structopt(short = "w", long = "workers",  default_value = "1")]
+    #[structopt(short = "w", long = "workers",  default_value = "4")]
     pub workers: i64,
 
     /// Block size for operations. Accepts standard size modifiers

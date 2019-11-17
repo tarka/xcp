@@ -20,6 +20,7 @@ mod drivers;
 mod options;
 mod os;
 mod progress;
+mod threadpool;
 mod utils;
 
 use std::path::PathBuf;

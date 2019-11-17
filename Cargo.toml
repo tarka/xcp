@@ -38,7 +38,6 @@ num_cpus = "1.0"
 simplelog = "0.7"
 structopt = "0.3"
 thiserror = "1.0"
-threadpool = "1"
 unbytify = "0.2"
 walkdir = "2"
 

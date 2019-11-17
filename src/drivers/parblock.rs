@@ -20,7 +20,6 @@ use std::path::{PathBuf};
 use std::sync::Arc;
 use std::thread;
 use crossbeam_channel as cbc;
-use threadpool::ThreadPool;
 use log::{debug, error, info};
 use walkdir::WalkDir;
 
@@ -29,6 +28,7 @@ use crate::drivers::CopyDriver;
 use crate::os::{allocate_file, copy_file_offset};
 use crate::progress::ProgressBar;
 use crate::options::{Opts, num_workers, parse_ignore, ignore_filter};
+use crate::threadpool::{Builder, ThreadPool};
 use crate::utils::{FileType, ToFileType, empty};
 
 
@@ -55,14 +55,6 @@ struct CopyHandle {
     from: File,
     to: File,
 }
-
-// impl Drop for CopyHandle {
-//     fn drop(&mut self) {
-//         drop(&self.from);
-//         drop(&self.to);
-//         info!("Closing {:?}", self);
-//     }
-// }
 
 
 fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &cbc::Sender<Result<u64>>, bsize: u64) -> Result<()>
@@ -140,13 +132,19 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     let bsize = opts.block_size;
     let stx = stat_tx.clone();
     let _dispatcher = thread::spawn(move || {
-        let pool = ThreadPool::new(nworkers);
+        let pool = Builder::new()
+            .num_threads(nworkers)
+            .queue_len(128)  // FIXME
+            .build();
         for op in file_rx {
-            info!("Queueing file {:?}", op.from);
+            //info!("Queueing file {:?}", op.from);
             queue_file_blocks(&op.from, op.target, &pool, &stx, bsize)
                 .unwrap(); // FIXME
         }
+        info!("Queuing complete");
+
         pool.join();
+        info!("Pool complete");
     });
 
     for source in sources {
@@ -192,6 +190,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
                         target: target
                     })?;
                     total += meta.len();
+
                     // updates.update(Ok(meta.len()))?;
                     // work_tx.send(Operation::Copy(from, target))?;
                 }
