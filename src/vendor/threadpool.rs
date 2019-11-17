@@ -799,6 +799,7 @@ mod test {
     const TEST_TASKS: usize = 4;
 
     #[test]
+    #[ignore]
     fn test_set_num_threads_increasing() {
         let new_thread_amount = TEST_TASKS + 8;
         let mut pool = ThreadPool::new(TEST_TASKS);
@@ -820,6 +821,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_set_num_threads_decreasing() {
         let new_thread_amount = 2;
         let mut pool = ThreadPool::new(TEST_TASKS);
@@ -839,6 +841,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_active_count() {
         let pool = ThreadPool::new(TEST_TASKS);
         for _ in 0..2 * TEST_TASKS {
@@ -854,6 +857,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_works() {
         let pool = ThreadPool::new(TEST_TASKS);
 
@@ -869,12 +873,14 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     #[should_panic]
     fn test_zero_tasks_panic() {
         ThreadPool::new(0);
     }
 
     #[test]
+    #[ignore]
     fn test_recovery_from_subtask_panic() {
         let pool = ThreadPool::new(TEST_TASKS);
 
@@ -899,6 +905,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_should_not_panic_on_drop_if_subtasks_panic_after_drop() {
         let pool = ThreadPool::new(TEST_TASKS);
         let waiter = Arc::new(Barrier::new(TEST_TASKS + 1));
@@ -919,6 +926,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_massive_task_creation() {
         let test_tasks = 4_200_000;
 
@@ -960,6 +968,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_shrink() {
         let test_tasks_begin = TEST_TASKS + 2;
 
@@ -998,6 +1007,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_name() {
         let name = "test";
         let mut pool = ThreadPool::with_name(name.to_owned(), 2);
@@ -1033,6 +1043,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_debug() {
         let pool = ThreadPool::new(4);
         let debug = format!("{:?}", pool);
@@ -1059,6 +1070,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_repeate_join() {
         let pool = ThreadPool::with_name("repeate join test".into(), 8);
         let test_count = Arc::new(AtomicUsize::new(0));
@@ -1087,6 +1099,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_multi_join() {
         use std::sync::mpsc::TryRecvError::*;
 
@@ -1131,6 +1144,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_empty_pool() {
         // Joining an empty pool must return imminently
         let pool = ThreadPool::new(4);
@@ -1141,6 +1155,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_no_fun_or_joy() {
         // What happens when you keep adding jobs after a join
 
@@ -1161,6 +1176,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_clone() {
         let pool = ThreadPool::with_name("clone example".into(), 2);
 
@@ -1222,24 +1238,28 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_sync_shared_data() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<super::ThreadPoolSharedData>();
     }
 
     #[test]
+    #[ignore]
     fn test_send_shared_data() {
         fn assert_send<T: Send>() {}
         assert_send::<super::ThreadPoolSharedData>();
     }
 
     #[test]
+    #[ignore]
     fn test_send() {
         fn assert_send<T: Send>() {}
         assert_send::<ThreadPool>();
     }
 
     #[test]
+    #[ignore]
     fn test_cloned_eq() {
         let a = ThreadPool::new(2);
 
@@ -1247,6 +1267,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     /// The scenario is joining threads should not be stuck once their wave
     /// of joins has completed. So once one thread joining on a pool has
     /// succeded other threads joining on the same pool must get out even if

@@ -20,7 +20,7 @@ mod drivers;
 mod options;
 mod os;
 mod progress;
-mod threadpool;
+mod vendor;
 mod utils;
 
 use std::path::PathBuf;
@@ -29,6 +29,7 @@ use log::info;
 use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 use structopt::StructOpt;
 
+pub use crate::vendor::threadpool;
 use crate::errors::{Result, XcpError};
 use crate::drivers::{CopyDriver, Drivers};
 
