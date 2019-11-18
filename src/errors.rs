@@ -14,48 +14,39 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use core::result;
-use failure::Fail;
-use std::io::{Error as IOError, ErrorKind as IOKind};
+use std::io::{Error as IOError};
 use std::path::PathBuf;
 
+use thiserror::Error;
+pub use anyhow::Result;
 
-#[derive(Debug, Fail)]
+
+#[derive(Debug, Error)]
 pub enum XcpError {
-    #[fail(display = "Failed to find filename.")]
-    UnknownFilename,
+    #[error("Unknown file-type: {0}")]
+    UnknownFiletype(PathBuf),
 
-    #[fail(display = "Unknown file-type: {:?}", path)]
-    UnknownFiletype { path: PathBuf },
+    #[error("Unknown driver: {0}")]
+    UnknownDriver(String),
 
-    #[fail(display = "Unknown driver: {:?}", driver)]
-    UnknownDriver { driver: String },
+    #[error("Invalid arguments: {0}")]
+    InvalidArguments(&'static str),
 
-    #[fail(display = "Invalid arguments: {}", msg)]
-    InvalidArguments { msg: &'static str },
+    #[error("Invalid source: {0}")]
+    InvalidSource(&'static str),
 
-    #[fail(display = "Invalid source: {}", msg)]
-    InvalidSource { msg: &'static str },
+    #[error("Invalid destination: {0}")]
+    InvalidDestination(&'static str),
 
-    #[fail(display = "Invalid destination: {}", msg)]
-    InvalidDestination { msg: &'static str },
+    #[error("Destination Exists: {0}, {1}")]
+    DestinationExists(&'static str, PathBuf),
 
-    #[fail(display = "Destination Exists: {:?}", path)]
-    DestinationExists { msg: &'static str, path: PathBuf },
+    #[error("IO Error: {0}")]
+    IOError(IOError),
 
-    #[fail(display = "IO Error: {:?}", err)]
-    IOError { err: IOError },
+    #[error("Early shutdown: {0}")]
+    EarlyShutdown(&'static str),
 
-    #[fail(display = "Early shutdown: {:?}", msg)]
-    EarlyShutdown { msg: &'static str },
-
-    #[fail(display = "Unsupported operation; this function should never be called on this OS.")]
-    UnsupportedOperation { },
+    #[error("Unsupported operation; this function should never be called on this OS.")]
+    UnsupportedOperation,
 }
-
-pub fn io_err(kind: IOKind, desc: &str) -> Error {
-    IOError::new(kind, desc).into()
-}
-
-pub use failure::Error;
-pub type Result<T> = result::Result<T, Error>;

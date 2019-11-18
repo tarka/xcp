@@ -20,16 +20,17 @@ mod drivers;
 mod options;
 mod os;
 mod progress;
+mod vendor;
 mod utils;
 
 use std::path::PathBuf;
-use std::io::ErrorKind as IOKind;
 
 use log::info;
 use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 use structopt::StructOpt;
 
-use crate::errors::{io_err, Result, XcpError};
+pub use crate::vendor::threadpool;
+use crate::errors::{Result, XcpError};
 use crate::drivers::{CopyDriver, Drivers};
 
 fn main() -> Result<()> {
@@ -44,14 +45,15 @@ fn main() -> Result<()> {
     TermLogger::init(log_level, Config::default(), TerminalMode::Mixed)
         .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
-    let dopt = opts.driver.unwrap_or(Drivers::Simple);
+    let dopt = opts.driver.unwrap_or(Drivers::ParFile);
     let driver: &dyn CopyDriver = match dopt {
-        Drivers::Simple => &drivers::simple::Driver{},
+        Drivers::ParFile => &drivers::parfile::Driver{},
+        Drivers::ParBlock => &drivers::parblock::Driver{},
     };
 
     let (dest, source_patterns) = opts.paths
         .split_last()
-        .ok_or(XcpError::InvalidArguments{msg: "Insufficient arguments"})
+        .ok_or(XcpError::InvalidArguments("Insufficient arguments"))
         .map(|(d, s)| {
             (PathBuf::from(d), s)
         })?;
@@ -59,20 +61,27 @@ fn main() -> Result<()> {
     // Do this check before expansion otherwise it could result in
     // unexpected behaviour when the a glob expands to a single file.
     if source_patterns.len() > 1 && !dest.is_dir() {
-        return Err(XcpError::InvalidDestination {
-            msg: "Multiple sources and destination is not a directory.",
-        }
+        return Err(XcpError::InvalidDestination("Multiple sources and destination is not a directory.")
         .into());
     }
 
     let sources = options::expand_sources(source_patterns, &opts)?;
     if sources.is_empty() {
-        return Err(io_err(IOKind::NotFound, "No source files found."));
+        return Err(XcpError::InvalidSource("No source files found.").into());
+
 
     } else if sources.len() == 1 && dest.is_file() {
-        // Special case; rename/overwrite.
+        // Special case; rename/overwrite existing file.
+        if opts.noclobber {
+            return Err(XcpError::DestinationExists(
+                "Destination file exists and --no-clobber is set.",
+                dest
+            ).into());
+        }
+
         info!("Copying file {:?} to {:?}", sources[0], dest);
         driver.copy_single(&sources[0], dest, &opts)?;
+
 
     } else {
 
@@ -80,19 +89,19 @@ fn main() -> Result<()> {
         for source in &sources {
             info!("Copying source {:?} to {:?}", source, dest);
             if !source.exists() {
-                return Err(io_err(IOKind::NotFound, "Source does not exist."));
+                return Err(XcpError::InvalidSource("Source does not exist.").into());
             }
 
             if source.is_dir() && !opts.recursive {
-                return Err(XcpError::InvalidSource {
-                    msg: "Source is directory and --recursive not specified.",
-                }.into())
+                return Err(XcpError::InvalidSource(
+                    "Source is directory and --recursive not specified."
+                ).into())
             }
 
             if dest.exists() && !dest.is_dir() {
-                return Err(XcpError::InvalidDestination {
-                    msg: "Source is directory but target exists and is not a directory",
-                }.into());
+                return Err(XcpError::InvalidDestination(
+                    "Source is directory but target exists and is not a directory"
+                ).into());
             }
         }
 

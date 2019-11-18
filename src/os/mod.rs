@@ -20,7 +20,8 @@ use cfg_if::cfg_if;
 cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
         mod linux;
-        pub use linux::{allocate_file, copy_file_bytes, copy_file_offset, probably_sparse, next_sparse_segments};
+        pub use common::allocate_file;
+        pub use linux::{copy_file_bytes, copy_file_offset, probably_sparse, next_sparse_segments};
     } else {
         pub use common::{allocate_file, copy_file_bytes, copy_file_offset, probably_sparse, next_sparse_segments};
     }

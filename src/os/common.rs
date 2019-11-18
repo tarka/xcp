@@ -20,7 +20,6 @@ use std::io;
 use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::io::AsRawFd;
-use std::mem;
 
 use crate::errors::{Result, XcpError};
 
@@ -31,16 +30,6 @@ pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
     }
 }
 
-
-const BLKSIZE: usize = 4 * 1024;  // Assume 4k blocks on disk.
-type Buffer = [u8; BLKSIZE];
-
-fn get_buffer() -> Buffer {
-    let buf: Buffer = unsafe {
-        mem::MaybeUninit::uninit().assume_init()
-    };
-    buf
-}
 
 fn pread(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize> {
     let ret = unsafe {
@@ -59,22 +48,24 @@ fn pwrite(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize>
 }
 
 #[allow(dead_code)]
+/// Copy a block of bytes at an offset between files. Uses Posix pread/pwrite.
 pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<u64> {
-    let mut buf = get_buffer();
+    // FIXME: For larger buffers we should use a pre-allocated thread-local?
+    let mut buf = vec!(0; nbytes);
 
     let mut written: usize = 0;
     while written < nbytes {
-        let next = cmp::min(nbytes - written, BLKSIZE);
+        let next = cmp::min(nbytes - written, nbytes);
         let noff = off + written;
 
         let rlen = match pread(reader, &mut buf[..next], next, noff) {
-            Ok(0) => return Err(XcpError::InvalidSource { msg: "Source file ended prematurely."}.into()),
+            Ok(0) => return Err(XcpError::InvalidSource("Source file ended prematurely.").into()),
             Ok(len) => len,
             Err(e) => return Err(e),
         };
 
         let _wlen = match pwrite(writer, &mut buf[..rlen], next, noff) {
-            Ok(len) if len < rlen => return Err(XcpError::InvalidSource { msg: "Failed write to file."}.into()),
+            Ok(len) if len < rlen => return Err(XcpError::InvalidSource("Failed write to file.").into()),
             Ok(len) => len,
             Err(e) => return Err(e),
         };
@@ -85,18 +76,18 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
 }
 
 
-// Slightly modified version of io::copy() that only copies a set amount of bytes.
+/// Slightly modified version of io::copy() that only copies a set amount of bytes.
 pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<u64> {
-    let mut buf = get_buffer();
+    let mut buf = vec!(0; nbytes);
 
     let mut written = 0;
     while written < nbytes {
-        let next = cmp::min(nbytes - written, BLKSIZE);
+        let next = cmp::min(nbytes - written, nbytes);
         let len = match reader.read(&mut buf[..next]) {
-            Ok(0) => return Err(XcpError::InvalidSource { msg: "Source file ended prematurely."}.into()),
+            Ok(0) => return Err(XcpError::InvalidSource("Source file ended prematurely.").into()),
             Ok(len) => len,
             Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
-            Err(e) => return Err(XcpError::IOError { err: e}.into()),
+            Err(e) => return Err(XcpError::IOError(e).into()),
         };
         writer.write_all(&buf[..len])?;
         written += len;
@@ -120,16 +111,20 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
 }
 
 
+/// Allocate file space on disk. Uses Posix ftruncate().
+pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
+    let r = unsafe {
+        libc::ftruncate(fd.as_raw_fd(), len as i64)
+    };
+    result_or_errno(r as i64, ())
+}
+
+
 // No sparse file handling by default, needs to be implemented
 // per-OS. This effectively disables the following operations.
 #[allow(dead_code)]
 pub fn probably_sparse(_fd: &File) -> Result<bool> {
     Ok(false)
-}
-
-#[allow(dead_code)]
-pub fn allocate_file(_fd: &File, _len: u64) -> Result<()> {
-    Err(XcpError::UnsupportedOperation {}.into())
 }
 
 #[allow(dead_code)]

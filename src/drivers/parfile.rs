@@ -17,15 +17,14 @@
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
 use std::fs::{create_dir_all, read_link};
-use std::io::ErrorKind as IOKind;
 use std::os::unix::fs::symlink;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::thread;
-use walkdir::{WalkDir};
+use walkdir::WalkDir;
 
-use crate::errors::{io_err, Result, XcpError};
-use crate::drivers::{CopyDriver};
-use crate::operations::{copy_file};
+use crate::errors::{Result, XcpError};
+use crate::drivers::CopyDriver;
+use crate::operations::copy_file;
 use crate::progress::{
     iprogress_bar, BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
     BATCH_DEFAULT,
@@ -105,9 +104,8 @@ fn copy_source(
     updates: &mut BatchUpdater,
 ) -> Result<()> {
 
-    let sourcedir = source.components().last().ok_or(XcpError::InvalidSource {
-        msg: "Failed to find source directory name.",
-    })?;
+    let sourcedir = source.components().last()
+        .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
 
     let target_base = if dest.exists() && !opts.no_target_directory {
         dest.join(sourcedir)
@@ -134,12 +132,9 @@ fn copy_source(
 
         if target.exists() && opts.noclobber {
             work_tx.send(Operation::End)?;
-            updates.update(Err(XcpError::DestinationExists {
-                msg: "Destination file exists and --no-clobber is set.",
-                path: target }.into()))?;
-            return Err(XcpError::EarlyShutdown {
-                msg: "Path exists and --no-clobber set.",
-            }.into());
+            updates.update(Err(XcpError::DestinationExists(
+                "Destination file exists and --no-clobber is set.", target).into()))?;
+            return Err(XcpError::EarlyShutdown("Path exists and --no-clobber set.").into());
         }
 
         match meta.file_type().to_enum() {
@@ -163,7 +158,7 @@ fn copy_source(
             FileType::Unknown => {
                 error!("Unknown filetype found; this should never happen!");
                 work_tx.send(Operation::End)?;
-                updates.update(Err(XcpError::UnknownFiletype { path: target }.into()))?;
+                updates.update(Err(XcpError::UnknownFiletype(target).into()))?;
             }
         };
     }
@@ -246,20 +241,6 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
 
 
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
-    let dest = if dest.is_dir() {
-        let fname = source.file_name().ok_or(XcpError::UnknownFilename)?;
-        dest.join(fname)
-    } else {
-        dest.clone()
-    };
-
-    if dest.is_file() && opts.noclobber {
-        return Err(io_err(
-            IOKind::AlreadyExists,
-            "Destination file exists and --no-clobber is set.",
-        ));
-    }
-
 
     let mut copy_stat = if opts.noprogress {
         BatchUpdater {

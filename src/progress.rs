@@ -18,6 +18,7 @@ use crossbeam_channel as cbc;
 
 use indicatif;
 
+use crate::options::Opts;
 use crate::errors::Result;
 
 #[derive(Debug, Clone)]
@@ -113,6 +114,13 @@ pub enum ProgressBar {
 }
 
 impl ProgressBar {
+    pub fn new(opts: &Opts, size: u64) -> ProgressBar {
+        match opts.noprogress {
+            true => ProgressBar::Nop,
+            false => iprogress_bar(size)
+        }
+    }
+
     pub fn set_size(&self, size: u64) {
         match self {
             ProgressBar::Visual(pb) => pb.set_length(size),
@@ -120,9 +128,23 @@ impl ProgressBar {
         }
     }
 
+    pub fn inc_size(&self, size: u64) {
+        match self {
+            ProgressBar::Visual(pb) => pb.inc_length(size),
+            ProgressBar::Nop => {}
+        }
+    }
+
     pub fn set_position(&self, size: u64) {
         match self {
             ProgressBar::Visual(pb) => pb.set_position(size),
+            ProgressBar::Nop => {}
+        }
+    }
+
+    pub fn inc(&self, size: u64) {
+        match self {
+            ProgressBar::Visual(pb) => pb.inc(size),
             ProgressBar::Nop => {}
         }
     }
@@ -137,11 +159,11 @@ impl ProgressBar {
 
 
 pub fn iprogress_bar(size: u64) -> ProgressBar {
-    let ipb = indicatif::ProgressBar::new(size);
-    ipb.set_style(
-        indicatif::ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-            .progress_chars("#>-"),
-    );
+    let ipb = indicatif::ProgressBar::new(size)
+        .with_style(
+            indicatif::ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                .progress_chars("#>-"),
+        );
     ProgressBar::Visual(ipb)
 }

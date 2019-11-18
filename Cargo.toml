@@ -21,22 +21,29 @@ travis-ci = { repository = "tarka/xcp" }
 default = ["kernel_copy_file_range"]
 kernel_copy_file_range = []
 
+[profile.release]
+overflow-checks = true
+
 [dependencies]
-cfg-if = "0.1"
-clap = "2"
-crossbeam-channel = "0.3"
-failure = "0.1"
-glob = "0.2"
-ignore = "0.4"
-indicatif = "0.11"
-libc = "0.2"
-log = "0.4"
-num_cpus = "1.0"
-simplelog = "0.7"
-structopt = "0.3"
-walkdir = "2"
+anyhow = "1.0.20"
+cfg-if = "0.1.10"
+clap = "2.33.0"
+crossbeam-channel = "0.4.0"
+glob = "0.3.0"
+ignore = "0.4.10"
+indicatif = "0.13.0"
+libc = "0.2.65"
+log = "0.4.8"
+num_cpus = "1.11.1"
+simplelog = "0.7.4"
+structopt = "0.3.4"
+thiserror = "1.0.5"
+unbytify = "0.2.0"
+walkdir = "2.2.9"
 
 [dev-dependencies]
-tempfile = "3"
-escargot = "0.5"
-uuid = { version="0.7", features=["v4"]}
+tempfile = "3.1.0"
+escargot = "0.5.0"
+uuid = { version = "0.8.1", features = ["v4"] }
+test-case = "0.3.3"
+fxhash = "0.2.1"

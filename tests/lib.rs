@@ -14,9 +14,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use failure::Error;
-
+use core::hash::Hasher;
 use escargot::CargoBuild;
+use fxhash::FxHasher64;
 use std::fs::{create_dir_all, write, File};
 use std::io::{Read, Write};
 use std::os::unix::fs::symlink;
@@ -24,7 +24,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::result;
 use tempfile::tempdir;
+use test_case::test_case;
 use uuid::Uuid;
+use anyhow::Error;
 
 
 pub type TResult = result::Result<(), Error>;
@@ -59,6 +61,24 @@ fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
 
     Ok(buf == text)
 }
+
+fn hash_file(f: &Path) -> result::Result<u64, Error> {
+    let mut h = FxHasher64::default();
+    let fd = File::open(f)?;
+
+    for b in fd.bytes() {
+        h.write_u8(b?);
+    }
+
+    Ok(h.finish())
+}
+
+fn files_match(a: &Path, b: &Path) -> bool {
+    let ah = hash_file(a).unwrap();
+    let bh = hash_file(b).unwrap();
+    ah == bh
+}
+
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
@@ -116,6 +136,28 @@ fn probably_sparse(file: &Path) -> Result<bool, Error> {
     Ok(blocks < size / blksize)
 }
 
+#[test]
+fn test_hasher() -> TResult {
+    {
+        let dir = tempdir()?;
+        let a = dir.path().join("source.txt");
+        let b = dir.path().join("dest.txt");
+        let text = "sd;lkjfasl;kjfa;sldkfjaslkjfa;jsdlfkjsdlfkajl";
+        create_file(&a, text)?;
+        create_file(&b, text)?;
+        assert!(files_match(&a, &b));
+    }
+    {
+        let dir = tempdir()?;
+        let a = dir.path().join("source.txt");
+        let b = dir.path().join("dest.txt");
+        create_file(&a, "lskajdf;laksjdfl;askjdf;alksdj")?;
+        create_file(&b, "29483793857398")?;
+        assert!(!files_match(&a, &b));
+    }
+
+    Ok(())
+}
 
 #[test]
 fn basic_help() -> TResult {
@@ -142,9 +184,12 @@ fn no_args() -> TResult {
     Ok(())
 }
 
-#[test]
-fn source_missing() -> TResult {
-    let out = run(&["/this/should/not/exist", "/dev/null"])?;
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn source_missing(drv: &str) -> TResult {
+    let out = run(&[
+        "--driver", drv,
+        "/this/should/not/exist", "/dev/null"])?;
 
     assert!(!out.status.success());
     assert!(out.status.code().unwrap() == 1);
@@ -155,11 +200,14 @@ fn source_missing() -> TResult {
     Ok(())
 }
 
-#[test]
-fn source_missing_globbed() -> TResult {
-    let out = run(&["-g",
-                    "/this/should/not/exist/*.txt",
-                    "/dev/null"])?;
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn source_missing_globbed(drv: &str) -> TResult {
+    let out = run(&[
+        "--driver", drv,
+        "-g",
+        "/this/should/not/exist/*.txt",
+        "/dev/null"])?;
 
     assert!(!out.status.success());
     assert!(out.status.code().unwrap() == 1);
@@ -170,8 +218,9 @@ fn source_missing_globbed() -> TResult {
     Ok(())
 }
 
-#[test]
-fn dest_file_exists() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dest_file_exists(drv: &str) -> TResult {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
@@ -181,6 +230,7 @@ fn dest_file_exists() -> TResult {
         File::create(&dest_path)?;
     }
     let out = run(&[
+        "--driver", drv,
         "--no-clobber",
         source_path.to_str().unwrap(),
         dest_path.to_str().unwrap(),
@@ -193,8 +243,9 @@ fn dest_file_exists() -> TResult {
     Ok(())
 }
 
-#[test]
-fn dest_file_in_dir_exists() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dest_file_in_dir_exists(drv: &str) -> TResult {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
@@ -205,6 +256,7 @@ fn dest_file_in_dir_exists() -> TResult {
     }
 
     let out = run(&[
+        "--driver", drv,
         "--no-clobber",
         source_path.to_str().unwrap(),
         dir.path().to_str().unwrap(),
@@ -217,8 +269,62 @@ fn dest_file_in_dir_exists() -> TResult {
     Ok(())
 }
 
-#[test]
-fn file_copy() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dest_file_exists_overwrites(drv: &str) -> TResult {
+    let dir = tempdir()?;
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+
+    {
+        create_file(&source_path, "falskjdfa;lskdjfa")?;
+        File::create(&dest_path)?;
+    }
+    assert!(!files_match(&source_path, &dest_path));
+
+    let out = run(&[
+        "--driver", drv,
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])?;
+
+    assert!(out.status.success());
+    assert!(files_match(&source_path, &dest_path));
+
+    Ok(())
+}
+
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dest_file_exists_noclobber(drv: &str) -> TResult {
+    let dir = tempdir()?;
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+
+    {
+        create_file(&source_path, "falskjdfa;lskdjfa")?;
+        File::create(&dest_path)?;
+    }
+    assert!(!files_match(&source_path, &dest_path));
+
+    let out = run(&[
+        "--driver", drv,
+        "--no-clobber",
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])?;
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8(out.stderr)?;
+    assert!(stderr.contains("Destination file exists"));
+    assert!(!files_match(&source_path, &dest_path));
+
+    Ok(())
+}
+
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn file_copy(drv: &str) -> TResult {
     let dir = tempdir()?;
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
@@ -226,16 +332,21 @@ fn file_copy() -> TResult {
 
     create_file(&source_path, text)?;
 
-    let out = run(&[source_path.to_str().unwrap(), dest_path.to_str().unwrap()])?;
+    let out = run(&[
+        "--driver", drv,
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap()])?;
 
     assert!(out.status.success());
     assert!(file_contains(&dest_path, text)?);
+    assert!(files_match(&source_path, &dest_path));
 
     Ok(())
 }
 
-#[test]
-fn file_copy_rel() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn file_copy_rel(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
     let source_path = dir.join("source.txt");
     let dest_path = dir.join("dest.txt");
@@ -243,17 +354,22 @@ fn file_copy_rel() -> TResult {
 
     create_file(&source_path, text)?;
 
-    let out = run(&[source_path.to_str().unwrap(), dest_path.to_str().unwrap()])?;
+    let out = run(&[
+        "--driver", drv,
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap()])?;
 
     assert!(out.status.success());
     assert!(file_contains(&dest_path, text)?);
+    assert!(files_match(&source_path, &dest_path));
 
     Ok(())
 }
 
 
-#[test]
-fn file_copy_multiple() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn file_copy_multiple(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
     let dest = dir.join("dest");
     create_dir_all(&dest)?;
@@ -263,6 +379,7 @@ fn file_copy_multiple() -> TResult {
     create_file(&f2, "test")?;
 
     let out = run(&[
+        "--driver", drv,
         "-vv",
         f1.to_str().unwrap(),
         f2.to_str().unwrap(),
@@ -277,8 +394,9 @@ fn file_copy_multiple() -> TResult {
 }
 
 
-#[test]
-fn copy_empty_dir() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn copy_empty_dir(drv: &str) -> TResult {
     let dir = tempdir()?;
 
     let source_path = dir.path().join("mydir");
@@ -288,6 +406,7 @@ fn copy_empty_dir() -> TResult {
     create_dir_all(&dest_base)?;
 
     let out = run(&[
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -301,8 +420,9 @@ fn copy_empty_dir() -> TResult {
     Ok(())
 }
 
-#[test]
-fn copy_all_dirs() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn copy_all_dirs(drv: &str) -> TResult {
     let dir = tempdir()?;
 
     let source_path = dir.path().join("mydir");
@@ -313,6 +433,7 @@ fn copy_all_dirs() -> TResult {
     create_dir_all(&dest_base)?;
 
     let out = run(&[
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -326,8 +447,9 @@ fn copy_all_dirs() -> TResult {
     Ok(())
 }
 
-#[test]
-fn copy_all_dirs_rel() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn copy_all_dirs_rel(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -338,6 +460,7 @@ fn copy_all_dirs_rel() -> TResult {
     create_dir_all(&dest_base)?;
 
     let out = run(&[
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -351,8 +474,9 @@ fn copy_all_dirs_rel() -> TResult {
     Ok(())
 }
 
-#[test]
-fn copy_dirs_files() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn copy_dirs_files(drv: &str) -> TResult {
     let dir = tempdir()?;
 
     let source_path = dir.path().join("mydir");
@@ -369,6 +493,7 @@ fn copy_dirs_files() -> TResult {
     create_dir_all(&dest_base)?;
 
     let out = run(&[
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -383,8 +508,9 @@ fn copy_dirs_files() -> TResult {
     Ok(())
 }
 
-#[test]
-fn copy_dirs_overwrites() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn copy_dirs_overwrites(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -397,6 +523,7 @@ fn copy_dirs_overwrites() -> TResult {
     let dest_file = dest_base.join("mydir/file.txt");
 
     let mut out = run(&[
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -408,7 +535,7 @@ fn copy_dirs_overwrites() -> TResult {
     write(&source_file, "new content")?;
     assert!(file_contains(&source_file, "new content")?);
 
-    out = run(&[
+    out = run(&["--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -416,6 +543,7 @@ fn copy_dirs_overwrites() -> TResult {
 
     assert!(out.status.success());
     assert!(file_contains(&dest_file, "new content")?);
+    assert!(files_match(&source_file, &dest_file));
 
     Ok(())
 }
@@ -476,8 +604,9 @@ fn copy_dirs_overwrites_no_target_dir() -> TResult {
     Ok(())
 }
 
-#[test]
-fn dir_copy_to_nonexistent_is_rename() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dir_copy_to_nonexistent_is_rename(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -489,6 +618,7 @@ fn dir_copy_to_nonexistent_is_rename() -> TResult {
     let dest_file = dest_base.join("file.txt");
 
     let out = run(&[
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -501,8 +631,9 @@ fn dir_copy_to_nonexistent_is_rename() -> TResult {
     Ok(())
 }
 
-#[test]
-fn dir_overwrite_with_noclobber() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dir_overwrite_with_noclobber(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -515,6 +646,7 @@ fn dir_overwrite_with_noclobber() -> TResult {
     let dest_file = dest_base.join("mydir/file.txt");
 
     let mut out = run(&[
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -522,11 +654,13 @@ fn dir_overwrite_with_noclobber() -> TResult {
 
     assert!(out.status.success());
     assert!(file_contains(&dest_file, "orig")?);
+    assert!(files_match(&source_file, &dest_file));
 
     write(&source_file, "new content")?;
     assert!(file_contains(&source_file, "new content")?);
 
     out = run(&[
+        "--driver", drv,
         "-r",
         "--no-clobber",
         source_path.to_str().unwrap(),
@@ -539,8 +673,9 @@ fn dir_overwrite_with_noclobber() -> TResult {
 }
 
 
-#[test]
-fn dir_copy_containing_symlinks() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dir_copy_containing_symlinks(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -556,6 +691,7 @@ fn dir_copy_containing_symlinks() -> TResult {
     let dest_rlink = source_path.join("link.txt");
 
     let out = run(&[
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -574,8 +710,9 @@ fn dir_copy_containing_symlinks() -> TResult {
 }
 
 
-#[test]
-fn dir_copy_with_hidden_file() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dir_copy_with_hidden_file(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -587,6 +724,7 @@ fn dir_copy_with_hidden_file() -> TResult {
     let dest_file = dest_base.join(".file.txt");
 
     let out = run(&[
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -595,12 +733,14 @@ fn dir_copy_with_hidden_file() -> TResult {
     assert!(out.status.success());
     assert!(dest_file.exists());
     assert!(file_contains(&dest_file, "orig")?);
+    assert!(files_match(&source_file, &dest_file));
 
     Ok(())
 }
 
-#[test]
-fn dir_copy_with_hidden_dir() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dir_copy_with_hidden_dir(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir/.hidden");
@@ -612,6 +752,7 @@ fn dir_copy_with_hidden_dir() -> TResult {
     let dest_file = dest_base.join("file.txt");
 
     let out = run(&[
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -620,13 +761,15 @@ fn dir_copy_with_hidden_dir() -> TResult {
     assert!(out.status.success());
     assert!(dest_file.exists());
     assert!(file_contains(&dest_file, "orig")?);
+    assert!(files_match(&source_file, &dest_file));
 
     Ok(())
 }
 
 
-#[test]
-fn dir_with_gitignore() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn dir_with_gitignore(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
 
     let source_path = dir.join("mydir");
@@ -651,6 +794,7 @@ fn dir_with_gitignore() -> TResult {
     let dest_base = dir.join("dest");
 
     let out = run(&[
+        "--driver", drv,
         "-r",
         "--gitignore",
         source_path.to_str().unwrap(),
@@ -670,8 +814,9 @@ fn dir_with_gitignore() -> TResult {
 }
 
 
-#[test]
-fn copy_with_glob() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn copy_with_glob(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
     let dest = dir.join("dest");
     create_dir_all(&dest)?;
@@ -681,6 +826,7 @@ fn copy_with_glob() -> TResult {
     create_file(&f2, "test")?;
 
     let out = run(&[
+        "--driver", drv,
         "--glob",
         dir.join("file*.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
@@ -693,8 +839,9 @@ fn copy_with_glob() -> TResult {
     Ok(())
 }
 
-#[test]
-fn copy_pattern_no_glob() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn copy_pattern_no_glob(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
     let dest = dir.join("dest");
     create_dir_all(&dest)?;
@@ -703,6 +850,7 @@ fn copy_pattern_no_glob() -> TResult {
     create_file(&f1, "test")?;
 
     let out = run(&[
+        "--driver", drv,
         dir.join("a [b] c.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
     ])?;
@@ -715,8 +863,9 @@ fn copy_pattern_no_glob() -> TResult {
 
 
 
-#[test]
-fn glob_pattern_error() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+fn glob_pattern_error(drv: &str) -> TResult {
     let dir = tempdir_rel()?;
     let dest = dir.join("dest");
     create_dir_all(&dest)?;
@@ -726,6 +875,7 @@ fn glob_pattern_error() -> TResult {
     create_file(&f2, "test")?;
 
     let out = run(&[
+        "--driver", drv,
         "--glob",
         dir.join("file***.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
@@ -733,15 +883,16 @@ fn glob_pattern_error() -> TResult {
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr)?;
-    assert!(stderr.contains("PatternError"));
+    assert!(stderr.contains("Pattern syntax error"));
 
     Ok(())
 }
 
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-#[test]
-fn test_sparse() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+//#[test_case("parblock"; "Test with parallel block driver")]
+fn test_sparse(drv: &str) -> TResult {
     use std::fs::read;
 
     let dir = tempdir()?;
@@ -753,6 +904,7 @@ fn test_sparse() -> TResult {
     assert!(probably_sparse(&from)?);
 
     let out = run(&[
+        "--driver", drv,
         from.to_str().unwrap(),
         to.to_str().unwrap(),
     ])?;
@@ -770,8 +922,9 @@ fn test_sparse() -> TResult {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-#[test]
-fn test_sparse_leading_gap() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+//#[test_case("parblock"; "Test with parallel block driver")]
+fn test_sparse_leading_gap(drv: &str) -> TResult {
     use std::fs::read;
 
     let dir = tempdir()?;
@@ -783,13 +936,13 @@ fn test_sparse_leading_gap() -> TResult {
     assert!(probably_sparse(&from)?);
 
     let out = run(&[
+        "--driver", drv,
         from.to_str().unwrap(),
         to.to_str().unwrap(),
     ])?;
+
     assert!(out.status.success());
-
     assert!(probably_sparse(&to)?);
-
     assert_eq!(quickstat(&from)?, quickstat(&to)?);
 
     let from_data = read(&from)?;
@@ -800,8 +953,9 @@ fn test_sparse_leading_gap() -> TResult {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-#[test]
-fn test_sparse_trailng_gap() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+//#[test_case("parblock"; "Test with parallel block driver")]
+fn test_sparse_trailng_gap(drv: &str) -> TResult {
     use std::fs::read;
 
     let dir = tempdir()?;
@@ -813,13 +967,45 @@ fn test_sparse_trailng_gap() -> TResult {
     assert!(probably_sparse(&from)?);
 
     let out = run(&[
+        "--driver", drv,
         from.to_str().unwrap(),
         to.to_str().unwrap(),
     ])?;
     assert!(out.status.success());
 
     assert!(probably_sparse(&to)?);
+    assert_eq!(quickstat(&from)?, quickstat(&to)?);
 
+
+    let from_data = read(&from)?;
+    let to_data = read(&to)?;
+    assert_eq!(from_data, to_data);
+
+    Ok(())
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+//#[test_case("parblock"; "Test with parallel block driver")]
+fn test_sparse_single_overwrite(drv: &str) -> TResult {
+    use std::fs::read;
+
+    let dir = tempdir()?;
+    let from = dir.path().join("sparse.bin");
+    let to = dir.path().join("target.bin");
+
+    let slen = create_sparse(&from, 1024, 1024)?;
+    create_file(&to, "")?;
+    assert_eq!(slen, from.metadata()?.len());
+    assert!(probably_sparse(&from)?);
+
+    let out = run(&[
+        "--driver", drv,
+        from.to_str().unwrap(),
+        to.to_str().unwrap(),
+    ])?;
+    assert!(out.status.success());
+    assert!(probably_sparse(&to)?);
     assert_eq!(quickstat(&from)?, quickstat(&to)?);
 
     let from_data = read(&from)?;
@@ -830,8 +1016,9 @@ fn test_sparse_trailng_gap() -> TResult {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-#[test]
-fn test_empty_sparse() -> TResult {
+#[test_case("parfile"; "Test with parallel file driver")]
+//#[test_case("parblock"; "Test with parallel block driver")]
+fn test_empty_sparse(drv: &str) -> TResult {
     use std::fs::read;
 
     let dir = tempdir()?;
@@ -845,6 +1032,7 @@ fn test_empty_sparse() -> TResult {
     assert_eq!(from.metadata()?.len(), 1024*1024);
 
     let out = run(&[
+        "--driver", drv,
         from.to_str().unwrap(),
         to.to_str().unwrap(),
     ])?;

@@ -22,7 +22,7 @@ use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::ptr;
 
-use crate::os::common::{copy_bytes_uspace, copy_range_uspace, result_or_errno};
+use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
 use crate::errors::{Result};
 
 
@@ -55,20 +55,19 @@ mod ffi {
     extern "C" {
         pub fn copy_file_range(
             fd_in: libc::c_int,
-            off_in: libc::loff_t,
+            off_in: *mut libc::loff_t,
             fd_out: libc::c_int,
-            off_out: libc::loff_t,
+            off_out: *mut libc::loff_t,
             len: libc::size_t,
             flags: libc::c_uint,
         ) -> libc::ssize_t;
     }
 }
 
-
-macro_rules! ptr_or_null(
+macro_rules! box_ptr_or_null(
     ($e:expr) =>
         (match $e {
-            Some(mut o) =>  &mut o as *mut i64,
+            Some(b) =>  Box::into_raw(Box::new(b)),
             None => ptr::null_mut()
         })
 );
@@ -87,17 +86,33 @@ fn copy_file_range(infd: &File, in_off: Option<i64>,
 {
     USE_CFR.with(|cfr| {
         if *cfr.borrow() {
+            // copy_file_range(2) takes an optional pointer to an
+            // offset. However, taking pointers to the argument values
+            // interacts badly with the optimiser and can end up
+            // pointing at invalid values. To prevent this we force
+            // the values onto the heap and take a pointer to
+            // that. Note the cleanup below.
+            let in_ptr = box_ptr_or_null!(in_off);
+            let out_ptr = box_ptr_or_null!(out_off);
 
             let r = unsafe {
                 ffi::copy_file_range(
                     infd.as_raw_fd(),
-                    ptr_or_null!(in_off),
+                    in_ptr,
                     outfd.as_raw_fd(),
-                    ptr_or_null!(out_off),
+                    out_ptr,
                     bytes as usize,
                     0,
                 ) as i64
             };
+
+            // Clean-up the allocated memory by pulling it back into a Box.
+            if !in_ptr.is_null() {
+                unsafe { Box::from_raw(in_ptr) };
+            }
+            if !out_ptr.is_null() {
+                unsafe { Box::from_raw(out_ptr) };
+            }
 
             match r {
                 -1 => {
@@ -155,14 +170,6 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
 pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<u64> {
     copy_range_kernel(infd, outfd, bytes, off)
         .unwrap_or_else(|| copy_range_uspace(infd, outfd, bytes as usize, off as usize))
-}
-
-
-pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
-    let r = unsafe {
-        libc::ftruncate(fd.as_raw_fd(), len as i64)
-    };
-    result_or_errno(r as i64, ())
 }
 
 
@@ -238,6 +245,7 @@ mod tests {
     use std::fs::{read, OpenOptions};
     use std::process::Command;
     use std::io::{Seek, SeekFrom, Write};
+    use crate::os::allocate_file;
 
     #[test]
     fn test_sparse_detection() -> Result<()> {
