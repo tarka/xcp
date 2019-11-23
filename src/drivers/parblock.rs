@@ -150,7 +150,6 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             .queue_len(128)
             .build();
         for op in file_rx {
-            //info!("Queueing file {:?}", op.from);
             queue_file_blocks(&op.from, op.target, &pool, &stx, bsize)
                 .unwrap(); // FIXME
         }
@@ -203,15 +202,11 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
                         target: target
                     })?;
                     total += meta.len();
-
-                    // updates.update(Ok(meta.len()))?;
-                    // work_tx.send(Operation::Copy(from, target))?;
                 }
 
                 FileType::Symlink => {
                     let lfile = read_link(from)?;
                     debug!("Send symlink operation {:?} to {:?}", lfile, target);
-                    // work_tx.send(Operation::Link(lfile, target))?;
                 }
 
                 FileType::Dir => {
@@ -232,7 +227,6 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     drop(file_tx);
     pb.set_size(total);
     for up in stat_rx {
-        //println!("UPDATE {:?}", up);
         match up {
             StatusUpdate::Copied(v) => pb.inc(v),
             StatusUpdate::Size(v) => pb.inc_size(v),
