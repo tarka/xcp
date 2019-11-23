@@ -57,10 +57,41 @@ struct CopyHandle {
     to: File,
 }
 
+// FIXME: We should probably move this to the progress-bar module and
+// abstract away more of the channel setup to be no-ops when
+// --no-progress is specified.
 static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
 
+#[derive(Clone)]
+struct Sender {
+    noop: bool,
+    chan: cbc::Sender<StatusUpdate>
+}
+impl Sender {
+    fn new(chan: &cbc::Sender<StatusUpdate>, opts: &Opts) -> Sender {
+        Sender {
+            noop: opts.noprogress,
+            chan: chan.clone()
+        }
+    }
 
-fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &cbc::Sender<StatusUpdate>, bsize: u64) -> Result<u64>
+    fn send(&self, update: StatusUpdate, bytes: u64, bsize: u64) -> Result<()> {
+        if self.noop {
+            return Ok(());
+        }
+        // Avoid saturating the queue with small writes
+        let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
+        if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
+            Ok(self.chan.send(update)?)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+
+
+fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &Sender, bsize: u64) -> Result<u64>
 {
     let len = source.metadata()?.len();
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
@@ -90,11 +121,7 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
                                          bytes,
                                          (off * bsize) as i64).unwrap();
 
-                // Avoid saturating the queue with small writes
-                let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
-                if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
-                    stat_tx.send(StatusUpdate::Copied(r)).unwrap();
-                }
+                stat_tx.send(StatusUpdate::Copied(r), bytes, bsize).unwrap();
             });
 
         }
@@ -106,12 +133,13 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
     let nworkers = num_workers(&opts);
     let (stat_tx, stat_rx) = cbc::unbounded();
+    let sender = Sender::new(&stat_tx, opts);
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
     let pb = ProgressBar::new(opts, len);
 
-    queue_file_blocks(source, dest, &pool, &stat_tx, opts.block_size)?;
+    queue_file_blocks(source, dest, &pool,  &sender, opts.block_size)?;
 
     // Gather the results as we go; close our end of the channel so it
     // ends when drained.
@@ -140,17 +168,18 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
 
     let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
     let bsize = opts.block_size;
-    let stx = stat_tx.clone();
+    let sender = Sender::new(&stat_tx, opts);
     let _dispatcher = thread::spawn(move || {
         let pool = Builder::new()
             .num_threads(nworkers)
             // Use bounded queue for backpressure; this limits open
             // files in-flight so we don't run out of file handles.
-            // FIXME: Number is arbitrary ATM.
+            // FIXME: Number is arbitrary ATM, we should be able to
+            // calculate it from ulimits.
             .queue_len(128)
             .build();
         for op in file_rx {
-            queue_file_blocks(&op.from, op.target, &pool, &stx, bsize)
+            queue_file_blocks(&op.from, op.target, &pool, &sender, bsize)
                 .unwrap(); // FIXME
         }
         info!("Queuing complete");
