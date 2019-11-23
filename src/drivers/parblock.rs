@@ -68,10 +68,10 @@ struct Sender {
     chan: cbc::Sender<StatusUpdate>
 }
 impl Sender {
-    fn new(chan: &cbc::Sender<StatusUpdate>, opts: &Opts) -> Sender {
+    fn new(chan: cbc::Sender<StatusUpdate>, opts: &Opts) -> Sender {
         Sender {
             noop: opts.noprogress,
-            chan: chan.clone()
+            chan: chan
         }
     }
 
@@ -132,22 +132,23 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
 
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
     let nworkers = num_workers(&opts);
-    let (stat_tx, stat_rx) = cbc::unbounded();
-    let sender = Sender::new(&stat_tx, opts);
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
     let pb = ProgressBar::new(opts, len);
 
+    let (stat_tx, stat_rx) = cbc::unbounded();
+    let sender = Sender::new(stat_tx, opts);
     queue_file_blocks(source, dest, &pool,  &sender, opts.block_size)?;
+    drop(sender);
 
     // Gather the results as we go; close our end of the channel so it
     // ends when drained.
-    drop(stat_tx);
     for r in stat_rx {
         pb.inc(r.value());
     }
     pool.join();
+    pb.end();
 
     Ok(())
 }
@@ -168,7 +169,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
 
     let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
     let bsize = opts.block_size;
-    let sender = Sender::new(&stat_tx, opts);
+    let sender = Sender::new(stat_tx, opts);
     let _dispatcher = thread::spawn(move || {
         let pool = Builder::new()
             .num_threads(nworkers)
@@ -252,7 +253,6 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
         }
     }
 
-    drop(stat_tx);
     drop(file_tx);
     pb.set_size(total);
     for up in stat_rx {
