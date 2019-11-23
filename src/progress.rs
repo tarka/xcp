@@ -28,13 +28,13 @@ pub enum StatusUpdate {
 }
 
 impl StatusUpdate {
-    fn set(&self, bytes: u64) -> StatusUpdate {
+    pub fn set(&self, bytes: u64) -> StatusUpdate {
         match self {
             StatusUpdate::Copied(_) => StatusUpdate::Copied(bytes),
             StatusUpdate::Size(_) => StatusUpdate::Size(bytes),
         }
     }
-    fn value(&self) -> u64 {
+    pub fn value(&self) -> u64 {
         match self {
             StatusUpdate::Copied(v) => *v,
             StatusUpdate::Size(v) => *v,

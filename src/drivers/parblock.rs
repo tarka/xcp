@@ -26,7 +26,7 @@ use walkdir::WalkDir;
 use crate::errors::{Result, XcpError};
 use crate::drivers::CopyDriver;
 use crate::os::{allocate_file, copy_file_offset};
-use crate::progress::ProgressBar;
+use crate::progress::{ProgressBar, StatusUpdate};
 use crate::options::{Opts, num_workers, parse_ignore, ignore_filter};
 use crate::threadpool::{Builder, ThreadPool};
 use crate::utils::{FileType, ToFileType, empty};
@@ -57,7 +57,7 @@ struct CopyHandle {
 }
 
 
-fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &cbc::Sender<Result<u64>>, bsize: u64) -> Result<()>
+fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &cbc::Sender<StatusUpdate>, bsize: u64) -> Result<u64>
 {
     let len = source.metadata()?.len();
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
@@ -79,17 +79,19 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
         for off in 0..blocks {
             let handle = arc.clone();
             let stat_tx = status_channel.clone();
+            let bytes = cmp::min(len - (off * bsize), bsize);
 
             pool.execute(move || {
                 let r = copy_file_offset(&handle.from,
                                          &handle.to,
-                                         cmp::min(len - (off * bsize), bsize),
-                                         (off * bsize) as i64);
-                stat_tx.send(r).unwrap(); // Not much we can do if this fails.
+                                         bytes,
+                                         (off * bsize) as i64).unwrap();
+                stat_tx.send(StatusUpdate::Copied(r)).unwrap();
             });
+
         }
     }
-    Ok(())
+    Ok(len)
 }
 
 
@@ -107,7 +109,7 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
     // ends when drained.
     drop(stat_tx);
     for r in stat_rx {
-        pb.inc(r?);
+        pb.inc(r.value());
     }
     pool.join();
 
@@ -126,7 +128,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     let mut total = 0;
 
     let nworkers = num_workers(&opts) as usize;
-    let (stat_tx, stat_rx) = cbc::unbounded::<Result<u64>>();
+    let (stat_tx, stat_rx) = cbc::unbounded::<StatusUpdate>();
 
     let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
     let bsize = opts.block_size;
@@ -134,7 +136,10 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     let _dispatcher = thread::spawn(move || {
         let pool = Builder::new()
             .num_threads(nworkers)
-            .queue_len(128)  // FIXME
+            // Use bounded queue for backpressure; this limits open
+            // files in-flight so we don't run out of file handles.
+            // FIXME: Number is arbitrary ATM.
+            .queue_len(128)
             .build();
         for op in file_rx {
             //info!("Queueing file {:?}", op.from);
@@ -218,8 +223,12 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     drop(stat_tx);
     drop(file_tx);
     pb.set_size(total);
-    for r in stat_rx {
-        pb.inc(r?);
+    for up in stat_rx {
+        //println!("UPDATE {:?}", up);
+        match up {
+            StatusUpdate::Copied(v) => pb.inc(v),
+            StatusUpdate::Size(v) => pb.inc_size(v),
+        }
     }
 
     Ok(())
