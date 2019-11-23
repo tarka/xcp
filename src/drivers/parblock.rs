@@ -18,6 +18,7 @@ use std::cmp;
 use std::fs::{File, create_dir_all, read_link};
 use std::path::{PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
@@ -56,6 +57,8 @@ struct CopyHandle {
     to: File,
 }
 
+static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
+
 
 fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &cbc::Sender<StatusUpdate>, bsize: u64) -> Result<u64>
 {
@@ -86,7 +89,12 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
                                          &handle.to,
                                          bytes,
                                          (off * bsize) as i64).unwrap();
-                stat_tx.send(StatusUpdate::Copied(r)).unwrap();
+
+                // Avoid saturating the queue with small writes
+                let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
+                if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
+                    stat_tx.send(StatusUpdate::Copied(r)).unwrap();
+                }
             });
 
         }
@@ -230,6 +238,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             StatusUpdate::Size(v) => pb.inc_size(v),
         }
     }
+    pb.end();
 
     Ok(())
 }
