@@ -21,3 +21,14 @@ jobs:
 
       - name: Run tests
         run: ~/.cargo/bin/cargo test
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Install Rust
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash /dev/stdin -y
+
+      - name: Run tests
+        run: ~/.cargo/bin/cargo test
