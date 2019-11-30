@@ -24,6 +24,10 @@ jobs:
           name: Run tests
           command: ~/.cargo/bin/cargo test --color never
 
+      - run:
+          name: Run expensive tests
+          command: ~/.cargo/bin/cargo test --color never -- --ignored
+
       - save_cache:
           key: rust-cache
           paths:

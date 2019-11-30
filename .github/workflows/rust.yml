@@ -21,3 +21,6 @@ jobs:
 
       - name: Run tests
         run: ~/.cargo/bin/cargo test
+
+      - name: Run expensive tests
+        run: ~/.cargo/bin/cargo test -- --ignored
