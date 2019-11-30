@@ -29,6 +29,7 @@ anyhow = "1.0.20"
 cfg-if = "0.1.10"
 clap = "2.33.0"
 crossbeam-channel = "0.4.0"
+fiemap = "0.1.0"
 glob = "0.3.0"
 ignore = "0.4.10"
 indicatif = "0.13.0"
@@ -42,8 +43,11 @@ unbytify = "0.2.0"
 walkdir = "2.2.9"
 
 [dev-dependencies]
-tempfile = "3.1.0"
 escargot = "0.5.0"
-uuid = { version = "0.8.1", features = ["v4"] }
-test-case = "0.3.3"
 fxhash = "0.2.1"
+rand = "0.7.2"
+rand_distr = "0.2.2"
+rand_xorshift = "0.2.0"
+tempfile = "3.1.0"
+test-case = "0.3.3"
+uuid = { version = "0.8.1", features = ["v4"] }

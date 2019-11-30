@@ -341,7 +341,6 @@ mod tests {
         assert!(probably_sparse(&File::open(&file)?)?);
 
         let bytes = read(&file)?;
-                    println!("BYTES IS {}", data);
 
         assert!(bytes.len() == 1024*1024);
         assert!(bytes[offset] == b't');
@@ -378,7 +377,6 @@ mod tests {
                 .write(true)
                 .append(false)
                 .open(&file)?;
-            println!("copy {} to {}", data.len(), offset);
             let copied = copy_range_kernel(&infd, &outfd,
                                     data.len() as u64,
                                     offset as i64).unwrap()?;
