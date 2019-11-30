@@ -24,28 +24,6 @@ use test_case::test_case;
 
 use crate::util::*;
 
-#[test]
-fn test_hasher() -> TResult {
-    {
-        let dir = tempdir()?;
-        let a = dir.path().join("source.txt");
-        let b = dir.path().join("dest.txt");
-        let text = "sd;lkjfasl;kjfa;sldkfjaslkjfa;jsdlfkjsdlfkajl";
-        create_file(&a, text)?;
-        create_file(&b, text)?;
-        assert!(files_match(&a, &b));
-    }
-    {
-        let dir = tempdir()?;
-        let a = dir.path().join("source.txt");
-        let b = dir.path().join("dest.txt");
-        create_file(&a, "lskajdf;laksjdfl;askjdf;alksdj")?;
-        create_file(&b, "29483793857398")?;
-        assert!(!files_match(&a, &b));
-    }
-
-    Ok(())
-}
 
 #[test]
 fn basic_help() -> TResult {
@@ -395,6 +373,32 @@ fn copy_dirs_files(drv: &str) -> TResult {
 
     Ok(())
 }
+
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+#[ignore] // Expensive so skip for local dev
+fn copy_generated_tree(drv: &str) -> TResult {
+    let dir = tempdir()?;
+
+    let src = dir.path().join("generated");
+    let dest = dir.path().join("target");
+
+    gen_filetree(&src, 0)?;
+
+    let out = run(&[
+        "--driver", drv,
+        "-r",
+        src.to_str().unwrap(),
+        dest.to_str().unwrap(),
+    ])?;
+    assert!(out.status.success());
+
+    compare_trees(&src, &dest)?;
+
+    Ok(())
+}
+
+
 
 #[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
