@@ -26,7 +26,7 @@ jobs:
 
       - run:
           name: Run expensive tests
-          command: ~/.cargo/bin/cargo test --color never -- --ignored
+          command: ~/.cargo/bin/cargo test --color never -- --ignored --nocapture
 
       - save_cache:
           key: rust-cache
