@@ -383,8 +383,11 @@ fn copy_generated_tree(drv: &str) -> TResult {
     let src = dir.path().join("generated");
     let dest = dir.path().join("target");
 
+    // Spam some output to keep CI from timing-out (hopefully).
+    println!("Generating file tree...");
     gen_filetree(&src, 0)?;
 
+    println!("Running copy...");
     let out = run(&[
         "--driver", drv,
         "-r",
@@ -393,6 +396,7 @@ fn copy_generated_tree(drv: &str) -> TResult {
     ])?;
     assert!(out.status.success());
 
+    println!("Compare trees...");
     compare_trees(&src, &dest)?;
 
     Ok(())

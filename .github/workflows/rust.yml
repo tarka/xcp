@@ -23,4 +23,4 @@ jobs:
         run: ~/.cargo/bin/cargo test
 
       - name: Run expensive tests
-        run: ~/.cargo/bin/cargo test -- --ignored
+        run: ~/.cargo/bin/cargo test -- --ignored --nocapture
