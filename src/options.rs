@@ -74,6 +74,10 @@ pub struct Opts {
     #[structopt(long = "no-progress")]
     pub noprogress: bool,
 
+    /// Do not copy the file permissions.
+    #[structopt(long = "no-perms")]
+    pub no_perms: bool,
+
     /// Specify the driver. Currently there are 2; the default
     /// "parfile", which parallelises copies across workers at the
     /// file level, and an experimental "parblock" driver, which

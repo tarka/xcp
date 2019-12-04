@@ -14,16 +14,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::{Path};
+use log::debug;
 use std::cmp;
-use std::fs::{File};
-use log::{debug};
+use std::fs::File;
+use std::path::Path;
 
-use crate::errors::{Result};
+use crate::errors::Result;
 use crate::options::Opts;
-use crate::os::{allocate_file, copy_file_bytes, probably_sparse, next_sparse_segments};
+use crate::os::{allocate_file, copy_file_bytes, next_sparse_segments, probably_sparse};
 use crate::progress::{BatchUpdater, Updater};
-
 
 /// Copy len bytes from wherever the descriptor cursors are set.
 pub fn copy_bytes(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
@@ -55,20 +54,21 @@ pub fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Res
     Ok(len)
 }
 
-
-pub fn copy_file(from: &Path, to: &Path, _opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
+pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
     let infd = File::open(from)?;
     let outfd = File::create(to)?;
 
     let total = if probably_sparse(&infd)? {
         debug!("File {:?} is sparse", from);
         copy_sparse(&infd, &outfd, updates)?
-
     } else {
         let len = infd.metadata()?.len();
         copy_bytes(&infd, &outfd, len, updates)?
     };
 
-    outfd.set_permissions(infd.metadata()?.permissions())?;
+    if !opts.no_perms {
+        outfd.set_permissions(infd.metadata()?.permissions())?;
+    }
+
     Ok(total)
 }
