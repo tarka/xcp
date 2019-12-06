@@ -23,21 +23,19 @@ use std::path::PathBuf;
 use std::thread;
 use walkdir::WalkDir;
 
-use crate::errors::{Result, Error, XcpError};
 use crate::drivers::CopyDriver;
+use crate::errors::{Error, Result, XcpError};
 use crate::operations::copy_file;
+use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use crate::progress::{
     iprogress_bar, BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
     BATCH_DEFAULT,
 };
-use crate::utils::{FileType, ToFileType, empty};
-use crate::options::{Opts, num_workers, parse_ignore, ignore_filter};
-
+use crate::utils::{empty, FileType, ToFileType};
 
 // ********************************************************************** //
 
-pub struct Driver  {
-}
+pub struct Driver {}
 
 impl CopyDriver for Driver {
     fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
@@ -51,7 +49,6 @@ impl CopyDriver for Driver {
 
 // ********************************************************************** //
 
-
 #[derive(Debug)]
 enum Operation {
     Copy(PathBuf, PathBuf),
@@ -59,8 +56,11 @@ enum Operation {
     End,
 }
 
-
-fn copy_worker(work: cbc::Receiver<Operation>, opts: &Opts, mut updates: BatchUpdater) -> Result<()> {
+fn copy_worker(
+    work: cbc::Receiver<Operation>,
+    opts: &Opts,
+    mut updates: BatchUpdater,
+) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
         debug!("Received operation {:?}", op);
@@ -96,7 +96,6 @@ fn copy_worker(work: cbc::Receiver<Operation>, opts: &Opts, mut updates: BatchUp
     Ok(())
 }
 
-
 fn copy_source(
     source: &PathBuf,
     dest: &PathBuf,
@@ -104,9 +103,9 @@ fn copy_source(
     work_tx: &cbc::Sender<Operation>,
     updates: &mut BatchUpdater,
 ) -> Result<()> {
-
-    let sourcedir = source.components().last()
-        .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
+    let sourcedir = source.components().last().ok_or(XcpError::InvalidSource(
+        "Failed to find source directory name.",
+    ))?;
 
     let target_base = if dest.exists() && !opts.no_target_directory {
         dest.join(sourcedir)
@@ -117,7 +116,8 @@ fn copy_source(
 
     let gitignore = parse_ignore(source, opts)?;
 
-    for entry in WalkDir::new(&source).into_iter()
+    for entry in WalkDir::new(&source)
+        .into_iter()
         .filter_entry(|e| ignore_filter(e, &gitignore))
     {
         debug!("Got tree entry {:?}", entry);
@@ -134,7 +134,10 @@ fn copy_source(
         if target.exists() && opts.noclobber {
             work_tx.send(Operation::End)?;
             updates.update(Err(XcpError::DestinationExists(
-                "Destination file exists and --no-clobber is set.", target).into()))?;
+                "Destination file exists and --no-clobber is set.",
+                target,
+            )
+            .into()))?;
             return Err(XcpError::EarlyShutdown("Path exists and --no-clobber set.").into());
         }
 
@@ -167,7 +170,6 @@ fn copy_source(
     Ok(())
 }
 
-
 fn tree_walker(
     sources: Vec<PathBuf>,
     dest: &PathBuf,
@@ -185,7 +187,6 @@ fn tree_walker(
     Ok(())
 }
 
-
 pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
     let (work_tx, work_rx) = cbc::unbounded();
     let (stat_tx, stat_rx) = cbc::unbounded();
@@ -199,7 +200,6 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     // Use scoped threads here so we can pass down e.g. Opts without
     // repeated cloning.
     cbt::scope(|s| {
-
         for _ in 0..num_workers(opts) {
             let _copy_worker = {
                 let copy_stat = BatchUpdater {
@@ -237,8 +237,8 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
         }
 
         Ok::<(), Error>(())
-
-    }).unwrap()?;
+    })
+    .unwrap()?;
 
     // FIXME: We should probably join the threads and consume any errors.
 
@@ -248,9 +248,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     Ok(())
 }
 
-
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
-
     let mut copy_stat = if opts.noprogress {
         BatchUpdater {
             sender: Box::new(NopUpdater {}),
