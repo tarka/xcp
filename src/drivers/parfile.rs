@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::thread;
 use walkdir::WalkDir;
 
-use crate::errors::{Result, XcpError};
+use crate::errors::{Result, Error, XcpError};
 use crate::drivers::CopyDriver;
 use crate::operations::copy_file;
 use crate::progress::{
@@ -220,23 +220,25 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             s.spawn(|_s| tree_walker(sources, &dest, opts, work_tx, size_stat))
         };
 
-    }).unwrap();
+        let mut copied = 0;
+        let mut total = 0;
 
-    let mut copied = 0;
-    let mut total = 0;
-
-    for stat in stat_rx {
-        match stat? {
-            StatusUpdate::Size(s) => {
-                total += s;
-                pb.set_size(total);
-            }
-            StatusUpdate::Copied(s) => {
-                copied += s;
-                pb.set_position(copied);
+        for stat in stat_rx {
+            match stat? {
+                StatusUpdate::Size(s) => {
+                    total += s;
+                    pb.set_size(total);
+                }
+                StatusUpdate::Copied(s) => {
+                    copied += s;
+                    pb.set_position(copied);
+                }
             }
         }
-    }
+
+        Ok::<(), Error>(())
+
+    }).unwrap()?;
 
     // FIXME: We should probably join the threads and consume any errors.
 
