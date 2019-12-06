@@ -102,6 +102,7 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
     };
     // Ensure target file exists up-front.
     allocate_file(&fhandle.to, len)?;
+    fhandle.to.set_permissions(fhandle.from.metadata()?.permissions())?;
 
     {
         // Put the open files in an Arc, which we drop once work has
@@ -131,7 +132,7 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
 
 
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
-    let nworkers = num_workers(&opts);
+    let nworkers = num_workers(opts);
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
@@ -164,7 +165,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     let pb = ProgressBar::new(opts, 0);
     let mut total = 0;
 
-    let nworkers = num_workers(&opts) as usize;
+    let nworkers = num_workers(opts) as usize;
     let (stat_tx, stat_rx) = cbc::unbounded::<StatusUpdate>();
 
     let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
@@ -201,7 +202,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
         };
         debug!("Target base is {:?}", target_base);
 
-        let gitignore = parse_ignore(&source, &opts)?;
+        let gitignore = parse_ignore(&source, opts)?;
 
         for entry in WalkDir::new(&source).into_iter()
             .filter_entry(|e| ignore_filter(e, &gitignore))

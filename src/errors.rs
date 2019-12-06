@@ -18,7 +18,7 @@ use std::io::{Error as IOError};
 use std::path::PathBuf;
 
 use thiserror::Error;
-pub use anyhow::Result;
+pub use anyhow::{Result, Error};
 
 
 #[derive(Debug, Error)]

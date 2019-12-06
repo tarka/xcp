@@ -15,6 +15,7 @@
  */
 
 use crossbeam_channel as cbc;
+use crossbeam_utils::thread as cbt;
 use log::{debug, error, info};
 use std::fs::{create_dir_all, read_link};
 use std::os::unix::fs::symlink;
@@ -59,7 +60,7 @@ enum Operation {
 }
 
 
-fn copy_worker(work: cbc::Receiver<Operation>, mut updates: BatchUpdater) -> Result<()> {
+fn copy_worker(work: cbc::Receiver<Operation>, opts: &Opts, mut updates: BatchUpdater) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
         debug!("Received operation {:?}", op);
@@ -74,7 +75,7 @@ fn copy_worker(work: cbc::Receiver<Operation>, mut updates: BatchUpdater) -> Res
                 // copy_file sends back its own updates, but we should
                 // send back any errors as they may have occured
                 // before the copy started..
-                let r = copy_file(&from, &to, &mut updates);
+                let r = copy_file(&from, &to, opts, &mut updates);
                 if r.is_err() {
                     updates.update(r)?;
                 }
@@ -170,14 +171,14 @@ fn copy_source(
 fn tree_walker(
     sources: Vec<PathBuf>,
     dest: &PathBuf,
-    opts: Opts,
+    opts: &Opts,
     work_tx: cbc::Sender<Operation>,
     mut updates: BatchUpdater,
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 
     for source in sources {
-        copy_source(&source, &dest, &opts, &work_tx, &mut updates)?;
+        copy_source(&source, &dest, opts, &work_tx, &mut updates)?;
     }
     work_tx.send(Operation::End)?;
     debug!("Walk-worker finished: {:?}", thread::current().id());
@@ -195,26 +196,31 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
         (iprogress_bar(0), BATCH_DEFAULT)
     };
 
-    for _ in 0..num_workers(&opts) {
-        let _copy_worker = {
-            let copy_stat = BatchUpdater {
-                sender: Box::new(stat_tx.clone()),
-                stat: StatusUpdate::Copied(0),
+    // Use scoped threads here so we can pass down e.g. Opts without
+    // repeated cloning.
+    cbt::scope(|s| {
+
+        for _ in 0..num_workers(opts) {
+            let _copy_worker = {
+                let copy_stat = BatchUpdater {
+                    sender: Box::new(stat_tx.clone()),
+                    stat: StatusUpdate::Copied(0),
+                    batch_size: batch_size,
+                };
+                let wrx = work_rx.clone();
+                s.spawn(|_s| copy_worker(wrx, opts, copy_stat))
+            };
+        }
+        let _walk_worker = {
+            let size_stat = BatchUpdater {
+                sender: Box::new(stat_tx),
+                stat: StatusUpdate::Size(0),
                 batch_size: batch_size,
             };
-            let wrx = work_rx.clone();
-            thread::spawn(|| copy_worker(wrx, copy_stat))
+            s.spawn(|_s| tree_walker(sources, &dest, opts, work_tx, size_stat))
         };
-    }
-    let _walk_worker = {
-        let topts = opts.clone();
-        let size_stat = BatchUpdater {
-            sender: Box::new(stat_tx),
-            stat: StatusUpdate::Size(0),
-            batch_size: batch_size,
-        };
-        thread::spawn(move || tree_walker(sources, &dest, topts, work_tx, size_stat))
-    };
+
+    }).unwrap();
 
     let mut copied = 0;
     let mut total = 0;
@@ -231,6 +237,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             }
         }
     }
+
     // FIXME: We should probably join the threads and consume any errors.
 
     pb.end();
@@ -260,7 +267,7 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
         }
     };
 
-    copy_file(source, &dest, &mut copy_stat)?;
+    copy_file(source, &dest, opts, &mut copy_stat)?;
 
     Ok(())
 }

@@ -19,9 +19,10 @@ use std::cmp;
 use std::fs::{File};
 use log::{debug};
 
-use crate::progress::{BatchUpdater, Updater};
-use crate::os::{allocate_file, copy_file_bytes, probably_sparse, next_sparse_segments};
 use crate::errors::{Result};
+use crate::options::Opts;
+use crate::os::{allocate_file, copy_file_bytes, probably_sparse, next_sparse_segments};
+use crate::progress::{BatchUpdater, Updater};
 
 
 /// Copy len bytes from wherever the descriptor cursors are set.
@@ -55,7 +56,7 @@ pub fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Res
 }
 
 
-pub fn copy_file(from: &Path, to: &Path, updates: &mut BatchUpdater) -> Result<u64> {
+pub fn copy_file(from: &Path, to: &Path, _opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
     let infd = File::open(from)?;
     let outfd = File::create(to)?;
 
