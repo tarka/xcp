@@ -91,9 +91,10 @@ impl Sender {
 
 
 
-fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &Sender, bsize: u64) -> Result<u64>
+fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &Sender, opts: &Opts) -> Result<u64>
 {
     let len = source.metadata()?.len();
+    let bsize = opts.block_size;
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
     let fhandle = CopyHandle {
@@ -140,7 +141,7 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
 
     let (stat_tx, stat_rx) = cbc::unbounded();
     let sender = Sender::new(stat_tx, opts);
-    queue_file_blocks(source, dest, &pool,  &sender, opts.block_size)?;
+    queue_file_blocks(source, dest, &pool,  &sender, opts)?;
     drop(sender);
 
     // Gather the results as we go; close our end of the channel so it
@@ -169,7 +170,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     let (stat_tx, stat_rx) = cbc::unbounded::<StatusUpdate>();
 
     let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
-    let bsize = opts.block_size;
+    let qopts = opts.clone();  // FIXME: Would be better to use scoped thread?
     let sender = Sender::new(stat_tx, opts);
     let _dispatcher = thread::spawn(move || {
         let pool = Builder::new()
@@ -181,7 +182,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             .queue_len(128)
             .build();
         for op in file_rx {
-            queue_file_blocks(&op.from, op.target, &pool, &sender, bsize)
+            queue_file_blocks(&op.from, op.target, &pool, &sender, &qopts)
                 .unwrap(); // FIXME
         }
         info!("Queuing complete");
