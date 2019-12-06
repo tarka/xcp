@@ -15,9 +15,7 @@
  */
 
 use anyhow::Error;
-use core::hash::Hasher;
 use escargot::CargoBuild;
-use fxhash::FxHasher64;
 use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::{Alphanumeric, Pareto, Triangular};
 use rand_xorshift::XorShiftRng;
@@ -101,8 +99,6 @@ pub fn files_match(a: &Path, b: &Path) -> bool {
     if a.metadata().unwrap().len() != b.metadata().unwrap().len() {
         return false;
     }
-    // let ah = hash_file(a).unwrap();
-    // let bh = hash_file(b).unwrap();
     let mut abr = BufReader::with_capacity(1024*1024, File::open(a).unwrap());
     let mut bbr = BufReader::with_capacity(1024*1024, File::open(b).unwrap());
     loop {
