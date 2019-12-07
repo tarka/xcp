@@ -20,9 +20,7 @@ use std::io;
 use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::io::AsRawFd;
-use std::path::Path;
 
-use crate::options::Opts;
 use crate::errors::{Result, XcpError};
 
 

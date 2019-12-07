@@ -16,7 +16,7 @@
 
 use log::debug;
 use std::cmp;
-use std::fs::File;
+use std::fs::{File, Metadata};
 use std::path::Path;
 
 use crate::errors::Result;
@@ -28,7 +28,7 @@ use crate::progress::{BatchUpdater, Updater};
 pub struct CopyHandle {
     pub infd: File,
     pub outfd: File,
-    pub len: u64,
+    pub metadata: Metadata,
 }
 
 
@@ -36,17 +36,17 @@ pub fn init_copy(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
     let infd = File::open(from)?;
     let outfd = File::create(to)?;
 
-    let len = infd.metadata()?.len();
-    allocate_file(&outfd, len)?;
+    let metadata = infd.metadata()?;
+    allocate_file(&outfd, metadata.len())?;
 
     if !opts.no_perms {
-        outfd.set_permissions(infd.metadata()?.permissions())?;
+        outfd.set_permissions(metadata.permissions())?;
     }
 
     Ok(CopyHandle {
         infd,
         outfd,
-        len,
+        metadata,
     })
 }
 
@@ -67,8 +67,7 @@ pub fn copy_bytes(handle: &CopyHandle, len: u64, updates: &mut BatchUpdater) -> 
 
 /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
 pub fn copy_sparse(handle: &CopyHandle, updates: &mut BatchUpdater) -> Result<u64> {
-    let len = handle.infd.metadata()?.len();
-
+    let len = handle.metadata.len();
     let mut pos = 0;
 
     while pos < len {
@@ -88,7 +87,7 @@ pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater
         debug!("File {:?} is sparse", from);
         copy_sparse(&handle, updates)?
     } else {
-        copy_bytes(&handle, handle.len, updates)?
+        copy_bytes(&handle, handle.metadata.len(), updates)?
     };
 
     Ok(total)

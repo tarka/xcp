@@ -17,7 +17,7 @@
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
 use std::cmp;
-use std::fs::{create_dir_all, read_link, File};
+use std::fs::{create_dir_all, read_link};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -28,7 +28,7 @@ use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
 use crate::operations::init_copy;
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
-use crate::os::{allocate_file, copy_file_offset};
+use crate::os::copy_file_offset;
 use crate::progress::{ProgressBar, StatusUpdate};
 use crate::threadpool::{Builder, ThreadPool};
 use crate::utils::{empty, FileType, ToFileType};
@@ -82,11 +82,12 @@ impl Sender {
 }
 
 fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &Sender, opts: &Opts,) -> Result<u64> {
-    let len = source.metadata()?.len();
+    let fhandle = init_copy(source, &dest, opts)?;
+
+    let len = fhandle.metadata.len();
     let bsize = opts.block_size;
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
-    let fhandle = init_copy(source, &dest, opts)?;
 
     {
         // Put the open files in an Arc, which we drop once work has
