@@ -26,6 +26,7 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
+use crate::operations::create_target;
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use crate::os::{allocate_file, copy_file_offset};
 use crate::progress::{ProgressBar, StatusUpdate};
@@ -86,28 +87,17 @@ impl Sender {
     }
 }
 
-fn queue_file_blocks(
-    source: &PathBuf,
-    dest: PathBuf,
-    pool: &ThreadPool,
-    status_channel: &Sender,
-    opts: &Opts,
-) -> Result<u64> {
+fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &Sender, opts: &Opts,) -> Result<u64> {
     let len = source.metadata()?.len();
     let bsize = opts.block_size;
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
+    let from = File::open(&source)?;
+    let to = create_target(&from, &dest, opts)?;
     let fhandle = CopyHandle {
-        from: File::open(&source)?,
-        to: File::create(&dest)?,
+        from: from,
+        to: to,
     };
-    // Ensure target file exists up-front.
-    allocate_file(&fhandle.to, len)?;
-    if !opts.no_perms {
-        fhandle
-            .to
-            .set_permissions(fhandle.from.metadata()?.permissions())?;
-    }
 
     {
         // Put the open files in an Arc, which we drop once work has

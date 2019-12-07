@@ -37,10 +37,24 @@ pub fn copy_bytes(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdate
     Ok(written)
 }
 
+
+pub fn create_target(infd: &File, to: &Path, opts: &Opts) -> Result<File> {
+    let outfd = File::create(to)?;
+
+    let len = infd.metadata()?.len();
+    allocate_file(&outfd, len)?;
+
+    if !opts.no_perms {
+        outfd.set_permissions(infd.metadata()?.permissions())?;
+    }
+
+    Ok(outfd)
+}
+
+
 /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
 pub fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Result<u64> {
     let len = infd.metadata()?.len();
-    allocate_file(&outfd, len)?;
 
     let mut pos = 0;
 
@@ -56,7 +70,7 @@ pub fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Res
 
 pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
     let infd = File::open(from)?;
-    let outfd = File::create(to)?;
+    let outfd = create_target(&infd, to, opts)?;
 
     let total = if probably_sparse(&infd)? {
         debug!("File {:?} is sparse", from);
@@ -65,10 +79,6 @@ pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater
         let len = infd.metadata()?.len();
         copy_bytes(&infd, &outfd, len, updates)?
     };
-
-    if !opts.no_perms {
-        outfd.set_permissions(infd.metadata()?.permissions())?;
-    }
 
     Ok(total)
 }
