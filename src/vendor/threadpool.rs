@@ -952,7 +952,7 @@ mod test {
                     b1.wait();
                 }
 
-                tx.send(1).is_ok();
+                tx.send(1).unwrap();
             });
         }
 
