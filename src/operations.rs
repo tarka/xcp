@@ -24,21 +24,16 @@ use crate::options::Opts;
 use crate::os::{allocate_file, copy_file_bytes, next_sparse_segments, probably_sparse};
 use crate::progress::{BatchUpdater, Updater};
 
-/// Copy len bytes from wherever the descriptor cursors are set.
-pub fn copy_bytes(infd: &File, outfd: &File, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
-    let mut written = 0u64;
-    while written < len {
-        let bytes_to_copy = cmp::min(len - written, updates.batch_size);
-        let result = copy_file_bytes(&infd, &outfd, bytes_to_copy)?;
-        written += result;
-        updates.update(Ok(result))?;
-    }
-
-    Ok(written)
+#[derive(Debug)]
+pub struct CopyHandle {
+    pub infd: File,
+    pub outfd: File,
+    pub len: u64,
 }
 
 
-pub fn create_target(infd: &File, to: &Path, opts: &Opts) -> Result<File> {
+pub fn init_copy(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
+    let infd = File::open(from)?;
     let outfd = File::create(to)?;
 
     let len = infd.metadata()?.len();
@@ -48,20 +43,38 @@ pub fn create_target(infd: &File, to: &Path, opts: &Opts) -> Result<File> {
         outfd.set_permissions(infd.metadata()?.permissions())?;
     }
 
-    Ok(outfd)
+    Ok(CopyHandle {
+        infd,
+        outfd,
+        len,
+    })
+}
+
+
+/// Copy len bytes from wherever the descriptor cursors are set.
+pub fn copy_bytes(handle: &CopyHandle, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
+    let mut written = 0u64;
+    while written < len {
+        let bytes_to_copy = cmp::min(len - written, updates.batch_size);
+        let result = copy_file_bytes(&handle.infd, &handle.outfd, bytes_to_copy)?;
+        written += result;
+        updates.update(Ok(result))?;
+    }
+
+    Ok(written)
 }
 
 
 /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
-pub fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Result<u64> {
-    let len = infd.metadata()?.len();
+pub fn copy_sparse(handle: &CopyHandle, updates: &mut BatchUpdater) -> Result<u64> {
+    let len = handle.infd.metadata()?.len();
 
     let mut pos = 0;
 
     while pos < len {
-        let (next_data, next_hole) = next_sparse_segments(infd, outfd, pos)?;
+        let (next_data, next_hole) = next_sparse_segments(&handle.infd, &handle.outfd, pos)?;
 
-        let _written = copy_bytes(infd, outfd, next_hole - next_data, updates)?;
+        let _written = copy_bytes(&handle, next_hole - next_data, updates)?;
         pos = next_hole;
     }
 
@@ -69,15 +82,13 @@ pub fn copy_sparse(infd: &File, outfd: &File, updates: &mut BatchUpdater) -> Res
 }
 
 pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
-    let infd = File::open(from)?;
-    let outfd = create_target(&infd, to, opts)?;
+    let handle = init_copy(from, to, opts)?;
 
-    let total = if probably_sparse(&infd)? {
+    let total = if probably_sparse(&handle.infd)? {
         debug!("File {:?} is sparse", from);
-        copy_sparse(&infd, &outfd, updates)?
+        copy_sparse(&handle, updates)?
     } else {
-        let len = infd.metadata()?.len();
-        copy_bytes(&infd, &outfd, len, updates)?
+        copy_bytes(&handle, handle.len, updates)?
     };
 
     Ok(total)

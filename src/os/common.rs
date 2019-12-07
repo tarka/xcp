@@ -20,8 +20,11 @@ use std::io;
 use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::io::AsRawFd;
+use std::path::Path;
 
+use crate::options::Opts;
 use crate::errors::{Result, XcpError};
+
 
 pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
     match result {

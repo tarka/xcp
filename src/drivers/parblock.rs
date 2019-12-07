@@ -26,7 +26,7 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::create_target;
+use crate::operations::init_copy;
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use crate::os::{allocate_file, copy_file_offset};
 use crate::progress::{ProgressBar, StatusUpdate};
@@ -48,12 +48,6 @@ impl CopyDriver for Driver {
 }
 
 // ********************************************************************** //
-
-#[derive(Debug)]
-struct CopyHandle {
-    from: File,
-    to: File,
-}
 
 // FIXME: We should probably move this to the progress-bar module and
 // abstract away more of the channel setup to be no-ops when
@@ -92,12 +86,7 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
     let bsize = opts.block_size;
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
-    let from = File::open(&source)?;
-    let to = create_target(&from, &dest, opts)?;
-    let fhandle = CopyHandle {
-        from: from,
-        to: to,
-    };
+    let fhandle = init_copy(source, &dest, opts)?;
 
     {
         // Put the open files in an Arc, which we drop once work has
@@ -112,7 +101,7 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
             let bytes = cmp::min(len - (off * bsize), bsize);
 
             pool.execute(move || {
-                let r = copy_file_offset(&handle.from, &handle.to, bytes, (off * bsize) as i64)
+                let r = copy_file_offset(&handle.infd, &handle.outfd, bytes, (off * bsize) as i64)
                     .unwrap();
 
                 stat_tx.send(StatusUpdate::Copied(r), bytes, bsize).unwrap();
