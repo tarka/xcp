@@ -237,6 +237,90 @@ pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64,
 }
 
 
+// //////////////////////////////////////// //
+
+use std::path::Path;
+use libc::{ioctl, c_ulong};
+
+// See ioctl_list(2)
+const FS_IOC_FIEMAP: c_ulong = 0xC020660B;
+const PAGE_SIZE: usize = 32;
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct FiemapExtent {
+    fe_logical: u64,        // Logical offset in bytes for the start of the extent
+    fe_physical: u64,       // Physical offset in bytes for the start of the extent
+    fe_length: u64,         // Length in bytes for the extent
+    fe_reserved64: [u64; 2],
+    fe_flags: u32,          // FIEMAP_EXTENT_* flags for this extent
+    fe_reserved: [u32; 3],
+}
+impl FiemapExtent {
+    fn new() -> FiemapExtent {
+        FiemapExtent {
+            fe_logical: 0,
+            fe_physical: 0,
+            fe_length: 0,
+            fe_reserved64: [0; 2],
+            fe_flags: 0,
+            fe_reserved: [0; 3],
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct FiemapReq {
+    fm_start: u64,          // Logical offset (inclusive) at which to start mapping (in)
+    fm_length: u64,         // Logical length of mapping which userspace cares about (in)
+    fm_flags: u32,          // FIEMAP_FLAG_* flags for request (in/out)
+    fm_mapped_extents: u32, // Number of extents that were mapped (out)
+    fm_extent_count: u32,   // Size of fm_extents array (in)
+    fm_reserved: u32,
+    fm_extents: [FiemapExtent; PAGE_SIZE], // Array of mapped extents (out)
+}
+impl FiemapReq {
+    fn new() -> FiemapReq {
+        FiemapReq {
+            fm_start: 0,
+            fm_length: 0,
+            fm_flags: 0,
+            fm_mapped_extents: 0,
+            fm_extent_count: PAGE_SIZE as u32,
+            fm_reserved: 0,
+	    fm_extents: [FiemapExtent::new(); PAGE_SIZE],
+        }
+    }
+}
+
+fn fetch_extents(file: &Path) -> Result<Vec<FiemapExtent>> {
+    let fd = File::open(file)?;
+    let req = FiemapReq::new();
+    //let vec = Vec::with_capacity(PAGE_SIZE);
+
+    loop {
+        if unsafe {
+            ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req)
+        } != 0 {
+            return Err(io::Error::last_os_error().into());
+        }
+
+        // let e = req.fm_extents[..req.fm_mapped_extents as usize];
+        // vec.push(e);
+
+        if req.fm_mapped_extents == 0 { break; }
+    }
+
+    Ok(vec!())
+}
+
+fn map_holes(file: &Path) -> Result<Vec<u64>> {
+    let extents = fetch_extents(file)?;
+    Ok(vec!())
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -499,6 +583,28 @@ mod tests {
 
         assert_eq!(len, file.metadata()?.len());
         assert!(probably_sparse(&File::open(&file)?)?);
+
+        Ok(())
+    }
+
+
+
+    #[test]
+    fn test_fiemap_test() -> Result<()> {
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
+        let out = Command::new("/usr/bin/truncate")
+            .args(&["-s", "1M", file.to_str().unwrap()])
+            .output()?;
+        assert!(out.status.success());
+
+        use fiemap::{fiemap, FiemapExtent};
+        let map: Vec<FiemapExtent> = fiemap(&file)?
+            .map(|r| r.unwrap())
+            .collect();
+
+        assert_eq!(map.len(), 1);
+        assert_eq!(map[0].fe_length, 0);
 
         Ok(())
     }
