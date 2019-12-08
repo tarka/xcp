@@ -568,4 +568,59 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_empty_extent() -> Result<()> {
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
+
+        let out = Command::new("/usr/bin/truncate")
+            .args(&["-s", "1M", file.to_str().unwrap()])
+            .output()?;
+        assert!(out.status.success());
+
+        let extents = map_extents(&file)?;
+        assert_eq!(extents.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extent_fetch() -> Result<()> {
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
+        let from = dir.path().join("from.txt");
+        let data = "test data";
+
+        {
+            let mut fd = File::create(&from)?;
+            write!(fd, "{}", data)?;
+        }
+
+        let out = Command::new("/usr/bin/truncate")
+            .args(&["-s", "1M", file.to_str().unwrap()])
+            .output()?;
+        assert!(out.status.success());
+
+        let offset: usize = 512*1024;
+        {
+            let infd = File::open(&from)?;
+            let outfd: File = OpenOptions::new()
+                .write(true)
+                .append(false)
+                .open(&file)?;
+            let copied = copy_file_range(&infd, Some(0),
+                                         &outfd, Some(offset as i64),
+                                         data.len() as u64).unwrap()?;
+            assert_eq!(copied as usize, data.len());
+        }
+
+        let extents = map_extents(&file)?;
+        assert_eq!(extents.len(), 1);
+        assert_eq!(extents[0].start, offset as u64);
+        assert_eq!(extents[0].end, offset as u64 + 4*1024-1);  // FIXME: Assume 4k blocks
+
+        Ok(())
+    }
+
+
 }
