@@ -21,9 +21,7 @@ use std::io;
 use std::ops::Range;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
-use std::path::Path;
 use std::ptr;
-use fiemap::{fiemap, Fiemap, FiemapExtent};
 
 use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
 use crate::errors::{Result};
@@ -250,19 +248,92 @@ pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
     Ok(merged)
 }
 
-pub fn map_extents(from: &Path) -> Result<Vec<Range<u64>>> {
-    // FIXME: Not ideal; the `fiemap` call should probably return
-    // error for any low-level error. We should probably implement our
-    // own calls to fiemap here anyway, as we can optimise our
-    // use-case.
-    Ok(fiemap(from)?
-       .map(|re| {
-           let e = re.unwrap();
-           let start = e.fe_logical;
-           let end = start + e.fe_length - 1;
-           start..end
-       })
-       .collect())
+
+// See ioctl_list(2)
+const FS_IOC_FIEMAP: libc::c_ulong = 0xC020660B;
+const FIEMAP_EXTENT_LAST: u32 = 0x00000001;
+const PAGE_SIZE: usize = 32;
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+struct FiemapExtent {
+    fe_logical: u64,        // Logical offset in bytes for the start of the extent
+    fe_physical: u64,       // Physical offset in bytes for the start of the extent
+    fe_length: u64,         // Length in bytes for the extent
+    fe_reserved64: [u64; 2],
+    fe_flags: u32,          // FIEMAP_EXTENT_* flags for this extent
+    fe_reserved: [u32; 3],
+}
+impl FiemapExtent {
+    fn new() -> FiemapExtent {
+        FiemapExtent {
+            fe_logical: 0,
+            fe_physical: 0,
+            fe_length: 0,
+            fe_reserved64: [0; 2],
+            fe_flags: 0,
+            fe_reserved: [0; 3],
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+struct FiemapReq {
+    fm_start: u64,          // Logical offset (inclusive) at which to start mapping (in)
+    fm_length: u64,         // Logical length of mapping which userspace cares about (in)
+    fm_flags: u32,          // FIEMAP_FLAG_* flags for request (in/out)
+    fm_mapped_extents: u32, // Number of extents that were mapped (out)
+    fm_extent_count: u32,   // Size of fm_extents array (in)
+    fm_reserved: u32,
+    fm_extents: [FiemapExtent; PAGE_SIZE], // Array of mapped extents (out)
+}
+impl FiemapReq {
+    fn new() -> FiemapReq {
+        FiemapReq {
+            fm_start: 0,
+            fm_length: u64::max_value(),
+            fm_flags: 0,
+            fm_mapped_extents: 0,
+            fm_extent_count: PAGE_SIZE as u32,
+            fm_reserved: 0,
+	    fm_extents: [FiemapExtent::new(); PAGE_SIZE],
+        }
+    }
+}
+
+fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
+    let mut req = FiemapReq::new();
+    let req_ptr: *const FiemapReq = &req;
+    let mut extents = Vec::with_capacity(PAGE_SIZE);
+
+    loop {
+        if unsafe {
+            libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr)
+        } != 0 {
+            return Err(io::Error::last_os_error().into());
+        }
+        if req.fm_mapped_extents == 0 {
+            break;
+        }
+
+        for i in 0..req.fm_mapped_extents as usize {
+            let e = req.fm_extents[i];
+            let start = e.fe_logical;
+            let end = start + e.fe_length - 1;
+            extents.push(start..end);
+        }
+
+        let last = req.fm_extents[(req.fm_mapped_extents-1) as usize];
+        if last.fe_flags & FIEMAP_EXTENT_LAST != 0 {
+            break;
+        }
+
+        // Looks like we're going around again...
+        req.fm_start = last.fe_logical + last.fe_length;
+    }
+
+    Ok(extents)
 }
 
 
@@ -291,6 +362,7 @@ mod tests {
     use std::fs::{read, OpenOptions};
     use std::process::Command;
     use std::io::{Seek, SeekFrom, Write};
+    use std::iter;
     use crate::os::allocate_file;
 
     #[test]
@@ -481,7 +553,6 @@ mod tests {
 
     #[test]
     fn test_sparse_rust_seek() -> Result<()> {
-        //let dir = tempdir()?;
         let dir = PathBuf::from("target");
         let file = dir.join("sparse.bin");
 
@@ -578,7 +649,9 @@ mod tests {
             .output()?;
         assert!(out.status.success());
 
-        let extents = map_extents(&file)?;
+        let fd = File::open(file)?;
+
+        let extents = map_extents(&fd)?;
         assert_eq!(extents.len(), 0);
 
         Ok(())
@@ -614,7 +687,9 @@ mod tests {
             assert_eq!(copied as usize, data.len());
         }
 
-        let extents = map_extents(&file)?;
+        let fd = File::open(file)?;
+
+        let extents = map_extents(&fd)?;
         assert_eq!(extents.len(), 1);
         assert_eq!(extents[0].start, offset as u64);
         assert_eq!(extents[0].end, offset as u64 + 4*1024-1);  // FIXME: Assume 4k blocks
@@ -622,5 +697,34 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_extent_fetch_many() -> Result<()> {
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
 
+        let out = Command::new("/usr/bin/truncate")
+            .args(&["-s", "1M", file.to_str().unwrap()])
+            .output()?;
+        assert!(out.status.success());
+
+        let fsize = 1024*1024;
+        // FIXME: Assumes 4k blocks
+        let bsize = 4*1024;
+        let block = iter::repeat(0xff as u8).take(bsize).collect::<Vec<u8>>();
+
+        let mut fd = OpenOptions::new()
+            .write(true)
+            .append(false)
+            .open(&file)?;
+        // Skip every-other block
+        for off in (0..fsize).step_by(bsize*2) {
+            lseek(&fd, off, Wence::Set)?;
+            fd.write_all(block.as_slice())?;
+        }
+
+        let extents = map_extents(&fd)?;
+        assert_eq!(extents.len(), fsize as usize / bsize / 2);
+
+        Ok(())
+    }
 }
