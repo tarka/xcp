@@ -18,9 +18,12 @@ use libc;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io;
+use std::ops::Range;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
+use std::path::Path;
 use std::ptr;
+use fiemap::{fiemap, Fiemap, FiemapExtent};
 
 use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
 use crate::errors::{Result};
@@ -219,6 +222,49 @@ pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<SeekOff> {
         Ok(SeekOff::Offset(r as u64))
     }
 }
+
+pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
+    let mut merged: Vec<Range<u64>> = vec!();
+
+    let mut prev: Option<Range<u64>> = None;
+    for e in extents {
+        match prev {
+            Some(p) => {
+                if e.start == p.end + 1 {
+                    // Current & prev are contiguous, merge & see what
+                    // comes next.
+                    prev = Some(p.start..e.end);
+                } else {
+                    merged.push(p);
+                    prev = Some(e);
+                }
+            },
+            // First iter
+            None => prev = Some(e)
+        }
+    }
+    if let Some(p) = prev {
+        merged.push(p);
+    }
+
+    Ok(merged)
+}
+
+pub fn map_extents(from: &Path) -> Result<Vec<Range<u64>>> {
+    // FIXME: Not ideal; the `fiemap` call should probably return
+    // error for any low-level error. We should probably implement our
+    // own calls to fiemap here anyway, as we can optimise our
+    // use-case.
+    Ok(fiemap(from)?
+       .map(|re| {
+           let e = re.unwrap();
+           let start = e.fe_logical;
+           let end = start + e.fe_length - 1;
+           start..end
+       })
+       .collect())
+}
+
 
 pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64, u64)> {
     let next_data = match lseek(infd, pos as i64, Wence::Data)? {
@@ -502,4 +548,24 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_extent_merge() -> Result<()> {
+        assert_eq!(merge_extents(vec!())?,
+                   vec!());
+        assert_eq!(merge_extents(vec!(0..1))?,
+                   vec!(0..1));
+        assert_eq!(merge_extents(vec!(0..1, 10..20))?,
+                   vec!(0..1, 10..20));
+        assert_eq!(merge_extents(vec!(0..10, 11..20))?,
+                   vec!(0..20));
+        assert_eq!(merge_extents(vec!(0..5, 11..20, 21..30, 40..50))?,
+                   vec!(0..5, 11..30, 40..50));
+        assert_eq!(merge_extents(vec!(0..5, 11..20, 21..30, 40..50, 51..60))?,
+                   vec!(0..5, 11..30, 40..60));
+        assert_eq!(merge_extents(vec!(0..10, 11..20, 21..30, 31..50, 51..60))?,
+                   vec!(0..60));
+        Ok(())
+    }
+
 }
