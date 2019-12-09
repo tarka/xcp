@@ -20,7 +20,7 @@ use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::{Alphanumeric, Pareto, Triangular};
 use rand_xorshift::XorShiftRng;
 use std::cmp;
-use std::fs::{create_dir_all, File, OpenOptions};
+use std::fs::{create_dir_all, File};
 use std::io::{BufRead, BufReader, Read, Write, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -66,7 +66,7 @@ pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
         .output()?;
     assert!(out.status.success());
 
-    let mut fd = OpenOptions::new()
+    let mut fd = std::fs::OpenOptions::new()
         .write(true)
         .append(false)
         .open(&file)?;
@@ -161,10 +161,12 @@ pub fn quickstat(file: &Path) -> Result<(i32, i32, i32), Error> {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
     let (size, blocks, blksize) = quickstat(file)?;
-
     Ok(blocks < size / blksize)
 }
-
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
+    Ok(false)
+}
 
 const MAXDEPTH: u64 = 2;
 
