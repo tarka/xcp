@@ -23,6 +23,6 @@ cfg_if! {
         pub use common::{ allocate_file, merge_extents};
         pub use linux::{copy_file_bytes, copy_file_offset, probably_sparse, next_sparse_segments, map_extents};
     } else {
-        pub use common::{allocate_file, copy_file_bytes, copy_file_offset, probably_sparse, next_sparse_segments, map_extents};
+        pub use common::{allocate_file, copy_file_bytes, copy_file_offset, probably_sparse, next_sparse_segments, merge_extents, map_extents};
     }
 }
