@@ -473,6 +473,7 @@ fn copy_generated_tree(drv: &str) -> TResult {
     Ok(())
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 #[ignore] // Expensive so skip for local dev

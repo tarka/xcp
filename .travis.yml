@@ -4,8 +4,8 @@ language: rust
 rust:
   - stable
   - beta
+cache: cargo
 script:
   - cargo build
   - cargo test
-  - cargo test -- --ignored --nocapture
 
