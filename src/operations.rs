@@ -14,7 +14,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use log::debug;
 use std::cmp;
 use std::fs::{File, Metadata};
 use std::path::Path;
@@ -31,14 +30,12 @@ pub struct CopyHandle {
     pub metadata: Metadata,
 }
 
-
 pub fn init_copy(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
     let infd = File::open(from)?;
-    let outfd = File::create(to)?;
-
     let metadata = infd.metadata()?;
-    allocate_file(&outfd, metadata.len())?;
 
+    let outfd = File::create(to)?;
+    allocate_file(&outfd, metadata.len())?;
     if !opts.no_perms {
         outfd.set_permissions(metadata.permissions())?;
     }
@@ -82,9 +79,7 @@ pub fn copy_sparse(handle: &CopyHandle, updates: &mut BatchUpdater) -> Result<u6
 
 pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
     let handle = init_copy(from, to, opts)?;
-
     let total = if probably_sparse(&handle.infd)? {
-        debug!("File {:?} is sparse", from);
         copy_sparse(&handle, updates)?
     } else {
         copy_bytes(&handle, handle.metadata.len(), updates)?
@@ -92,3 +87,4 @@ pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater
 
     Ok(total)
 }
+

@@ -18,6 +18,7 @@ use crossbeam_channel as cbc;
 use log::{debug, error, info};
 use std::cmp;
 use std::fs::{create_dir_all, read_link};
+use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -26,9 +27,9 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::init_copy;
+use crate::operations::{init_copy, CopyHandle};
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
-use crate::os::copy_file_offset;
+use crate::os::{copy_file_offset, map_extents, merge_extents, probably_sparse};
 use crate::progress::{ProgressBar, StatusUpdate};
 use crate::threadpool::{Builder, ThreadPool};
 use crate::utils::{empty, FileType, ToFileType};
@@ -81,35 +82,49 @@ impl Sender {
     }
 }
 
-fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &Sender, opts: &Opts,) -> Result<u64> {
-    let fhandle = init_copy(source, &dest, opts)?;
-
-    let len = fhandle.metadata.len();
+fn queue_file_range(handle: &Arc<CopyHandle>, range: Range<u64>, pool: &ThreadPool, status_channel: &Sender, opts: &Opts,) -> Result<u64> {
+    let len = range.end - range.start;
     let bsize = opts.block_size;
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
+    for blkn in 0..blocks {
+        let harc = handle.clone();
+        let stat_tx = status_channel.clone();
+        let bytes = cmp::min(len - (blkn * bsize), bsize);
+        let off = range.start + (blkn * bsize);
 
-    {
-        // Put the open files in an Arc, which we drop once work has
-        // been queued. This will keep them open until all work has
-        // been consumed, then close them. (This may be overkill;
-        // opening the files in the workers would also be valid.)
-        let arc = Arc::new(fhandle);
+        pool.execute(move || {
+            let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64)
+                .unwrap();
 
-        for off in 0..blocks {
-            let handle = arc.clone();
-            let stat_tx = status_channel.clone();
-            let bytes = cmp::min(len - (off * bsize), bsize);
-
-            pool.execute(move || {
-                let r = copy_file_offset(&handle.infd, &handle.outfd, bytes, (off * bsize) as i64)
-                    .unwrap();
-
-                stat_tx.send(StatusUpdate::Copied(r), bytes, bsize).unwrap();
-            });
-        }
+            stat_tx.send(StatusUpdate::Copied(r), bytes, bsize).unwrap();
+        });
     }
     Ok(len)
+}
+
+fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &Sender, opts: &Opts,) -> Result<u64> {
+    let handle = init_copy(source, &dest, opts)?;
+    let len = handle.metadata.len();
+
+    // Put the open files in an Arc, which we drop once work has
+    // been queued. This will keep them open until all work has
+    // been consumed, then close them. (This may be overkill;
+    // opening the files in the workers would also be valid.)
+    let harc = Arc::new(handle);
+
+    if probably_sparse(&harc.infd)? {
+        let sparse_map = merge_extents(map_extents(&harc.infd)?)?;
+        let mut queued = 0;
+        for ext in sparse_map {
+            println!("EXT: {:?}", ext);
+            queued += queue_file_range(&harc, ext, pool, status_channel, opts)?;
+        }
+        Ok(queued)
+
+    } else {
+        queue_file_range(&harc, 0..len, pool, status_channel, opts)
+    }
 }
 
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
