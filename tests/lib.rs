@@ -455,7 +455,36 @@ fn copy_generated_tree(drv: &str) -> TResult {
 
     // Spam some output to keep CI from timing-out (hopefully).
     println!("Generating file tree...");
-    gen_filetree(&src, 0)?;
+    gen_filetree(&src, 0, false)?;
+
+    println!("Running copy...");
+    let out = run(&[
+        "--driver",
+        drv,
+        "-r",
+        src.to_str().unwrap(),
+        dest.to_str().unwrap(),
+    ])?;
+    assert!(out.status.success());
+
+    println!("Compare trees...");
+    compare_trees(&src, &dest)?;
+
+    Ok(())
+}
+
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+#[ignore] // Expensive so skip for local dev
+fn copy_generated_tree_sparse(drv: &str) -> TResult {
+    let dir = tempdir()?;
+
+    let src = dir.path().join("generated");
+    let dest = dir.path().join("target");
+
+    // Spam some output to keep CI from timing-out (hopefully).
+    println!("Generating file tree...");
+    gen_filetree(&src, 0, true)?;
 
     println!("Running copy...");
     let out = run(&[
