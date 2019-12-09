@@ -1,3 +1,11 @@
 ---
 os: osx
 language: rust
+rust:
+  - stable
+  - beta
+script:
+  - cargo build
+  - cargo test
+  - cargo test -- --ignored --nocapture
+
