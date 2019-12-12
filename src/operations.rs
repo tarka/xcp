@@ -20,7 +20,7 @@ use std::path::Path;
 
 use crate::errors::Result;
 use crate::options::Opts;
-use crate::os::{allocate_file, copy_file_bytes, next_sparse_segments, probably_sparse};
+use crate::os::{allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse};
 use crate::progress::{BatchUpdater, Updater};
 
 #[derive(Debug)]
@@ -36,15 +36,18 @@ pub fn init_copy(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
 
     let outfd = File::create(to)?;
     allocate_file(&outfd, metadata.len())?;
-    if !opts.no_perms {
-        outfd.set_permissions(metadata.permissions())?;
-    }
 
-    Ok(CopyHandle {
+    let handle = CopyHandle {
         infd,
         outfd,
         metadata,
-    })
+    };
+
+    // FIXME: This should happen at the end of the file copy, but with
+    // the parblock handler this may be tricky. This works in practice.
+    copy_permissions(&handle, opts)?;
+
+    Ok(handle)
 }
 
 

@@ -41,6 +41,7 @@ structopt = "0.3.4"
 thiserror = "1.0.5"
 unbytify = "0.2.0"
 walkdir = "2.2.9"
+xattr = "0.2.2"
 
 [dev-dependencies]
 escargot = "0.5.0"

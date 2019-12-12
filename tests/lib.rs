@@ -21,6 +21,7 @@ use std::os::unix::fs::symlink;
 use std::process::Command;
 use tempfile::tempdir;
 use test_case::test_case;
+use xattr;
 
 use crate::util::*;
 
@@ -228,6 +229,8 @@ fn file_copy_perms(drv: &str) -> TResult {
     perms.set_readonly(true);
     set_permissions(&source_path, perms)?;
 
+    xattr::set(&source_path, "user.test", b"my test")?;
+
     let out = run(&[
         "--driver",
         drv,
@@ -242,6 +245,7 @@ fn file_copy_perms(drv: &str) -> TResult {
         metadata(&source_path)?.permissions().readonly(),
         metadata(&dest_path)?.permissions().readonly()
     );
+    assert_eq!(xattr::get(&dest_path, "user.test")?.unwrap(), b"my test");
 
     Ok(())
 }

@@ -21,7 +21,10 @@ use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::ops::Range;
 use std::os::unix::io::AsRawFd;
+use xattr::FileExt;
 
+use crate::options::Opts;
+use crate::operations::CopyHandle;
 use crate::errors::{Result, XcpError};
 
 
@@ -30,6 +33,25 @@ pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
         -1 => Err(io::Error::last_os_error().into()),
         _ => Ok(retval),
     }
+}
+
+
+pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
+    if !opts.no_perms {
+        hdl.outfd.set_permissions(hdl.metadata.permissions())?;
+
+        // FIXME: Flag for xattr
+        if xattr::SUPPORTED_PLATFORM {
+            for attr in hdl.infd.list_xattr()? {
+                if let Some(val) = hdl.infd.get_xattr(&attr)? {
+                    hdl.outfd.set_xattr(attr, val.as_slice())?;
+                }
+            }
+        }
+
+        // FIXME: ACLs, selinux, etc.
+    }
+    Ok(())
 }
 
 
