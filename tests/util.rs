@@ -21,7 +21,7 @@ use rand_distr::{Alphanumeric, Pareto, Triangular};
 use rand_xorshift::XorShiftRng;
 use std::cmp;
 use std::fs::{create_dir_all, File};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Read, Write, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::result;
@@ -57,9 +57,6 @@ pub fn create_file(path: &Path, text: &str) -> Result<(), Error> {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
-    use std::fs::OpenOptions;
-    use std::io::{Seek, SeekFrom};
-
     let data = "c00lc0d3";
     let len = 4096u64 * 4096 + data.len() as u64 + tail;
 
@@ -69,7 +66,7 @@ pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
         .output()?;
     assert!(out.status.success());
 
-    let mut fd = OpenOptions::new()
+    let mut fd = std::fs::OpenOptions::new()
         .write(true)
         .append(false)
         .open(&file)?;
@@ -95,7 +92,7 @@ pub fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
 }
 
 pub fn files_match(a: &Path, b: &Path) -> bool {
-    println!("CHECKING {:?}", a);
+    println!("Checking: {:?}", a);
     if a.metadata().unwrap().len() != b.metadata().unwrap().len() {
         return false;
     }
@@ -164,10 +161,12 @@ pub fn quickstat(file: &Path) -> Result<(i32, i32, i32), Error> {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
     let (size, blocks, blksize) = quickstat(file)?;
-
     Ok(blocks < size / blksize)
 }
-
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
+    Ok(false)
+}
 
 const MAXDEPTH: u64 = 2;
 
@@ -177,15 +176,23 @@ pub fn gen_file_name(rng: &mut dyn RngCore, len: u64) -> String {
         .collect()
 }
 
-pub fn gen_file(path: &Path, rng: &mut dyn RngCore, size: usize) -> TResult {
+pub fn gen_file(path: &Path, rng: &mut dyn RngCore, size: usize, sparse: bool) -> TResult {
+    println!("Generating: {:?}", path);
     let mut fd = File::create(path)?;
-    let mut buffer = [0; 1024*1024];
+    const BSIZE: usize = 4096;
+    let mut buffer = [0; BSIZE];
     let mut left = size;
 
     while left > 0 {
-        let b = &mut buffer[..cmp::min(left, 1024*1024)];
+        let blen = cmp::min(left, BSIZE);
+        let b = &mut buffer[..blen];
         rng.fill(b);
-        left -= fd.write(b)?;
+        if sparse && b[0] % 3 == 0 {
+            fd.seek(SeekFrom::Current(blen as i64))?;
+            left -= blen;
+        } else {
+            left -= fd.write(b)?;
+        }
     }
 
     Ok(())
@@ -196,7 +203,7 @@ pub fn gen_file(path: &Path, rng: &mut dyn RngCore, size: usize) -> TResult {
 /// project, with most files in the 10's of Ks, and a few larger
 /// ones. With a seeded PRNG (see below) this will give a repeatable
 /// tree depending on the seed.
-pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64) -> TResult {
+pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64, with_sparse: bool) -> TResult {
     create_dir_all(base)?;
 
     let dist0 = Triangular::new(0.0, 64.0, 64.0/5.0).unwrap();
@@ -209,7 +216,8 @@ pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64) -> TResult {
         let fsize = rng.sample(distf) as u64;
         let fname = gen_file_name(rng, fnlen);
         let path = base.join(fname);
-        gen_file(&path, rng, fsize as usize)?;
+        let sparse = with_sparse && nfiles % 3 == 0;
+        gen_file(&path, rng, fsize as usize, sparse)?;
     }
 
     if depth < MAXDEPTH {
@@ -218,17 +226,16 @@ pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64) -> TResult {
             let fnlen = rng.sample(dist1) as u64;
             let fname = gen_file_name(rng, fnlen);
             let path = base.join(fname);
-            gen_subtree(&path, rng, depth+1)?;
+            gen_subtree(&path, rng, depth+1, with_sparse)?;
         }
     }
 
     Ok(())
 }
 
-pub fn gen_filetree(base: &Path, seed: u64) -> TResult {
+pub fn gen_filetree(base: &Path, seed: u64, with_sparse: bool) -> TResult {
     let mut rng = XorShiftRng::seed_from_u64(seed);
-    gen_subtree(base, &mut rng, 0)?;
-    Ok(())
+    gen_subtree(base, &mut rng, 0, with_sparse)
 }
 
 pub fn compare_trees(src: &Path, dest: &Path) -> TResult {
@@ -244,10 +251,14 @@ pub fn compare_trees(src: &Path, dest: &Path) -> TResult {
                    to.metadata()?.file_type().is_symlink());
 
         if from.is_file() {
+            assert_eq!(probably_sparse(&to)?, probably_sparse(&to)?);
             assert!(files_match(&from, &to));
+            // FIXME: Ideally we'd check sparse holes here, but
+            // there's no guarantee they'll match exactly due to
+            // low-level filesystem details (SEEK_HOLE behaviour,
+            // tail-packing, compression, etc.)
         }
 
-        // FIXME: Check sparse holes.
     }
     Ok(())
 }

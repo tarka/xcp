@@ -21,6 +21,7 @@ use std::os::unix::fs::symlink;
 use std::process::Command;
 use tempfile::tempdir;
 use test_case::test_case;
+use xattr;
 
 use crate::util::*;
 
@@ -228,6 +229,8 @@ fn file_copy_perms(drv: &str) -> TResult {
     perms.set_readonly(true);
     set_permissions(&source_path, perms)?;
 
+    xattr::set(&source_path, "user.test", b"my test")?;
+
     let out = run(&[
         "--driver",
         drv,
@@ -242,6 +245,7 @@ fn file_copy_perms(drv: &str) -> TResult {
         metadata(&source_path)?.permissions().readonly(),
         metadata(&dest_path)?.permissions().readonly()
     );
+    assert_eq!(xattr::get(&dest_path, "user.test")?.unwrap(), b"my test");
 
     Ok(())
 }
@@ -455,7 +459,37 @@ fn copy_generated_tree(drv: &str) -> TResult {
 
     // Spam some output to keep CI from timing-out (hopefully).
     println!("Generating file tree...");
-    gen_filetree(&src, 0)?;
+    gen_filetree(&src, 0, false)?;
+
+    println!("Running copy...");
+    let out = run(&[
+        "--driver",
+        drv,
+        "-r",
+        src.to_str().unwrap(),
+        dest.to_str().unwrap(),
+    ])?;
+    assert!(out.status.success());
+
+    println!("Compare trees...");
+    compare_trees(&src, &dest)?;
+
+    Ok(())
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
+#[ignore] // Expensive so skip for local dev
+fn copy_generated_tree_sparse(drv: &str) -> TResult {
+    let dir = tempdir()?;
+
+    let src = dir.path().join("generated");
+    let dest = dir.path().join("target");
+
+    // Spam some output to keep CI from timing-out (hopefully).
+    println!("Generating file tree...");
+    gen_filetree(&src, 0, true)?;
 
     println!("Running copy...");
     let out = run(&[
@@ -862,13 +896,13 @@ fn glob_pattern_error(drv: &str) -> TResult {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-//#[test_case("parblock"; "Test with parallel block driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
 fn test_sparse(drv: &str) -> TResult {
     use std::fs::read;
 
-    let dir = tempdir()?;
-    let from = dir.path().join("sparse.bin");
-    let to = dir.path().join("target.bin");
+    let dir = tempdir_rel()?;
+    let from = dir.join("sparse.bin");
+    let to = dir.join("target.bin");
 
     let slen = create_sparse(&from, 0, 0)?;
     assert_eq!(slen, from.metadata()?.len());
@@ -895,7 +929,7 @@ fn test_sparse(drv: &str) -> TResult {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-//#[test_case("parblock"; "Test with parallel block driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
 fn test_sparse_leading_gap(drv: &str) -> TResult {
     use std::fs::read;
 
@@ -927,7 +961,7 @@ fn test_sparse_leading_gap(drv: &str) -> TResult {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-//#[test_case("parblock"; "Test with parallel block driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
 fn test_sparse_trailng_gap(drv: &str) -> TResult {
     use std::fs::read;
 
@@ -959,7 +993,7 @@ fn test_sparse_trailng_gap(drv: &str) -> TResult {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-//#[test_case("parblock"; "Test with parallel block driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
 fn test_sparse_single_overwrite(drv: &str) -> TResult {
     use std::fs::read;
 
@@ -991,7 +1025,7 @@ fn test_sparse_single_overwrite(drv: &str) -> TResult {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-//#[test_case("parblock"; "Test with parallel block driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
 fn test_empty_sparse(drv: &str) -> TResult {
     use std::fs::read;
 

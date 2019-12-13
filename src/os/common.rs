@@ -19,8 +19,12 @@ use std::cmp;
 use std::io;
 use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
+use std::ops::Range;
 use std::os::unix::io::AsRawFd;
+use xattr::FileExt;
 
+use crate::options::Opts;
+use crate::operations::CopyHandle;
 use crate::errors::{Result, XcpError};
 
 
@@ -29,6 +33,25 @@ pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
         -1 => Err(io::Error::last_os_error().into()),
         _ => Ok(retval),
     }
+}
+
+
+pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
+    if !opts.no_perms {
+        hdl.outfd.set_permissions(hdl.metadata.permissions())?;
+
+        // FIXME: Flag for xattr
+        if xattr::SUPPORTED_PLATFORM {
+            for attr in hdl.infd.list_xattr()? {
+                if let Some(val) = hdl.infd.get_xattr(&attr)? {
+                    hdl.outfd.set_xattr(attr, val.as_slice())?;
+                }
+            }
+        }
+
+        // FIXME: ACLs, selinux, etc.
+    }
+    Ok(())
 }
 
 
@@ -129,8 +152,41 @@ pub fn probably_sparse(_fd: &File) -> Result<bool> {
 }
 
 #[allow(dead_code)]
+pub fn map_extents(_fd: &File) -> Result<Vec<Range<u64>>> {
+    // FIXME: Implement for *BSD with lseek?
+    Err(XcpError::UnsupportedOperation {}.into())
+}
+
+#[allow(dead_code)]
 pub fn next_sparse_segments(_infd: &File, _outfd: &File, _pos: u64) -> Result<(u64, u64)> {
     Err(XcpError::UnsupportedOperation {}.into())
+}
+
+pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
+    let mut merged: Vec<Range<u64>> = vec!();
+
+    let mut prev: Option<Range<u64>> = None;
+    for e in extents {
+        match prev {
+            Some(p) => {
+                if e.start == p.end + 1 {
+                    // Current & prev are contiguous, merge & see what
+                    // comes next.
+                    prev = Some(p.start..e.end);
+                } else {
+                    merged.push(p);
+                    prev = Some(e);
+                }
+            },
+            // First iter
+            None => prev = Some(e)
+        }
+    }
+    if let Some(p) = prev {
+        merged.push(p);
+    }
+
+    Ok(merged)
 }
 
 
@@ -211,4 +267,22 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_extent_merge() -> Result<()> {
+        assert_eq!(merge_extents(vec!())?,
+                   vec!());
+        assert_eq!(merge_extents(vec!(0..1))?,
+                   vec!(0..1));
+        assert_eq!(merge_extents(vec!(0..1, 10..20))?,
+                   vec!(0..1, 10..20));
+        assert_eq!(merge_extents(vec!(0..10, 11..20))?,
+                   vec!(0..20));
+        assert_eq!(merge_extents(vec!(0..5, 11..20, 21..30, 40..50))?,
+                   vec!(0..5, 11..30, 40..50));
+        assert_eq!(merge_extents(vec!(0..5, 11..20, 21..30, 40..50, 51..60))?,
+                   vec!(0..5, 11..30, 40..60));
+        assert_eq!(merge_extents(vec!(0..10, 11..20, 21..30, 31..50, 51..60))?,
+                   vec!(0..60));
+        Ok(())
+    }
 }
