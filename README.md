@@ -40,15 +40,22 @@ yay -S xcp
   filesystem-aware, and can massively speed-up copies on network mounts by
   performing the copy operations server-side. However, unlike `copy_file_range`
   sparse files are detected and handled appropriately.
-* Optional aggressive parallelism for systems with parallel IO. Quick
-  experiments on a modern laptop suggest there may be benefits to parallel
-  copies on NVMe disks. This is obviously highly system-dependent.
-* Non-Linux Unix-like OSs (OS X, *BSD) are supported via fall-back operation
-  (although sparse-files are not yet supported in this case).
-* Optionally understands `.gitignore` files to limit the copied directories.
 * Optimised for 'modern' systems (i.e. multiple cores, copious RAM, and
   solid-state disks, especially ones connected into the main system bus,
   e.g. M.2).
+* Optional aggressive parallelism for systems with parallel IO. Quick
+  experiments on a modern laptop suggest there may be benefits to parallel
+  copies on NVMe disks. This is obviously highly system-dependent.
+* Switchable 'drivers' to facilitate experimenting with alternative strategies
+  for copy optimisation. Currently 2 drivers are available:
+  * 'parfile': the previous hard-coded xcp copy method, which parallelises
+    tree-walking and per-file copying. This is the default.
+  * 'parblock': An experimental driver that parallelises copying at the block
+    level. This has the potential for performance improvements in some
+    architectures, but increases complexity. Testing is welcome.
+* Non-Linux Unix-like OSs (OS X, *BSD) are supported via fall-back operation
+  (although sparse-files are not yet supported in this case).
+* Optionally understands `.gitignore` files to limit the copied directories.
 * Optional native file-globbing.
   
 ### (Possible) future features
