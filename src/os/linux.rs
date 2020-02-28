@@ -330,13 +330,20 @@ pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+    use tempfile::{TempDir, tempdir_in};
     use std::path::{PathBuf};
+    use std::env::current_dir;
     use std::fs::{read, OpenOptions};
     use std::process::Command;
     use std::io::{Seek, SeekFrom, Write};
     use std::iter;
     use crate::os::allocate_file;
+
+    fn tempdir() -> Result<TempDir> {
+        // Force into local dir as /tmp might be tmpfs, which doesn't
+        // support all VFS options (notably fiemap).
+        Ok(tempdir_in(current_dir()?.join("target"))?)
+    }
 
     #[test]
     fn test_sparse_detection() -> Result<()> {

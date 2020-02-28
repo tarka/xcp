@@ -20,12 +20,13 @@ use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::{Alphanumeric, Pareto, Triangular};
 use rand_xorshift::XorShiftRng;
 use std::cmp;
+use std::env::current_dir;
 use std::fs::{create_dir_all, File};
 use std::io::{BufRead, BufReader, Read, Write, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::result;
-use tempfile::tempdir;
+use tempfile::{TempDir, tempdir_in};
 use uuid::Uuid;
 use walkdir::WalkDir;
 
@@ -40,6 +41,12 @@ pub fn get_command() -> Result<Command, Error> {
 pub fn run(args: &[&str]) -> Result<Output, Error> {
     let out = get_command()?.args(args).output()?;
     Ok(out)
+}
+
+pub fn tempdir() -> Result<TempDir, Error> {
+    // Force into local dir as /tmp might be tmpfs, which doesn't
+    // support all VFS options (notably fiemap).
+    Ok(tempdir_in(current_dir()?.join("target"))?)
 }
 
 pub fn tempdir_rel() -> Result<PathBuf, Error> {

@@ -19,7 +19,6 @@ mod util;
 use std::fs::{create_dir_all, metadata, set_permissions, write, File};
 use std::os::unix::fs::symlink;
 use std::process::Command;
-use tempfile::tempdir;
 use test_case::test_case;
 use xattr;
 
