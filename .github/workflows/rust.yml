@@ -8,8 +8,8 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - name: Run tests
-        run: ~/.cargo/bin/rustc --version
+      - name: Update Rust
+        run: ~/.cargo/bin/rustup update
 
       - name: Run tests
         run: cargo test
