@@ -15,7 +15,6 @@
  */
 
 use anyhow::Error;
-use escargot::CargoBuild;
 use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::{Alphanumeric, Pareto, Triangular};
 use rand_xorshift::XorShiftRng;
@@ -34,8 +33,8 @@ use walkdir::WalkDir;
 pub type TResult = result::Result<(), Error>;
 
 pub fn get_command() -> Result<Command, Error> {
-    let cmd = CargoBuild::new().run()?.command();
-    Ok(cmd)
+    let exe = env!("CARGO_BIN_EXE_xcp");
+    Ok(Command::new(exe))
 }
 
 pub fn run(args: &[&str]) -> Result<Output, Error> {
