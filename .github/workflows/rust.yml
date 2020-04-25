@@ -8,6 +8,9 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
+      - name: Update Rust to latest
+        run: ~/.cargo/bin/rustup update
+
       - name: Run tests
         run: cargo test
 
@@ -18,6 +21,9 @@ jobs:
 
       - name: Install Rust
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash /dev/stdin -y
+
+      - name: Update Rust (installer may lag behind)
+        run: ~/.cargo/bin/rustup update
 
       - name: Run tests
         run: ~/.cargo/bin/cargo test
