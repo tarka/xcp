@@ -57,7 +57,7 @@ pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
 
 fn pread(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize> {
     let ret = unsafe {
-        libc::pread(fd.as_raw_fd(), buf.as_mut_ptr() as *mut libc::c_void, nbytes, off as i64)
+        libc::pread64(fd.as_raw_fd(), buf.as_mut_ptr() as *mut libc::c_void, nbytes, off as libc::off64_t)
     };
 
     result_or_errno(ret as i64, ret as usize)
@@ -65,7 +65,7 @@ fn pread(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize> 
 
 fn pwrite(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize> {
     let ret = unsafe {
-        libc::pwrite(fd.as_raw_fd(), buf.as_mut_ptr() as *mut libc::c_void, nbytes, off as i64)
+        libc::pwrite64(fd.as_raw_fd(), buf.as_mut_ptr() as *mut libc::c_void, nbytes, off as libc::off64_t)
     };
 
     result_or_errno(ret as i64, ret as usize)
@@ -138,7 +138,7 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
 /// Allocate file space on disk. Uses Posix ftruncate().
 pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
     let r = unsafe {
-        libc::ftruncate(fd.as_raw_fd(), len as i64)
+        libc::ftruncate64(fd.as_raw_fd(), len as libc::off64_t)
     };
     result_or_errno(r as i64, ())
 }
