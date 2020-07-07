@@ -213,7 +213,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
                 target_base.clone()
             };
 
-            if target.exists() && opts.noclobber {
+            if opts.noclobber && target.exists() {
                 return Err(XcpError::DestinationExists(
                     "Destination file exists and --no-clobber is set.",
                     target,
