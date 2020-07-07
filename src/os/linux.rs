@@ -183,9 +183,9 @@ pub fn probably_sparse(fd: &File) -> Result<bool> {
 }
 
 
-/// Corresponds to lseek(2) `wence`
+/// Corresponds to lseek(2) `whence`
 #[allow(dead_code)]
-pub enum Wence {
+pub enum Whence {
     Set = libc::SEEK_SET as isize,
     Cur = libc::SEEK_CUR as isize,
     End = libc::SEEK_END as isize,
@@ -199,12 +199,12 @@ pub enum SeekOff {
     EOF
 }
 
-pub fn lseek(fd: &File, off: i64, wence: Wence) -> Result<SeekOff> {
+pub fn lseek(fd: &File, off: i64, whence: Whence) -> Result<SeekOff> {
     let r = unsafe {
         libc::lseek64(
             fd.as_raw_fd(),
             off,
-            wence as libc::c_int
+            whence as libc::c_int
         )
     };
 
@@ -311,17 +311,17 @@ pub fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
 
 
 pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64, u64)> {
-    let next_data = match lseek(infd, pos as i64, Wence::Data)? {
+    let next_data = match lseek(infd, pos as i64, Whence::Data)? {
         SeekOff::Offset(off) => off,
         SeekOff::EOF => infd.metadata()?.len()
     };
-    let next_hole = match lseek(infd, next_data as i64, Wence::Hole)? {
+    let next_hole = match lseek(infd, next_data as i64, Whence::Hole)? {
         SeekOff::Offset(off) => off,
         SeekOff::EOF => infd.metadata()?.len()
     };
 
-    lseek(infd, next_data as i64, Wence::Set)?;  // FIXME: EOF (but shouldn't happen)
-    lseek(outfd, next_data as i64, Wence::Set)?;
+    lseek(infd, next_data as i64, Whence::Set)?;  // FIXME: EOF (but shouldn't happen)
+    lseek(outfd, next_data as i64, Whence::Set)?;
 
     Ok((next_data, next_hole))
 }
@@ -525,7 +525,7 @@ mod tests {
 
         assert!(probably_sparse(&File::open(&file)?)?);
 
-        let off = lseek(&File::open(&file)?, 0, Wence::Data)?;
+        let off = lseek(&File::open(&file)?, 0, Whence::Data)?;
         assert_eq!(off, SeekOff::Offset(offset));
 
         Ok(())
@@ -577,7 +577,7 @@ mod tests {
         assert!(probably_sparse(&File::open(&file)?)?);
 
         let fd = File::open(&file)?;
-        let off = lseek(&fd, 0, Wence::Data)?;
+        let off = lseek(&fd, 0, Whence::Data)?;
         assert!(off == SeekOff::EOF);
 
         Ok(())
@@ -679,7 +679,7 @@ mod tests {
             .open(&file)?;
         // Skip every-other block
         for off in (0..fsize).step_by(bsize*2) {
-            lseek(&fd, off, Wence::Set)?;
+            lseek(&fd, off, Whence::Set)?;
             fd.write_all(block.as_slice())?;
         }
 
