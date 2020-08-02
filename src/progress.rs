@@ -162,7 +162,7 @@ pub fn iprogress_bar(size: u64) -> ProgressBar {
     let ipb = indicatif::ProgressBar::new(size)
         .with_style(
             indicatif::ProgressStyle::default_bar()
-                .template("[{elapsed_precise}] [{bar:80.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
                 .progress_chars("#>-"),
         );
     ProgressBar::Visual(ipb)
