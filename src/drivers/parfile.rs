@@ -131,7 +131,7 @@ fn copy_source(
             target_base.clone()
         };
 
-        if target.exists() && opts.noclobber {
+        if opts.noclobber && target.exists() {
             work_tx.send(Operation::End)?;
             updates.update(Err(XcpError::DestinationExists(
                 "Destination file exists and --no-clobber is set.",
