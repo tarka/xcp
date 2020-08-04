@@ -170,7 +170,7 @@ pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
     Ok(blocks < size / blksize)
 }
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
-pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
+pub fn probably_sparse(_file: &Path) -> Result<bool, Error> {
     Ok(false)
 }
 

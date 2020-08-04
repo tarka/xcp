@@ -450,7 +450,7 @@ fn copy_dirs_files(drv: &str) -> TResult {
 #[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 #[ignore] // Expensive so skip for local dev
-fn copy_generated_tree(drv: &str) -> TResult {
+fn stress_copy_generated_tree(drv: &str) -> TResult {
     let dir = tempdir()?;
 
     let src = dir.path().join("generated");
@@ -480,7 +480,7 @@ fn copy_generated_tree(drv: &str) -> TResult {
 #[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
 #[ignore] // Expensive so skip for local dev
-fn copy_generated_tree_sparse(drv: &str) -> TResult {
+fn stress_copy_generated_tree_sparse(drv: &str) -> TResult {
     let dir = tempdir()?;
 
     let src = dir.path().join("generated");
