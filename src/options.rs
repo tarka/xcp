@@ -85,6 +85,10 @@ pub struct Opts {
     #[structopt(long = "driver")]
     pub driver: Option<Drivers>,
 
+    /// Force the use of userspace copy operations
+    #[structopt(long = "userspace")]
+    pub userspace: bool,
+
     /// Analagous to cp's no-target-directory. Expected behavior is that when
     /// copying a directory to another directory, instead of creating a sub-folder
     /// in target, overwrite target.
