@@ -23,7 +23,7 @@ use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::ptr;
 
-use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
+use crate::os::common::{copy_bytes_uspace, copy_range_uspace, merge_extents};
 use crate::errors::{Result};
 
 
@@ -275,7 +275,7 @@ impl FiemapReq {
     }
 }
 
-pub fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
+fn read_extents(fd: &File) -> Result<Vec<Range<u64>>> {
     let mut req = FiemapReq::new();
     let req_ptr: *const FiemapReq = &req;
     let mut extents = Vec::with_capacity(PAGE_SIZE);
@@ -307,6 +307,10 @@ pub fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
     }
 
     Ok(extents)
+}
+
+pub fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
+    merge_extents(read_extents(fd)?)
 }
 
 

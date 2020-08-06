@@ -29,7 +29,7 @@ use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
 use crate::operations::{init_copy, CopyHandle};
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
-use crate::os::{copy_file_offset, map_extents, merge_extents, probably_sparse};
+use crate::os::{copy_file_offset, map_extents, probably_sparse};
 use crate::progress::{ProgressBar, StatusUpdate};
 use crate::threadpool::{Builder, ThreadPool};
 use crate::utils::{empty, FileType, ToFileType};
@@ -114,7 +114,7 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
     let harc = Arc::new(handle);
 
     if probably_sparse(&harc.infd)? {
-        let sparse_map = merge_extents(map_extents(&harc.infd)?)?;
+        let sparse_map = map_extents(&harc.infd)?;
         let mut queued = 0;
         for ext in sparse_map {
             println!("EXT: {:?}", ext);

@@ -23,7 +23,6 @@ cfg_if! {
         pub use common::{
             allocate_file,
             copy_permissions,
-            merge_extents
         };
         pub use linux::{
             copy_file_bytes,
@@ -41,7 +40,6 @@ cfg_if! {
             copy_permissions,
             probably_sparse,
             next_sparse_segments,
-            merge_extents,
             map_extents
         };
     }
