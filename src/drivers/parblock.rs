@@ -36,15 +36,17 @@ use crate::utils::{empty, FileType, ToFileType};
 
 // ********************************************************************** //
 
-pub struct Driver {}
+pub struct Driver;
 
 impl CopyDriver for Driver {
+    #[inline(always)]
     fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
-        copy_all(sources, dest, opts)
+        copy_all_impl(sources, dest, opts)
     }
 
+    #[inline(always)]
     fn copy_single(&self, source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
-        copy_single_file(source, dest, opts)
+        copy_single_file_impl(source, dest, opts)
     }
 }
 
@@ -127,7 +129,7 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
     }
 }
 
-pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
+fn copy_single_file_impl(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
     let nworkers = num_workers(opts);
     let pool = ThreadPool::new(nworkers as usize);
 
@@ -155,7 +157,7 @@ struct CopyOp {
     target: PathBuf,
 }
 
-pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
+fn copy_all_impl(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
     let pb = ProgressBar::new(opts, 0);
     let mut total = 0;
 
