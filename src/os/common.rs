@@ -28,7 +28,7 @@ use crate::operations::CopyHandle;
 use crate::errors::{Result, XcpError};
 
 
-pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
+fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
     match result {
         -1 => Err(io::Error::last_os_error().into()),
         _ => Ok(retval),
@@ -71,7 +71,6 @@ fn pwrite(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize>
     result_or_errno(ret as i64, ret as usize)
 }
 
-#[allow(dead_code)]
 /// Copy a block of bytes at an offset between files. Uses Posix pread/pwrite.
 pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<u64> {
     // FIXME: For larger buffers we should use a pre-allocated thread-local?
