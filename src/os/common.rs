@@ -23,9 +23,10 @@ use std::ops::Range;
 use std::os::unix::io::AsRawFd;
 use xattr::FileExt;
 
+use crate::errors::{Result, XcpError};
 use crate::options::Opts;
 use crate::operations::CopyHandle;
-use crate::errors::{Result, XcpError};
+use crate::utils::xattr_supported;
 
 
 pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
@@ -40,8 +41,8 @@ pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
     if !opts.no_perms {
         hdl.outfd.set_permissions(hdl.metadata.permissions())?;
 
-        // FIXME: Flag for xattr
-        if xattr::SUPPORTED_PLATFORM {
+        // FIXME: Flag for xattr.
+        if xattr_supported() {
             for attr in hdl.infd.list_xattr()? {
                 if let Some(val) = hdl.infd.get_xattr(&attr)? {
                     hdl.outfd.set_xattr(attr, val.as_slice())?;

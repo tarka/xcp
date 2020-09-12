@@ -14,6 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use cfg_if::cfg_if;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -48,4 +49,17 @@ impl ToFileType for fs::FileType {
 
 pub fn empty(path: &Path) -> bool {
     *path == PathBuf::new()
+}
+
+// NOTE: The xattr crate has a SUPPORTED_PLATFORM flag, however it
+// allows NetBSD, which fails for us, so we stick to platforms we've
+// tested.
+pub fn xattr_supported() -> bool {
+    cfg_if! {
+        if #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))] {
+            true
+        } else {
+            false
+        }
+    }
 }
