@@ -14,6 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use cfg_if::cfg_if;
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
 use std::cmp;
@@ -39,6 +40,16 @@ use crate::utils::{empty, FileType, ToFileType};
 pub struct Driver {}
 
 impl CopyDriver for Driver {
+    fn supported_platform(&self) -> bool {
+        cfg_if! {
+            if #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd", target_os = "netbsd"))] {
+                true
+            } else {
+                false
+            }
+        }
+    }
+
     fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
         copy_all(sources, dest, opts)
     }

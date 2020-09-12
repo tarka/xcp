@@ -26,6 +26,7 @@ use crate::errors::{Result, XcpError};
 
 
 pub trait CopyDriver {
+    fn supported_platform(&self) -> bool;
     fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>;
     fn copy_single(&self, source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()>;
 }

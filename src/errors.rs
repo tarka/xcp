@@ -47,6 +47,9 @@ pub enum XcpError {
     #[error("Early shutdown: {0}")]
     EarlyShutdown(&'static str),
 
+    #[error("Unsupported OS")]
+    UnsupportedOS(&'static str),
+
     #[error("Unsupported operation; this function should never be called on this OS.")]
     UnsupportedOperation,
 }

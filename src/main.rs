@@ -33,6 +33,22 @@ pub use crate::vendor::threadpool;
 use crate::errors::{Result, XcpError};
 use crate::drivers::{CopyDriver, Drivers};
 
+
+fn pick_driver(opts: &options::Opts) -> Result<&dyn CopyDriver> {
+    let dopt = opts.driver.unwrap_or(Drivers::ParFile);
+    let driver: &dyn CopyDriver = match dopt {
+        Drivers::ParFile => &drivers::parfile::Driver{},
+        Drivers::ParBlock => &drivers::parblock::Driver{},
+    };
+
+    if !driver.supported_platform() {
+        return Err(XcpError::UnsupportedOS("The parblock driver is not currently supported on Mac.").into())
+    }
+
+    Ok(driver)
+}
+
+
 fn main() -> Result<()> {
     let opts = options::Opts::from_args();
 
@@ -45,11 +61,7 @@ fn main() -> Result<()> {
     TermLogger::init(log_level, Config::default(), TerminalMode::Mixed)
         .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
-    let dopt = opts.driver.unwrap_or(Drivers::ParFile);
-    let driver: &dyn CopyDriver = match dopt {
-        Drivers::ParFile => &drivers::parfile::Driver{},
-        Drivers::ParBlock => &drivers::parblock::Driver{},
-    };
+    let driver = pick_driver(&opts)?;
 
     let (dest, source_patterns) = opts.paths
         .split_last()
