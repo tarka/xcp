@@ -46,3 +46,16 @@ cfg_if! {
         };
     }
 }
+
+// NOTE: The xattr crate has a SUPPORTED_PLATFORM flag, however it
+// allows NetBSD, which fails for us, so we stick to platforms we've
+// tested.
+pub const XATTR_SUPPORTED: bool = {
+    cfg_if! {
+        if #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))] {
+            true
+        } else {
+            false
+        }
+    }
+};
