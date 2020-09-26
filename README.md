@@ -42,7 +42,7 @@ yay -S xcp
   sparse files are detected and handled appropriately.
 * Optimised for 'modern' systems (i.e. multiple cores, copious RAM, and
   solid-state disks, especially ones connected into the main system bus,
-  e.g. M.2).
+  e.g. NVMe).
 * Optional aggressive parallelism for systems with parallel IO. Quick
   experiments on a modern laptop suggest there may be benefits to parallel
   copies on NVMe disks. This is obviously highly system-dependent.
