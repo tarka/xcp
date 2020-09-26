@@ -638,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "xcp"
-version = "0.8.0"
+version = "0.8.1-alpha.0"
 dependencies = [
  "anyhow 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
