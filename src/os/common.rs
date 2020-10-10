@@ -39,7 +39,6 @@ pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
 
 pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
     if !opts.no_perms {
-        hdl.outfd.set_permissions(hdl.metadata.permissions())?;
 
         // FIXME: Flag for xattr.
         if XATTR_SUPPORTED {
@@ -51,6 +50,8 @@ pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
         }
 
         // FIXME: ACLs, selinux, etc.
+
+        hdl.outfd.set_permissions(hdl.metadata.permissions())?;
     }
     Ok(())
 }
