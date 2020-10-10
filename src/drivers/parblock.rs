@@ -19,6 +19,7 @@ use crossbeam_channel as cbc;
 use log::{debug, error, info};
 use std::cmp;
 use std::fs::{create_dir_all, read_link};
+use std::os::unix::fs::symlink;
 use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -244,7 +245,8 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
 
                 FileType::Symlink => {
                     let lfile = read_link(from)?;
-                    debug!("Send symlink operation {:?} to {:?}", lfile, target);
+                    debug!("Creating symlink from {:?} to {:?}", lfile, target);
+                    let _r = symlink(&lfile, &target);
                 }
 
                 FileType::Dir => {
