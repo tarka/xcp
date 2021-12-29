@@ -26,7 +26,7 @@ mod utils;
 use std::path::PathBuf;
 
 use log::info;
-use simplelog::{Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
+use simplelog::{Config, ColorChoice, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 use structopt::StructOpt;
 
 pub use crate::vendor::threadpool;
@@ -58,7 +58,7 @@ fn main() -> Result<()> {
         2 => LevelFilter::Debug,
         _ => LevelFilter::Trace,
     };
-    TermLogger::init(log_level, Config::default(), TerminalMode::Mixed)
+    TermLogger::init(log_level, Config::default(), TerminalMode::Mixed, ColorChoice::Auto)
         .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
     let driver = pick_driver(&opts)?;

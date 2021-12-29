@@ -177,9 +177,10 @@ pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
 const MAXDEPTH: u64 = 2;
 
 pub fn gen_file_name(rng: &mut dyn RngCore, len: u64) -> String {
-    rng.sample_iter(Alphanumeric)
+    let r = rng.sample_iter(Alphanumeric)
         .take(len as usize)
-        .collect()
+        .collect::<Vec<u8>>();
+    String::from_utf8(r).unwrap()
 }
 
 pub fn gen_file(path: &Path, rng: &mut dyn RngCore, size: usize, sparse: bool) -> TResult {
