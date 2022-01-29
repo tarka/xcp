@@ -2,7 +2,7 @@
 name = "xcp"
 description = "xcp is a (partial) clone of the Unix `cp` command with some more user-friendly feedback and some optimisations."
 version = "0.9.1-alpha.0"
-edition = "2018"
+edition = "2021"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
 homepage = "https://github.com/tarka/xcp/"
@@ -25,18 +25,18 @@ kernel_copy_file_range = []
 overflow-checks = true
 
 [dependencies]
-anyhow = "1.0.52"
+anyhow = "1.0.53"
 cfg-if = "1.0.0"
-crossbeam-channel = "0.5.1"
-crossbeam-utils = "0.8.5"
+crossbeam-channel = "0.5.2"
+crossbeam-utils = "0.8.6"
 glob = "0.3.0"
 ignore = "0.4.18"
 indicatif = "0.16.2"
-libc = "0.2.112"
+libc = "0.2.116"
 log = "0.4.14"
 num_cpus = "1.13.1"
-simplelog = "0.11.1"
-structopt = "0.3.25"
+simplelog = "0.11.2"
+structopt = "0.3.26"
 thiserror = "1.0.30"
 unbytify = "0.2.0"
 walkdir = "2.3.2"
@@ -44,8 +44,8 @@ xattr = "0.2.2"
 
 [dev-dependencies]
 rand = "0.8.4"
-rand_distr = "0.4.2"
+rand_distr = "0.4.3"
 rand_xorshift = "0.3.0"
-tempfile = "3.2.0"
+tempfile = "3.3.0"
 test-case = "1.2.1"
 uuid = { version = "0.8.2", features = ["v4"] }
