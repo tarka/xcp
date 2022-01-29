@@ -1,5 +1,5 @@
 /*
- * Copyright © 2018, Steve Smith <tarkasteve@gmail.com>
+ * Copyright © 2022, Steve Smith <tarkasteve@gmail.com>
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -14,14 +14,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::path::PathBuf;
+
 use cfg_if::cfg_if;
 cfg_if! {if #[cfg(any(target_os = "linux", target_os = "android"))] {
 
-    use std::fs::{create_dir_all, metadata, set_permissions, write, File};
-    use std::os::unix::fs::symlink;
     use std::process::Command;
     use test_case::test_case;
-    use xattr;
 
     mod util;
     use crate::util::*;
@@ -200,6 +199,50 @@ cfg_if! {if #[cfg(any(target_os = "linux", target_os = "android"))] {
         let from_data = read(&from).unwrap();
         let to_data = read(&to).unwrap();
         assert_eq!(from_data, to_data);
+    }
+
+    #[test_case("parfile"; "Test with parallel file driver")]
+    #[test_case("parblock"; "Test with parallel block driver")]
+    fn copy_procfs_file(drv: &str) {
+        // Copying files on virtual filesystems (e.g. proc) with
+        // copy_file_range() has been known to have issues; see
+        // https://lwn.net/Articles/846403/ for details.
+
+        let dir = tempdir().unwrap();
+        let source_path = PathBuf::from("/proc/cpuinfo");
+        let dest_path = dir.path().join("dest.txt");
+        let out = run(&[
+            "--driver",
+            drv,
+            source_path.to_str().unwrap(),
+            dest_path.to_str().unwrap(),
+        ]).unwrap();
+
+        assert!(out.status.success());
+        let (size, _blocks, _blksize) = quickstat(&dest_path).unwrap();
+        assert!(size > 0);
+    }
+
+    #[test_case("parfile"; "Test with parallel file driver")]
+    #[test_case("parblock"; "Test with parallel block driver")]
+    fn copy_sysfs_file(drv: &str) {
+        // Copying files on virtual filesystems (e.g. proc) with
+        // copy_file_range() has been known to have issues; see
+        // https://lwn.net/Articles/846403/ for details.
+
+        let dir = tempdir().unwrap();
+        let source_path = PathBuf::from("/sys/kernel/vmcoreinfo");
+        let dest_path = dir.path().join("dest.txt");
+        let out = run(&[
+            "--driver",
+            drv,
+            source_path.to_str().unwrap(),
+            dest_path.to_str().unwrap(),
+        ]).unwrap();
+
+        assert!(out.status.success());
+        let (size, _blocks, _blksize) = quickstat(&dest_path).unwrap();
+        assert!(size > 0);
     }
 
 }}
