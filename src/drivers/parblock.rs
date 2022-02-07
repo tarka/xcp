@@ -16,9 +16,9 @@
 
 use cfg_if::cfg_if;
 use crossbeam_channel as cbc;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::cmp;
-use std::fs::{create_dir_all, read_link};
+use std::fs::{self, create_dir_all, read_link};
 use std::os::unix::fs::symlink;
 use std::ops::Range;
 use std::path::PathBuf;
@@ -115,8 +115,8 @@ fn queue_file_range(handle: &Arc<CopyHandle>, range: Range<u64>, pool: &ThreadPo
     Ok(len)
 }
 
-fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &Sender, opts: &Opts,) -> Result<u64> {
-    let handle = init_copy(source, &dest, opts)?;
+fn queue_file_blocks(source: &PathBuf, dest: &PathBuf, pool: &ThreadPool, status_channel: &Sender, opts: &Opts,) -> Result<u64> {
+    let handle = init_copy(source, dest, opts)?;
     let len = handle.metadata.len();
 
     // Put the open files in an Arc, which we drop once work has
@@ -144,19 +144,30 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
+    let mut total = 0;
     let pb = ProgressBar::new(opts, len);
 
     let (stat_tx, stat_rx) = cbc::unbounded();
     let sender = Sender::new(stat_tx, opts);
-    queue_file_blocks(source, dest, &pool, &sender, opts)?;
+    queue_file_blocks(source, &dest, &pool, &sender, opts)?;
     drop(sender);
 
     // Gather the results as we go; close our end of the channel so it
     // ends when drained.
     for r in stat_rx {
-        pb.inc(r.value());
+        let written = r.value();
+        total += written;
+        pb.inc(written);
     }
     pool.join();
+
+    if total == 0 {
+        warn!("Source file {} has size 0; falling back to stdlib copy in-case it is special file.", source.display());
+        return fs::copy(source, &dest)
+            .map(|_| ())
+            .map_err(|e| e.into())
+    }
+
     pb.end();
 
     Ok(())
@@ -187,7 +198,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             .queue_len(128)
             .build();
         for op in file_rx {
-            queue_file_blocks(&op.from, op.target, &pool, &sender, &qopts).unwrap();
+            queue_file_blocks(&op.from, &op.target, &pool, &sender, &qopts).unwrap();
             // FIXME
         }
         info!("Queuing complete");

@@ -14,8 +14,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::cmp;
-use std::fs::{File, Metadata};
+use log::{warn};
+use std::{cmp, io};
+use std::fs::{self, File, Metadata};
 use std::path::Path;
 
 use crate::errors::Result;
@@ -69,25 +70,30 @@ pub fn copy_bytes(handle: &CopyHandle, len: u64, updates: &mut BatchUpdater) -> 
 pub fn copy_sparse(handle: &CopyHandle, updates: &mut BatchUpdater) -> Result<u64> {
     let len = handle.metadata.len();
     let mut pos = 0;
+    let mut written = 0;
 
     while pos < len {
         let (next_data, next_hole) = next_sparse_segments(&handle.infd, &handle.outfd, pos)?;
 
-        let _written = copy_bytes(&handle, next_hole - next_data, updates)?;
+        written += copy_bytes(&handle, next_hole - next_data, updates)?;
         pos = next_hole;
     }
 
-    Ok(len)
+    Ok(written)
 }
 
 pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
+    if from.metadata()?.len() == 0 {
+        warn!("Source file {} has size 0; falling back to stdlib copy in-case it is special file.", from.display());
+        return fs::copy(from, to).map_err(|e| e.into())
+    }
+
     let handle = init_copy(from, to, opts)?;
-    let total = if probably_sparse(&handle.infd)? {
+    let written = if probably_sparse(&handle.infd)? {
         copy_sparse(&handle, updates)?
     } else {
         copy_bytes(&handle, handle.metadata.len(), updates)?
     };
 
-    Ok(total)
+    Ok(written)
 }
-

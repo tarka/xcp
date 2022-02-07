@@ -203,6 +203,7 @@ cfg_if! {if #[cfg(any(target_os = "linux", target_os = "android"))] {
 
     #[test_case("parfile"; "Test with parallel file driver")]
     #[test_case("parblock"; "Test with parallel block driver")]
+    //#[ignore]
     fn copy_procfs_file(drv: &str) {
         // Copying files on virtual filesystems (e.g. proc) with
         // copy_file_range() has been known to have issues; see
@@ -225,6 +226,7 @@ cfg_if! {if #[cfg(any(target_os = "linux", target_os = "android"))] {
 
     #[test_case("parfile"; "Test with parallel file driver")]
     #[test_case("parblock"; "Test with parallel block driver")]
+    #[ignore]
     fn copy_sysfs_file(drv: &str) {
         // Copying files on virtual filesystems (e.g. proc) with
         // copy_file_range() has been known to have issues; see
