@@ -11,6 +11,12 @@ below).
 bugs and unexpected or inconsistent behaviour. It probably shouldn't be used for
 anything critical yet.
 
+Additionally, there are some known issues with copying files from virtual
+filesystems (e.g. `/proc`, `/sys`), especially when using the block-parallel
+('parblock') driver. See [this LWN article](https://lwn.net/Articles/846403/)
+for an overview of some of the complexities of dealing with kernel-generated
+files.
+
 ## Installation
 
 *NOTE*: `xcp` requires Rust 1.36 or higher. 
