@@ -15,7 +15,8 @@ Additionally, there are some known issues with copying files from virtual
 filesystems (e.g. `/proc`, `/sys`), especially when using the block-parallel
 ('parblock') driver. See [this LWN article](https://lwn.net/Articles/846403/)
 for an overview of some of the complexities of dealing with kernel-generated
-files.
+files. There are some preliminary tests for this failing functionality on the
+branch [issue24-add-tests-for-virtual-files](https://github.com/tarka/xcp/tree/issue24-add-tests-for-virtual-files).
 
 ## Installation
 
