@@ -77,7 +77,7 @@ fn copy_worker(
             Operation::Copy(from, to) => {
                 info!("Worker: Copy {:?} -> {:?}", from, to);
                 // copy_file sends back its own updates, but we should
-                // send back any errors as they may have occured
+                // send back any errors as they may have occurred
                 // before the copy started..
                 let r = copy_file(&from, &to, opts, &mut updates);
                 if r.is_err() {
