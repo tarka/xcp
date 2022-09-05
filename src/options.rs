@@ -85,7 +85,7 @@ pub struct Opts {
     #[structopt(long = "driver")]
     pub driver: Option<Drivers>,
 
-    /// Analagous to cp's no-target-directory. Expected behavior is that when
+    /// Analogous to cp's no-target-directory. Expected behavior is that when
     /// copying a directory to another directory, instead of creating a sub-folder
     /// in target, overwrite target.
     #[structopt(short = "T", long = "no-target-directory" )]

@@ -1274,7 +1274,7 @@ mod test {
     #[ignore]
     /// The scenario is joining threads should not be stuck once their wave
     /// of joins has completed. So once one thread joining on a pool has
-    /// succeded other threads joining on the same pool must get out even if
+    /// succeeded other threads joining on the same pool must get out even if
     /// the thread is used for other jobs while the first group is finishing
     /// their join
     ///
