@@ -62,6 +62,7 @@ pub fn create_file(path: &Path, text: &str) -> Result<(), Error> {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
+#[allow(unused)]
 pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
     let data = "c00lc0d3";
     let len = 4096u64 * 4096 + data.len() as u64 + tail;
@@ -89,6 +90,7 @@ pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
     Ok(len as u64)
 }
 
+#[allow(unused)]
 pub fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
     let mut dest = File::open(path)?;
     let mut buf = String::new();

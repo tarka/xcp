@@ -17,11 +17,8 @@
 use cfg_if::cfg_if;
 cfg_if! {if #[cfg(any(target_os = "linux", target_os = "android"))] {
 
-    use std::fs::{create_dir_all, metadata, set_permissions, write, File};
-    use std::os::unix::fs::symlink;
     use std::process::Command;
     use test_case::test_case;
-    use xattr;
 
     mod util;
     use crate::util::*;
