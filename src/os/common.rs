@@ -15,6 +15,7 @@
  */
 
 use libc;
+use log::{debug, warn};
 use std::cmp;
 use std::io;
 use std::fs::File;
@@ -37,21 +38,39 @@ pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
 }
 
 
+fn copy_xattr(hdl: &CopyHandle, _opts: &Opts) -> Result<()> {
+    // FIXME: Flag for xattr.
+    if XATTR_SUPPORTED {
+        debug!("Starting xattr copy...");
+        for attr in hdl.infd.list_xattr()? {
+            if let Some(val) = hdl.infd.get_xattr(&attr)? {
+                debug!("Copy xattr {:?}", attr);
+                hdl.outfd.set_xattr(attr, val.as_slice())?;
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
     if !opts.no_perms {
-
-        // FIXME: Flag for xattr.
-        if XATTR_SUPPORTED {
-            for attr in hdl.infd.list_xattr()? {
-                if let Some(val) = hdl.infd.get_xattr(&attr)? {
-                    hdl.outfd.set_xattr(attr, val.as_slice())?;
-                }
+        let xr = copy_xattr(hdl, opts);
+        match xr {
+            Err(e) => {
+                // FIXME: We don't have a way of detecting if the
+                // target FS supports XAttr, so assume any error is
+                // "Unsupported" for now.
+                warn!("Failed to copy xattrs from {:?}: {}", hdl.infd, e);
             }
+            _ => {}
         }
 
         // FIXME: ACLs, selinux, etc.
 
+        debug!("Performing permissions copy");
         hdl.outfd.set_permissions(hdl.metadata.permissions())?;
+
+        debug!("Permissions copy done");
     }
     Ok(())
 }
