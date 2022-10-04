@@ -36,6 +36,12 @@ cargo install xcp
 yay -S xcp
 ```
 
+### NetBSD
+[`xcp`](https://pkgsrc.se/sysutils/xcp) is available on NetBSD from the official repositories. To install it, simply run:
+```
+pkgin install xcp
+```
+
 ## Features and Anti-Features
 
 ### Features
