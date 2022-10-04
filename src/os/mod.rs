@@ -18,7 +18,7 @@ mod common;
 
 use cfg_if::cfg_if;
 cfg_if! {
-    if #[cfg(any(target_os = "linux", target_os = "android"))] {
+    if #[cfg(target_os = "linux")] {
         mod linux;
         pub use common::{
             allocate_file,
@@ -52,7 +52,7 @@ cfg_if! {
 // tested.
 pub const XATTR_SUPPORTED: bool = {
     cfg_if! {
-        if #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))] {
+        if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             true
         } else {
             false

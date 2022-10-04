@@ -226,6 +226,7 @@ fn file_copy_perms(drv: &str) {
         metadata(&source_path).unwrap().permissions().readonly(),
         metadata(&dest_path).unwrap().permissions().readonly()
     );
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     assert_eq!(xattr::get(&dest_path, "user.test").unwrap().unwrap(), b"my test");
 }
 
