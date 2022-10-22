@@ -642,11 +642,13 @@ impl ThreadPool {
         }
 
         // increase generation if we are the first thread to come out of the loop
-        self.shared_data.join_generation.compare_and_swap(
+        self.shared_data.join_generation.compare_exchange(
             generation,
             generation.wrapping_add(1),
             Ordering::SeqCst,
-        );
+            Ordering::SeqCst
+        ).unwrap();
+
     }
 }
 
