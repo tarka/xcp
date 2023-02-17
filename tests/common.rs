@@ -99,6 +99,26 @@ fn dest_file_exists(drv: &str) {
 
 #[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
+fn source_same_as_dest(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let dest = dir.join("dest");
+    create_dir_all(&dest).unwrap();
+
+    let out = run(&[
+        "--driver",
+        drv,
+        "-r",
+        dest.to_str().unwrap(),
+        dest.to_str().unwrap()
+    ]).unwrap();
+    
+    assert!(!out.status.success());
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.contains("Cannot copy a directory into itself"));
+}
+
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
 fn dest_file_in_dir_exists(drv: &str) {
     let dir = tempdir().unwrap();
     let source_path = dir.path().join("source.txt");
