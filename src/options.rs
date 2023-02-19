@@ -17,10 +17,10 @@
 use std::path::PathBuf;
 use std::result;
 
+use clap::{ArgAction, Parser};
 use glob::{glob, Paths};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use num_cpus;
-use structopt::StructOpt;
 use unbytify::unbytify;
 use walkdir::{DirEntry};
 
@@ -28,76 +28,73 @@ use crate::errors::Result;
 use crate::drivers::Drivers;
 
 
-#[derive(Clone, Debug, StructOpt)]
-#[structopt(
-    name = "xcp",
+#[derive(Clone, Debug, Parser)]
+#[command(name = "xcp",
     about = "Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY.",
-    setting = structopt::clap::AppSettings::ColoredHelp
 )]
 pub struct Opts {
     /// Explain what is being done. Can be specified multiple times to
     /// increase logging.
-    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
-    pub verbose: u64,
+    #[arg(short, long, action = ArgAction::Count)]
+    pub verbose: u8,
 
     /// Copy directories recursively
-    #[structopt(short = "r", long = "recursive")]
+    #[arg(short, long)]
     pub recursive: bool,
 
     /// Number of parallel workers for recursive copies. Default is 1;
     /// if the value is negative or 0 it uses the number of logical CPUs.
-    #[structopt(short = "w", long = "workers",  default_value = "4")]
+    #[arg(short, long = "workers",  default_value = "4")]
     pub workers: i64,
 
     /// Block size for operations. Accepts standard size modifiers
     /// like "M" and "GB". Actual usage internally depends on the
     /// driver.
-    #[structopt(long = "block-size",  default_value = "1MB", parse(try_from_str = unbytify))]
+    #[arg(long = "block-size",  default_value = "1MB", value_parser=unbytify)]
     pub block_size: u64,
 
     /// Do not overwrite an existing file
-    #[structopt(short = "n", long = "no-clobber")]
+    #[arg(short, long = "no-clobber")]
     pub noclobber: bool,
 
     /// Use .gitignore if present. NOTE: This is fairly basic at the
     /// moment, and only honours a .gitignore in the directory root
     /// for directory copies; global or sub-directory ignores are
     /// skipped.
-    #[structopt(long = "gitignore")]
+    #[arg(long = "gitignore")]
     pub gitignore: bool,
 
     /// Glob (expand) filename patterns natively (note; the shell may still do its own expansion first)
-    #[structopt(short = "g", long = "glob")]
+    #[arg(short, long = "glob")]
     pub glob: bool,
 
     /// Disable progress bar.
-    #[structopt(long = "no-progress")]
+    #[arg(long = "no-progress")]
     pub noprogress: bool,
 
     /// Do not copy the file permissions.
-    #[structopt(long = "no-perms")]
+    #[arg(long = "no-perms")]
     pub no_perms: bool,
 
     /// Specify the driver. Currently there are 2; the default
     /// "parfile", which parallelises copies across workers at the
     /// file level, and an experimental "parblock" driver, which
     /// parellelises at the block level. See also '--block-size'.
-    #[structopt(long = "driver")]
+    #[arg(long = "driver")]
     pub driver: Option<Drivers>,
 
     /// Analogous to cp's no-target-directory. Expected behavior is that when
     /// copying a directory to another directory, instead of creating a sub-folder
     /// in target, overwrite target.
-    #[structopt(short = "T", long = "no-target-directory" )]
+    #[arg(short = 'T', long = "no-target-directory" )]
     pub no_target_directory: bool,
 
-    #[structopt(required = true, min_values = 2 )]
     pub paths: Vec<String>,
 
 }
 
 
-// StructOpt handles optional flags with optional values as nested Options.
+// StructOpt/Clap handles optional flags with optional values as nested Options.
 pub fn num_workers(opts: &Opts) -> u64 {
     if opts.workers <= 0 {
         num_cpus::get() as u64
@@ -172,4 +169,8 @@ pub fn ignore_filter(entry: &DirEntry, ignore: &Option<Gitignore>) -> bool {
             !m.is_ignore()
         }
     }
+}
+
+pub fn parse_args() -> Result<Opts> {
+    Ok(Opts::parse())
 }

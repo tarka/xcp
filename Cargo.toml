@@ -27,6 +27,7 @@ overflow-checks = true
 [dependencies]
 anyhow = "1.0.69"
 cfg-if = "1.0.0"
+clap = { version = "*", features = ["derive"] }
 crossbeam-channel = "0.5.6"
 crossbeam-utils = "0.8.14"
 glob = "0.3.1"
@@ -36,7 +37,6 @@ libc = "0.2.139"
 log = "0.4.17"
 num_cpus = "1.15.0"
 simplelog = "0.12.0"
-structopt = "0.3.26"
 thiserror = "1.0.38"
 unbytify = "0.2.0"
 walkdir = "2.3.2"

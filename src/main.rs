@@ -27,7 +27,6 @@ use std::path::PathBuf;
 
 use log::info;
 use simplelog::{Config, ColorChoice, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
-use structopt::StructOpt;
 
 pub use crate::vendor::threadpool;
 use crate::errors::{Result, XcpError};
@@ -50,7 +49,7 @@ fn pick_driver(opts: &options::Opts) -> Result<&dyn CopyDriver> {
 
 
 fn main() -> Result<()> {
-    let opts = options::Opts::from_args();
+    let opts = options::parse_args()?;
 
     let log_level = match opts.verbose {
         0 => LevelFilter::Warn,

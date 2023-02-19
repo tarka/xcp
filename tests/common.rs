@@ -40,7 +40,7 @@ fn no_args() {
     assert!(out.status.code().unwrap() == 1);
 
     let stderr = String::from_utf8(out.stderr).unwrap();
-    assert!(stderr.contains("The following required arguments were not provided"));
+    assert!(stderr.contains("Insufficient arguments"));
 }
 
 #[test_case("parfile"; "Test with parallel file driver")]
