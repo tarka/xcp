@@ -3,22 +3,12 @@ jobs:
   build:
     # Use a recent machine image as we need a kernel >= 4.5
     machine:
-      image: circleci/classic:201808-01
+      image: cimg/rust:1.36.0
     steps:
       - checkout
 
       - restore_cache:
           key: rust-cache
-      - run:
-          name: Install and update Rust
-          command: |
-            if [ ! -f ~/.cargo/bin/rustup ]; then
-              curl https://sh.rustup.rs -sSf > /tmp/rustup-init.sh
-              chmod +x /tmp/rustup-init.sh
-              /tmp/rustup-init.sh -y
-            else
-              ~/.cargo/bin/rustup update
-            fi
 
       - run:
           name: Run tests
