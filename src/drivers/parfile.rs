@@ -198,7 +198,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     let (pb, batch_size) = if opts.noprogress {
         (ProgressBar::Nop, usize::max_value() as u64)
     } else {
-        (iprogress_bar(0), BATCH_DEFAULT)
+        (iprogress_bar(0)?, BATCH_DEFAULT)
     };
 
     // Use scoped threads here so we can pass down e.g. Opts without
@@ -263,7 +263,7 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
         let size = source.metadata()?.len();
         BatchUpdater {
             sender: Box::new(ProgressUpdater {
-                pb: iprogress_bar(size),
+                pb: iprogress_bar(size)?,
                 written: 0,
             }),
             stat: StatusUpdate::Copied(0),

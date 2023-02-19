@@ -144,7 +144,7 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
-    let pb = ProgressBar::new(opts, len);
+    let pb = ProgressBar::new(opts, len)?;
 
     let (stat_tx, stat_rx) = cbc::unbounded();
     let sender = Sender::new(stat_tx, opts);
@@ -168,7 +168,7 @@ struct CopyOp {
 }
 
 pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
-    let pb = ProgressBar::new(opts, 0);
+    let pb = ProgressBar::new(opts, 0)?;
     let mut total = 0;
 
     let nworkers = num_workers(opts) as usize;

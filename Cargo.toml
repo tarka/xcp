@@ -25,27 +25,27 @@ kernel_copy_file_range = []
 overflow-checks = true
 
 [dependencies]
-anyhow = "1.0.65"
+anyhow = "1.0.69"
 cfg-if = "1.0.0"
 crossbeam-channel = "0.5.6"
-crossbeam-utils = "0.8.12"
-glob = "0.3.0"
-ignore = "0.4.18"
-indicatif = "0.16.2"
-libc = "0.2.134"
+crossbeam-utils = "0.8.14"
+glob = "0.3.1"
+ignore = "0.4.20"
+indicatif = "0.17.3"
+libc = "0.2.139"
 log = "0.4.17"
-num_cpus = "1.13.1"
-simplelog = "0.11.2"
+num_cpus = "1.15.0"
+simplelog = "0.12.0"
 structopt = "0.3.26"
-thiserror = "1.0.37"
+thiserror = "1.0.38"
 unbytify = "0.2.0"
 walkdir = "2.3.2"
-xattr = "0.2.3"
+xattr = "1.0.0"
 
 [dev-dependencies]
 rand = "0.8.5"
 rand_distr = "0.4.3"
 rand_xorshift = "0.3.0"
 tempfile = "3.3.0"
-test-case = "1.2.3"
-uuid = { version = "0.8.2", features = ["v4"] }
+test-case = "3.0.0"
+uuid = { version = "1.3.0", features = ["v4"] }

@@ -114,9 +114,9 @@ pub enum ProgressBar {
 }
 
 impl ProgressBar {
-    pub fn new(opts: &Opts, size: u64) -> ProgressBar {
+    pub fn new(opts: &Opts, size: u64) -> Result<ProgressBar> {
         match opts.noprogress {
-            true => ProgressBar::Nop,
+            true => Ok(ProgressBar::Nop),
             false => iprogress_bar(size)
         }
     }
@@ -158,12 +158,12 @@ impl ProgressBar {
 }
 
 
-pub fn iprogress_bar(size: u64) -> ProgressBar {
+pub fn iprogress_bar(size: u64) -> Result<ProgressBar> {
     let ipb = indicatif::ProgressBar::new(size)
         .with_style(
             indicatif::ProgressStyle::default_bar()
-                .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?
                 .progress_chars("#>-"),
         );
-    ProgressBar::Visual(ipb)
+    Ok(ProgressBar::Visual(ipb))
 }

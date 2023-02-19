@@ -111,7 +111,7 @@ fn source_same_as_dest(drv: &str) {
         dest.to_str().unwrap(),
         dest.to_str().unwrap()
     ]).unwrap();
-    
+
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();
     assert!(stderr.contains("Cannot copy a directory into itself"));
