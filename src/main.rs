@@ -110,6 +110,10 @@ fn main() -> Result<()> {
                 ).into())
             }
 
+            if source == &dest {
+                return Err(XcpError::InvalidSource("Cannot copy a directory into itself").into());
+            }
+
             if dest.exists() && !dest.is_dir() {
                 return Err(XcpError::InvalidDestination(
                     "Source is directory but target exists and is not a directory"
