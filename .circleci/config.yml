@@ -6,14 +6,15 @@ executors:
 
 jobs:
   test:
-    executor: my-custom-executor
+    executor: rust-executor
     steps:
       - checkout
-      - run: |
-          cargo test --color never
-            - run: |
-      - run: |
-           cargo test --color never -- --ignored --nocapture
+      - run:
+          name: Run tests
+          command: cargo test --color never
+      - run:
+          name: Run expensive tests
+          command: cargo test --color never -- --ignored --nocapture
 
 workflows:
   rust-test-workflow:
