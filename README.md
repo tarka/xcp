@@ -20,7 +20,7 @@ branch [issue24-add-tests-for-virtual-files](https://github.com/tarka/xcp/tree/i
 
 ## Installation
 
-*NOTE*: `xcp` requires Rust 1.36 or higher. 
+*NOTE*: `xcp` requires Rust 1.56 (2021 edition) or higher.
 
 ### Cargo
 
@@ -71,7 +71,7 @@ pkgin install xcp
   (although sparse-files are not yet supported in this case).
 * Optionally understands `.gitignore` files to limit the copied directories.
 * Optional native file-globbing.
-  
+
 ### (Possible) future features
 
 * Conversion of files to sparse where appropriate, as with `cp`'s
