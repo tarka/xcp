@@ -1,26 +1,21 @@
-version: 2
+version: 2.1
+executors:
+  rust-executor:
+    docker:
+      - image: cimg/rust:1.36.0
+
 jobs:
-  build:
-    # Use a recent machine image as we need a kernel >= 4.5
-    machine:
-      image: cimg/rust:1.36.0
+  test:
+    executor: my-custom-executor
     steps:
       - checkout
+      - run: |
+          cargo test --color never
+            - run: |
+      - run: |
+           cargo test --color never -- --ignored --nocapture
 
-      - restore_cache:
-          key: rust-cache
-
-      - run:
-          name: Run tests
-          command: ~/.cargo/bin/cargo test --color never
-
-      - run:
-          name: Run expensive tests
-          command: ~/.cargo/bin/cargo test --color never -- --ignored --nocapture
-
-      - save_cache:
-          key: rust-cache
-          paths:
-            - ./target/
-            - ~/.cargo/
-            - ~/.rustup/
+workflows:
+  rust-test-workflow:
+    jobs:
+      - test
