@@ -57,6 +57,7 @@ impl CopyDriver for Driver {
 enum Operation {
     Copy(PathBuf, PathBuf),
     Link(PathBuf, PathBuf),
+    Skip(u64),
     End,
 }
 
@@ -88,6 +89,10 @@ fn copy_worker(
             Operation::Link(from, to) => {
                 info!("Worker: Symlink {:?} -> {:?}", from, to);
                 let _r = symlink(&from, &to);
+            }
+
+            Operation::Skip(ln) => {
+                updates.update(Ok(ln))?;
             }
 
             Operation::End => {
@@ -154,11 +159,14 @@ fn copy_source(
                             if meta.len()==meta_to.len(){
                                 info!("Skip copy becose same size: {:?} to {:?}", from, target);
                                 updates.update(Ok(meta.len()))?;
+                                work_tx.send(Operation::Skip(meta.len()))?;
                                 continue;
                             }
                         },
                         _=>{},
                     }
+                    info!("Not skip copy becose size:({}!={}), {:?} to {:?}", 
+                    meta.len(),meta_to.len(),from, target);
                 }
                 debug!("Send copy operation {:?} to {:?}", from, target);
                 updates.update(Ok(meta.len()))?;
