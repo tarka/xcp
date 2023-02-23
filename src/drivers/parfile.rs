@@ -152,7 +152,7 @@ fn copy_source(
                     match meta_to.file_type().to_enum(){
                         FileType::File=>{
                             if meta.len()==meta_to.len(){
-                                debug!("Skip copy becose same size: {:?} to {:?}", from, target);
+                                info!("Skip copy becose same size: {:?} to {:?}", from, target);
                                 updates.update(Ok(meta.len()))?;
                                 continue;
                             }
