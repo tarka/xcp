@@ -147,6 +147,19 @@ fn copy_source(
 
         match meta.file_type().to_enum() {
             FileType::File => {
+                if opts.skipsamesize&&target.exists() {
+                    let meta_to = target.symlink_metadata()?;
+                    match meta_to.file_type().to_enum(){
+                        FileType::File=>{
+                            if meta.len()==meta_to.len(){
+                                debug!("Skip copy becose same size: {:?} to {:?}", from, target);
+                                updates.update(Ok(meta.len()))?;
+                                continue;
+                            }
+                        },
+                        _=>{},
+                    }
+                }
                 debug!("Send copy operation {:?} to {:?}", from, target);
                 updates.update(Ok(meta.len()))?;
                 work_tx.send(Operation::Copy(from, target))?;

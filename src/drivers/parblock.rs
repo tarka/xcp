@@ -235,6 +235,19 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
 
             match meta.file_type().to_enum() {
                 FileType::File => {
+                    if opts.skipsamesize&&target.exists() {
+                        let meta_to = target.symlink_metadata()?;
+                        match meta_to.file_type().to_enum(){
+                            FileType::File=>{
+                                if meta.len()==meta_to.len(){
+                                    debug!("Skip copy becose same size: {:?} to {:?}", from, target);
+                                    total += meta.len();
+                                    continue;
+                                }
+                            },
+                            _=>{},
+                        }
+                    }
                     debug!("Start copy operation {:?} to {:?}", from, target);
                     file_tx.send(CopyOp {
                         from: from,
