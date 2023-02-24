@@ -141,6 +141,7 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
 
 pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
     let nworkers = num_workers(opts);
+    info!("num_workers set len={}",nworkers);
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
@@ -172,6 +173,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     let mut total = 0;
 
     let nworkers = num_workers(opts) as usize;
+    info!("num_workers set len={}",nworkers);
     let (stat_tx, stat_rx) = cbc::unbounded::<StatusUpdate>();
 
     let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();

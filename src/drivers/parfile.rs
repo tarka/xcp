@@ -222,10 +222,12 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
         (iprogress_bar(0)?, BATCH_DEFAULT)
     };
 
+    let nworkers = num_workers(opts);
+    info!("num_workers set len={}",nworkers);
     // Use scoped threads here so we can pass down e.g. Opts without
     // repeated cloning.
     cbt::scope(|s| {
-        for _ in 0..num_workers(opts) {
+        for _ in 0..nworkers {
             let _copy_worker = {
                 let copy_stat = BatchUpdater {
                     sender: Box::new(stat_tx.clone()),
