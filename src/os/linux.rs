@@ -223,6 +223,9 @@ pub fn lseek(fd: &File, off: i64, whence: Whence) -> Result<SeekOff> {
 
 
 // See ioctl_list(2)
+#[cfg(target_env="musl")]
+const FS_IOC_FIEMAP: libc::c_int = 0xC020660Bu64 as libc::c_int;
+#[cfg(not(target_env="musl"))]
 const FS_IOC_FIEMAP: libc::c_ulong = 0xC020660B;
 const FIEMAP_EXTENT_LAST: u32 = 0x00000001;
 const PAGE_SIZE: usize = 32;
@@ -282,7 +285,7 @@ pub fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
 
     loop {
         if unsafe {
-            libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr)
+          libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr)
         } != 0 {
             return Err(io::Error::last_os_error().into());
         }
