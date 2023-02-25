@@ -14,12 +14,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::io::{Error as IOError};
+use std::io::Error as IOError;
 use std::path::PathBuf;
 
+pub use anyhow::{Error, Result};
 use thiserror::Error;
-pub use anyhow::{Result, Error};
-
 
 #[derive(Debug, Error)]
 pub enum XcpError {

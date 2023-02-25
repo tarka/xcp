@@ -17,18 +17,17 @@
 use libc;
 use log::{debug, warn};
 use std::cmp;
-use std::io;
 use std::fs::File;
+use std::io;
 use std::io::{ErrorKind, Read, Write};
 use std::ops::Range;
 use std::os::unix::io::AsRawFd;
 use xattr::FileExt;
 
 use crate::errors::{Result, XcpError};
-use crate::options::Opts;
 use crate::operations::CopyHandle;
+use crate::options::Opts;
 use crate::os::XATTR_SUPPORTED;
-
 
 pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
     match result {
@@ -36,7 +35,6 @@ pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
         _ => Ok(retval),
     }
 }
-
 
 fn copy_xattr(hdl: &CopyHandle, _opts: &Opts) -> Result<()> {
     // FIXME: Flag for xattr.
@@ -75,10 +73,14 @@ pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
     Ok(())
 }
 
-
 fn pread(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize> {
     let ret = unsafe {
-        libc::pread(fd.as_raw_fd(), buf.as_mut_ptr() as *mut libc::c_void, nbytes, off as i64)
+        libc::pread(
+            fd.as_raw_fd(),
+            buf.as_mut_ptr() as *mut libc::c_void,
+            nbytes,
+            off as i64,
+        )
     };
 
     result_or_errno(ret as i64, ret as usize)
@@ -86,7 +88,12 @@ fn pread(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize> 
 
 fn pwrite(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize> {
     let ret = unsafe {
-        libc::pwrite(fd.as_raw_fd(), buf.as_mut_ptr() as *mut libc::c_void, nbytes, off as i64)
+        libc::pwrite(
+            fd.as_raw_fd(),
+            buf.as_mut_ptr() as *mut libc::c_void,
+            nbytes,
+            off as i64,
+        )
     };
 
     result_or_errno(ret as i64, ret as usize)
@@ -96,7 +103,7 @@ fn pwrite(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize>
 /// Copy a block of bytes at an offset between files. Uses Posix pread/pwrite.
 pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<u64> {
     // FIXME: For larger buffers we should use a pre-allocated thread-local?
-    let mut buf = vec!(0; nbytes);
+    let mut buf = vec![0; nbytes];
 
     let mut written: usize = 0;
     while written < nbytes {
@@ -110,7 +117,9 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
         };
 
         let _wlen = match pwrite(writer, &mut buf[..rlen], next, noff) {
-            Ok(len) if len < rlen => return Err(XcpError::InvalidSource("Failed write to file.").into()),
+            Ok(len) if len < rlen => {
+                return Err(XcpError::InvalidSource("Failed write to file.").into())
+            }
             Ok(len) => len,
             Err(e) => return Err(e),
         };
@@ -120,10 +129,9 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
     Ok(written as u64)
 }
 
-
 /// Slightly modified version of io::copy() that only copies a set amount of bytes.
 pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<u64> {
-    let mut buf = vec!(0; nbytes);
+    let mut buf = vec![0; nbytes];
 
     let mut written = 0;
     while written < nbytes {
@@ -140,7 +148,6 @@ pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) ->
     Ok(written as u64)
 }
 
-
 /// Version of copy_file_range that defers offset-management to the
 /// syscall. see copy_file_range(2) for details.
 #[allow(dead_code)]
@@ -155,15 +162,11 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
     copy_range_uspace(infd, outfd, bytes as usize, off as usize)
 }
 
-
 /// Allocate file space on disk. Uses Posix ftruncate().
 pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
-    let r = unsafe {
-        libc::ftruncate(fd.as_raw_fd(), len as i64)
-    };
+    let r = unsafe { libc::ftruncate(fd.as_raw_fd(), len as i64) };
     result_or_errno(r as i64, ())
 }
-
 
 // No sparse file handling by default, needs to be implemented
 // per-OS. This effectively disables the following operations.
@@ -184,7 +187,7 @@ pub fn next_sparse_segments(_infd: &File, _outfd: &File, _pos: u64) -> Result<(u
 }
 
 pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
-    let mut merged: Vec<Range<u64>> = vec!();
+    let mut merged: Vec<Range<u64>> = vec![];
 
     let mut prev: Option<Range<u64>> = None;
     for e in extents {
@@ -198,9 +201,9 @@ pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
                     merged.push(p);
                     prev = Some(e);
                 }
-            },
+            }
             // First iter
-            None => prev = Some(e)
+            None => prev = Some(e),
         }
     }
     if let Some(p) = prev {
@@ -210,12 +213,11 @@ pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
     Ok(merged)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::iter;
     use std::fs::read;
+    use std::iter;
     use tempfile::tempdir;
 
     #[test]
@@ -223,7 +225,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let from = dir.path().join("from.bin");
         let to = dir.path().join("to.bin");
-        let size = 128*1024;
+        let size = 128 * 1024;
         let data = iter::repeat("X").take(size).collect::<String>();
 
         {
@@ -239,8 +241,7 @@ mod tests {
             assert_eq!(written, size as u64);
         }
 
-        assert_eq!(from.metadata().unwrap().len(),
-                   to.metadata().unwrap().len());
+        assert_eq!(from.metadata().unwrap().len(), to.metadata().unwrap().len());
 
         {
             let from_data = read(&from).unwrap();
@@ -249,13 +250,12 @@ mod tests {
         }
     }
 
-
     #[test]
     fn test_copy_range_uspace_large() {
         let dir = tempdir().unwrap();
         let from = dir.path().join("from.bin");
         let to = dir.path().join("to.bin");
-        let size = 128*1024;
+        let size = 128 * 1024;
         let data = iter::repeat("X").take(size).collect::<String>();
 
         {
@@ -263,12 +263,11 @@ mod tests {
             write!(fd, "{}", data).unwrap();
         }
 
-
         {
             let infd = File::open(&from).unwrap();
             let outfd = File::create(&to).unwrap();
 
-            let blocksize = size/4;
+            let blocksize = size / 4;
             let mut written = 0;
 
             for off in (0..4).rev() {
@@ -278,8 +277,7 @@ mod tests {
             assert_eq!(written, size as u64);
         }
 
-        assert_eq!(from.metadata().unwrap().len(),
-                   to.metadata().unwrap().len());
+        assert_eq!(from.metadata().unwrap().len(), to.metadata().unwrap().len());
 
         {
             let from_data = read(&from).unwrap();
@@ -290,20 +288,22 @@ mod tests {
 
     #[test]
     fn test_extent_merge() -> Result<()> {
-        assert_eq!(merge_extents(vec!())?,
-                   vec!());
-        assert_eq!(merge_extents(vec!(0..1))?,
-                   vec!(0..1));
-        assert_eq!(merge_extents(vec!(0..1, 10..20))?,
-                   vec!(0..1, 10..20));
-        assert_eq!(merge_extents(vec!(0..10, 11..20))?,
-                   vec!(0..20));
-        assert_eq!(merge_extents(vec!(0..5, 11..20, 21..30, 40..50))?,
-                   vec!(0..5, 11..30, 40..50));
-        assert_eq!(merge_extents(vec!(0..5, 11..20, 21..30, 40..50, 51..60))?,
-                   vec!(0..5, 11..30, 40..60));
-        assert_eq!(merge_extents(vec!(0..10, 11..20, 21..30, 31..50, 51..60))?,
-                   vec!(0..60));
+        assert_eq!(merge_extents(vec!())?, vec!());
+        assert_eq!(merge_extents(vec!(0..1))?, vec!(0..1));
+        assert_eq!(merge_extents(vec!(0..1, 10..20))?, vec!(0..1, 10..20));
+        assert_eq!(merge_extents(vec!(0..10, 11..20))?, vec!(0..20));
+        assert_eq!(
+            merge_extents(vec!(0..5, 11..20, 21..30, 40..50))?,
+            vec!(0..5, 11..30, 40..50)
+        );
+        assert_eq!(
+            merge_extents(vec!(0..5, 11..20, 21..30, 40..50, 51..60))?,
+            vec!(0..5, 11..30, 40..60)
+        );
+        assert_eq!(
+            merge_extents(vec!(0..10, 11..20, 21..30, 31..50, 51..60))?,
+            vec!(0..60)
+        );
         Ok(())
     }
 }

@@ -23,9 +23,8 @@ use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::ptr;
 
+use crate::errors::Result;
 use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
-use crate::errors::{Result};
-
 
 /* **** Low level operations **** */
 
@@ -73,7 +72,6 @@ macro_rules! box_ptr_or_null(
         })
 );
 
-
 // Kernels prior to 4.5 don't have copy_file_range, and it may not
 // work across fs mounts, so we store the fallback to userspace in a
 // thread-local flag to avoid unnecessary syscalls.
@@ -81,10 +79,13 @@ thread_local! {
     static USE_CFR: RefCell<bool> = RefCell::new(true);
 }
 
-fn copy_file_range(infd: &File, in_off: Option<i64>,
-                   outfd: &File, out_off: Option<i64>,
-                   bytes: u64) -> Option<Result<u64>>
-{
+fn copy_file_range(
+    infd: &File,
+    in_off: Option<i64>,
+    outfd: &File,
+    out_off: Option<i64>,
+    bytes: u64,
+) -> Option<Result<u64>> {
     USE_CFR.with(|cfr| {
         if *cfr.borrow() {
             // copy_file_range(2) takes an optional pointer to an
@@ -119,21 +120,15 @@ fn copy_file_range(infd: &File, in_off: Option<i64>,
                 -1 => {
                     let errno = io::Error::last_os_error();
                     match errno.raw_os_error() {
-                        Some(libc::ENOSYS) |
-                        Some(libc::EPERM) |
-                        Some(libc::EXDEV) => {
+                        Some(libc::ENOSYS) | Some(libc::EPERM) | Some(libc::EXDEV) => {
                             // Flag as unavailable and fallback to userspace.
                             *cfr.borrow_mut() = false;
                             None
                         }
-                        _ => {
-                            Some(Err(errno.into()))
-                        }
+                        _ => Some(Err(errno.into())),
                     }
-                },
-                _ => {
-                    Some(Ok(r as u64))
                 }
+                _ => Some(Ok(r as u64)),
             }
         } else {
             None
@@ -141,13 +136,11 @@ fn copy_file_range(infd: &File, in_off: Option<i64>,
     })
 }
 
-
 // Wrapper for copy_file_range(2) that defers file offset tracking to
 // the underlying call. See the manpage for details.
 fn copy_bytes_kernel(infd: &File, outfd: &File, nbytes: u64) -> Option<Result<u64>> {
     copy_file_range(infd, None, outfd, None, nbytes)
 }
-
 
 // Wrapper for copy_file_range(2) that copies to the same position in
 // the target file.
@@ -156,14 +149,12 @@ fn copy_range_kernel(infd: &File, outfd: &File, nbytes: u64, off: i64) -> Option
     copy_file_range(infd, Some(off), outfd, Some(off), nbytes)
 }
 
-
 // Wrapper for copy_bytes_kernel that falls back to userspace if
 // copy_file_range is not available.
 pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
     copy_bytes_kernel(infd, outfd, bytes)
         .unwrap_or_else(|| copy_bytes_uspace(infd, outfd, bytes as usize))
 }
-
 
 // Wrapper for copy_range_kernel that copies a block . Falls back to userspace if
 // copy_file_range is not available.
@@ -173,7 +164,6 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
         .unwrap_or_else(|| copy_range_uspace(infd, outfd, bytes as usize, off as usize))
 }
 
-
 // Guestimate if file is sparse; if it has less blocks that would be
 // expected for its stated size. This is the same test used by
 // coreutils `cp`.
@@ -181,7 +171,6 @@ pub fn probably_sparse(fd: &File) -> Result<bool> {
     let stat = fd.metadata()?;
     Ok(stat.st_blocks() < stat.st_size() / stat.st_blksize())
 }
-
 
 /// Corresponds to lseek(2) `whence`
 #[allow(dead_code)]
@@ -196,31 +185,22 @@ pub enum Whence {
 #[derive(PartialEq, Debug)]
 pub enum SeekOff {
     Offset(u64),
-    EOF
+    EOF,
 }
 
 pub fn lseek(fd: &File, off: i64, whence: Whence) -> Result<SeekOff> {
-    let r = unsafe {
-        libc::lseek64(
-            fd.as_raw_fd(),
-            off,
-            whence as libc::c_int
-        )
-    };
+    let r = unsafe { libc::lseek64(fd.as_raw_fd(), off, whence as libc::c_int) };
 
     if r == -1 {
         let err = io::Error::last_os_error();
         match err.raw_os_error() {
-            Some(errno) if errno == libc::ENXIO => {
-                Ok(SeekOff::EOF)
-            }
-            _ => Err(err.into())
+            Some(errno) if errno == libc::ENXIO => Ok(SeekOff::EOF),
+            _ => Err(err.into()),
         }
     } else {
         Ok(SeekOff::Offset(r as u64))
     }
 }
-
 
 // See ioctl_list(2)
 const FS_IOC_FIEMAP: libc::c_ulong = 0xC020660B;
@@ -230,11 +210,11 @@ const PAGE_SIZE: usize = 32;
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 struct FiemapExtent {
-    fe_logical: u64,        // Logical offset in bytes for the start of the extent
-    fe_physical: u64,       // Physical offset in bytes for the start of the extent
-    fe_length: u64,         // Length in bytes for the extent
+    fe_logical: u64,  // Logical offset in bytes for the start of the extent
+    fe_physical: u64, // Physical offset in bytes for the start of the extent
+    fe_length: u64,   // Length in bytes for the extent
     fe_reserved64: [u64; 2],
-    fe_flags: u32,          // FIEMAP_EXTENT_* flags for this extent
+    fe_flags: u32, // FIEMAP_EXTENT_* flags for this extent
     fe_reserved: [u32; 3],
 }
 impl FiemapExtent {
@@ -270,7 +250,7 @@ impl FiemapReq {
             fm_mapped_extents: 0,
             fm_extent_count: PAGE_SIZE as u32,
             fm_reserved: 0,
-	    fm_extents: [FiemapExtent::new(); PAGE_SIZE],
+            fm_extents: [FiemapExtent::new(); PAGE_SIZE],
         }
     }
 }
@@ -281,9 +261,7 @@ pub fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
     let mut extents = Vec::with_capacity(PAGE_SIZE);
 
     loop {
-        if unsafe {
-            libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr)
-        } != 0 {
+        if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr) } != 0 {
             return Err(io::Error::last_os_error().into());
         }
         if req.fm_mapped_extents == 0 {
@@ -297,7 +275,7 @@ pub fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
             extents.push(start..end);
         }
 
-        let last = req.fm_extents[(req.fm_mapped_extents-1) as usize];
+        let last = req.fm_extents[(req.fm_mapped_extents - 1) as usize];
         if last.fe_flags & FIEMAP_EXTENT_LAST != 0 {
             break;
         }
@@ -309,35 +287,33 @@ pub fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
     Ok(extents)
 }
 
-
 pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64, u64)> {
     let next_data = match lseek(infd, pos as i64, Whence::Data)? {
         SeekOff::Offset(off) => off,
-        SeekOff::EOF => infd.metadata()?.len()
+        SeekOff::EOF => infd.metadata()?.len(),
     };
     let next_hole = match lseek(infd, next_data as i64, Whence::Hole)? {
         SeekOff::Offset(off) => off,
-        SeekOff::EOF => infd.metadata()?.len()
+        SeekOff::EOF => infd.metadata()?.len(),
     };
 
-    lseek(infd, next_data as i64, Whence::Set)?;  // FIXME: EOF (but shouldn't happen)
+    lseek(infd, next_data as i64, Whence::Set)?; // FIXME: EOF (but shouldn't happen)
     lseek(outfd, next_data as i64, Whence::Set)?;
 
     Ok((next_data, next_hole))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::{TempDir, tempdir_in};
-    use std::path::{PathBuf};
+    use crate::os::allocate_file;
     use std::env::current_dir;
     use std::fs::{read, OpenOptions};
-    use std::process::Command;
     use std::io::{Seek, SeekFrom, Write};
     use std::iter;
-    use crate::os::allocate_file;
+    use std::path::PathBuf;
+    use std::process::Command;
+    use tempfile::{tempdir_in, TempDir};
 
     fn tempdir() -> Result<TempDir> {
         // Force into local dir as /tmp might be tmpfs, which doesn't
@@ -353,8 +329,7 @@ mod tests {
         let file = dir.path().join("sparse.bin");
         let out = Command::new("/usr/bin/truncate")
             .args(&["-s", "1M", file.to_str().unwrap()])
-            .output()
-            ?;
+            .output()?;
         assert!(out.status.success());
 
         {
@@ -362,10 +337,7 @@ mod tests {
             assert!(probably_sparse(&fd)?);
         }
         {
-            let mut fd = OpenOptions::new()
-                .write(true)
-                .append(false)
-                .open(&file)?;
+            let mut fd = OpenOptions::new().write(true).append(false).open(&file)?;
             write!(fd, "{}", "test")?;
             assert!(probably_sparse(&fd)?);
         }
@@ -387,16 +359,12 @@ mod tests {
 
         let out = Command::new("/usr/bin/truncate")
             .args(&["-s", "1M", file.to_str().unwrap()])
-            .output()
-            ?;
+            .output()?;
         assert!(out.status.success());
 
         {
             let infd = File::open(&from)?;
-            let outfd: File = OpenOptions::new()
-                .write(true)
-                .append(false)
-                .open(&file)?;
+            let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
             copy_file_bytes(&infd, &outfd, data.len() as u64)?;
         }
 
@@ -404,7 +372,6 @@ mod tests {
 
         Ok(())
     }
-
 
     #[test]
     fn test_sparse_copy_middle() -> Result<()> {
@@ -423,16 +390,18 @@ mod tests {
             .output()?;
         assert!(out.status.success());
 
-        let offset: usize = 512*1024;
+        let offset: usize = 512 * 1024;
         {
             let infd = File::open(&from)?;
-            let outfd: File = OpenOptions::new()
-                .write(true)
-                .append(false)
-                .open(&file)?;
-            let copied = copy_file_range(&infd, Some(0),
-                                         &outfd, Some(offset as i64),
-                                         data.len() as u64).unwrap()?;
+            let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
+            let copied = copy_file_range(
+                &infd,
+                Some(0),
+                &outfd,
+                Some(offset as i64),
+                data.len() as u64,
+            )
+            .unwrap()?;
             assert_eq!(copied as usize, data.len());
         }
 
@@ -440,12 +409,12 @@ mod tests {
 
         let bytes = read(&file)?;
 
-        assert!(bytes.len() == 1024*1024);
+        assert!(bytes.len() == 1024 * 1024);
         assert!(bytes[offset] == b't');
-        assert!(bytes[offset+1] == b'e');
-        assert!(bytes[offset+2] == b's');
-        assert!(bytes[offset+3] == b't');
-        assert!(bytes[offset+data.len()] == 0);
+        assert!(bytes[offset + 1] == b'e');
+        assert!(bytes[offset + 2] == b's');
+        assert!(bytes[offset + 3] == b't');
+        assert!(bytes[offset + data.len()] == 0);
 
         Ok(())
     }
@@ -456,7 +425,7 @@ mod tests {
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
         let data = "test data";
-        let offset: usize = 512*1024;
+        let offset: usize = 512 * 1024;
 
         {
             let mut fd = File::create(&from)?;
@@ -471,25 +440,21 @@ mod tests {
 
         {
             let infd = File::open(&from)?;
-            let outfd: File = OpenOptions::new()
-                .write(true)
-                .append(false)
-                .open(&file)?;
-            let copied = copy_range_kernel(&infd, &outfd,
-                                    data.len() as u64,
-                                    offset as i64).unwrap()?;
+            let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
+            let copied =
+                copy_range_kernel(&infd, &outfd, data.len() as u64, offset as i64).unwrap()?;
             assert_eq!(copied as usize, data.len());
         }
 
         assert!(probably_sparse(&File::open(&file)?)?);
 
         let bytes = read(&file)?;
-        assert_eq!(bytes.len(), 1024*1024);
+        assert_eq!(bytes.len(), 1024 * 1024);
         assert_eq!(bytes[offset], b't');
-        assert_eq!(bytes[offset+1], b'e');
-        assert_eq!(bytes[offset+2], b's');
-        assert_eq!(bytes[offset+3], b't');
-        assert_eq!(bytes[offset+data.len()], 0);
+        assert_eq!(bytes[offset + 1], b'e');
+        assert_eq!(bytes[offset + 2], b's');
+        assert_eq!(bytes[offset + 3], b't');
+        assert_eq!(bytes[offset + data.len()], 0);
 
         Ok(())
     }
@@ -500,7 +465,7 @@ mod tests {
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
         let data = "test data";
-        let offset = 512*1024;
+        let offset = 512 * 1024;
 
         {
             let mut fd = File::create(&from)?;
@@ -513,13 +478,15 @@ mod tests {
         assert!(out.status.success());
         {
             let infd = File::open(&from)?;
-            let outfd: File = OpenOptions::new()
-                .write(true)
-                .append(false)
-                .open(&file)?;
-            let copied = copy_file_range(&infd, Some(0),
-                                         &outfd, Some(offset as i64),
-                                         data.len() as u64).unwrap()?;
+            let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
+            let copied = copy_file_range(
+                &infd,
+                Some(0),
+                &outfd,
+                Some(offset as i64),
+                data.len() as u64,
+            )
+            .unwrap()?;
             assert_eq!(copied as usize, data.len());
         }
 
@@ -542,28 +509,27 @@ mod tests {
             let mut fd = File::create(&file)?;
             write!(fd, "{}", data)?;
 
-            fd.seek(SeekFrom::Start(1024*4096))?;
+            fd.seek(SeekFrom::Start(1024 * 4096))?;
             write!(fd, "{}", data)?;
 
-            fd.seek(SeekFrom::Start(4096*4096 - data.len() as u64))?;
+            fd.seek(SeekFrom::Start(4096 * 4096 - data.len() as u64))?;
             write!(fd, "{}", data)?;
         }
 
         assert!(probably_sparse(&File::open(&file)?)?);
 
         let bytes = read(&file)?;
-        assert!(bytes.len() == 4096*4096);
+        assert!(bytes.len() == 4096 * 4096);
 
         let offset = 1024 * 4096;
         assert!(bytes[offset] == b'c');
-        assert!(bytes[offset+1] == b'0');
-        assert!(bytes[offset+2] == b'0');
-        assert!(bytes[offset+3] == b'l');
-        assert!(bytes[offset+data.len()] == 0);
+        assert!(bytes[offset + 1] == b'0');
+        assert!(bytes[offset + 2] == b'0');
+        assert!(bytes[offset + 3] == b'l');
+        assert!(bytes[offset + data.len()] == 0);
 
         Ok(())
     }
-
 
     #[test]
     fn test_lseek_no_data() -> Result<()> {
@@ -635,16 +601,18 @@ mod tests {
             .output()?;
         assert!(out.status.success());
 
-        let offset: usize = 512*1024;
+        let offset: usize = 512 * 1024;
         {
             let infd = File::open(&from)?;
-            let outfd: File = OpenOptions::new()
-                .write(true)
-                .append(false)
-                .open(&file)?;
-            let copied = copy_file_range(&infd, Some(0),
-                                         &outfd, Some(offset as i64),
-                                         data.len() as u64).unwrap()?;
+            let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
+            let copied = copy_file_range(
+                &infd,
+                Some(0),
+                &outfd,
+                Some(offset as i64),
+                data.len() as u64,
+            )
+            .unwrap()?;
             assert_eq!(copied as usize, data.len());
         }
 
@@ -653,7 +621,7 @@ mod tests {
         let extents = map_extents(&fd)?;
         assert_eq!(extents.len(), 1);
         assert_eq!(extents[0].start, offset as u64);
-        assert_eq!(extents[0].end, offset as u64 + 4*1024-1);  // FIXME: Assume 4k blocks
+        assert_eq!(extents[0].end, offset as u64 + 4 * 1024 - 1); // FIXME: Assume 4k blocks
 
         Ok(())
     }
@@ -668,17 +636,14 @@ mod tests {
             .output()?;
         assert!(out.status.success());
 
-        let fsize = 1024*1024;
+        let fsize = 1024 * 1024;
         // FIXME: Assumes 4k blocks
-        let bsize = 4*1024;
+        let bsize = 4 * 1024;
         let block = iter::repeat(0xff as u8).take(bsize).collect::<Vec<u8>>();
 
-        let mut fd = OpenOptions::new()
-            .write(true)
-            .append(false)
-            .open(&file)?;
+        let mut fd = OpenOptions::new().write(true).append(false).open(&file)?;
         // Skip every-other block
-        for off in (0..fsize).step_by(bsize*2) {
+        for off in (0..fsize).step_by(bsize * 2) {
             lseek(&fd, off, Whence::Set)?;
             fd.write_all(block.as_slice())?;
         }

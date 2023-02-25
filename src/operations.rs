@@ -20,7 +20,9 @@ use std::path::Path;
 
 use crate::errors::Result;
 use crate::options::Opts;
-use crate::os::{allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse};
+use crate::os::{
+    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse,
+};
 use crate::progress::{BatchUpdater, Updater};
 
 #[derive(Debug)]
@@ -50,7 +52,6 @@ pub fn init_copy(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
     Ok(handle)
 }
 
-
 /// Copy len bytes from wherever the descriptor cursors are set.
 pub fn copy_bytes(handle: &CopyHandle, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
     let mut written = 0u64;
@@ -63,7 +64,6 @@ pub fn copy_bytes(handle: &CopyHandle, len: u64, updates: &mut BatchUpdater) -> 
 
     Ok(written)
 }
-
 
 /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
 pub fn copy_sparse(handle: &CopyHandle, updates: &mut BatchUpdater) -> Result<u64> {
@@ -90,4 +90,3 @@ pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater
 
     Ok(total)
 }
-

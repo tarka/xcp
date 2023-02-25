@@ -64,7 +64,8 @@ fn source_missing_globbed(drv: &str) {
         "-g",
         "/this/should/not/exist/*.txt",
         "/dev/null",
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(!out.status.success());
     assert!(out.status.code().unwrap() == 1);
@@ -90,7 +91,8 @@ fn dest_file_exists(drv: &str) {
         "--no-clobber",
         source_path.to_str().unwrap(),
         dest_path.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();
@@ -109,8 +111,9 @@ fn source_same_as_dest(drv: &str) {
         drv,
         "-r",
         dest.to_str().unwrap(),
-        dest.to_str().unwrap()
-    ]).unwrap();
+        dest.to_str().unwrap(),
+    ])
+    .unwrap();
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();
@@ -135,7 +138,8 @@ fn dest_file_in_dir_exists(drv: &str) {
         "--no-clobber",
         source_path.to_str().unwrap(),
         dir.path().to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();
@@ -160,7 +164,8 @@ fn dest_file_exists_overwrites(drv: &str) {
         drv,
         source_path.to_str().unwrap(),
         dest_path.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(files_match(&source_path, &dest_path));
@@ -185,7 +190,8 @@ fn dest_file_exists_noclobber(drv: &str) {
         "--no-clobber",
         source_path.to_str().unwrap(),
         dest_path.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();
@@ -208,7 +214,8 @@ fn file_copy(drv: &str) {
         drv,
         source_path.to_str().unwrap(),
         dest_path.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(file_contains(&dest_path, text).unwrap());
@@ -231,13 +238,13 @@ fn file_copy_perms(drv: &str) {
     perms.set_readonly(true);
     set_permissions(&source_path, perms).unwrap();
 
-
     let out = run(&[
         "--driver",
         drv,
         source_path.to_str().unwrap(),
         dest_path.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(file_contains(&dest_path, text).unwrap());
@@ -247,7 +254,10 @@ fn file_copy_perms(drv: &str) {
         metadata(&dest_path).unwrap().permissions().readonly()
     );
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-    assert_eq!(xattr::get(&dest_path, "user.test").unwrap().unwrap(), b"my test");
+    assert_eq!(
+        xattr::get(&dest_path, "user.test").unwrap().unwrap(),
+        b"my test"
+    );
 }
 
 #[test_case("parfile"; "Test with parallel file driver")]
@@ -269,7 +279,8 @@ fn file_copy_no_perms(drv: &str) {
         "--no-perms",
         source_path.to_str().unwrap(),
         dest_path.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(file_contains(&dest_path, text).unwrap());
@@ -292,7 +303,8 @@ fn file_copy_rel(drv: &str) {
         drv,
         source_path.to_str().unwrap(),
         dest_path.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(file_contains(&dest_path, text).unwrap());
@@ -317,7 +329,8 @@ fn file_copy_multiple(drv: &str) {
         f1.to_str().unwrap(),
         f2.to_str().unwrap(),
         dest.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(dest.join("file1.txt").exists());
@@ -341,7 +354,8 @@ fn copy_empty_dir(drv: &str) {
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
 
@@ -367,7 +381,8 @@ fn copy_all_dirs(drv: &str) {
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
 
@@ -393,7 +408,8 @@ fn copy_all_dirs_rel(drv: &str) {
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
 
@@ -425,7 +441,8 @@ fn copy_dirs_files(drv: &str) {
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
 
@@ -454,7 +471,8 @@ fn copy_generated_tree(drv: &str) {
         "-r",
         src.to_str().unwrap(),
         dest.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
     assert!(out.status.success());
 
     println!("Compare trees...");
@@ -481,7 +499,8 @@ fn copy_dirs_overwrites(drv: &str) {
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(file_contains(&dest_file, "orig").unwrap());
@@ -495,7 +514,8 @@ fn copy_dirs_overwrites(drv: &str) {
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(file_contains(&dest_file, "new content").unwrap());
@@ -525,7 +545,8 @@ fn copy_dirs_overwrites_no_target_dir() {
             "-r",
             source_path.to_str().unwrap(),
             dest_base.to_str().unwrap(),
-        ]).unwrap();
+        ])
+        .unwrap();
 
         assert!(out.status.success());
         assert!(file_contains(&dest_file, "orig").unwrap());
@@ -549,7 +570,8 @@ fn copy_dirs_overwrites_no_target_dir() {
             "-T", //-no-target-directory
             source_path.to_str().unwrap(),
             dest_base.to_str().unwrap(),
-        ]).unwrap();
+        ])
+        .unwrap();
 
         assert!(out.status.success());
         assert!(file_contains(&dest_file, "new content").unwrap());
@@ -575,7 +597,8 @@ fn dir_copy_to_nonexistent_is_rename(drv: &str) {
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(dest_file.exists());
@@ -602,7 +625,8 @@ fn dir_overwrite_with_noclobber(drv: &str) {
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(file_contains(&dest_file, "orig").unwrap());
@@ -618,7 +642,8 @@ fn dir_overwrite_with_noclobber(drv: &str) {
         "--no-clobber",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(!out.status.success());
 }
@@ -646,14 +671,20 @@ fn dir_copy_containing_symlinks(drv: &str) {
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(dest_file.exists());
-    assert!(dest_rlink.symlink_metadata().unwrap().file_type().is_symlink());
+    assert!(dest_rlink
+        .symlink_metadata()
+        .unwrap()
+        .file_type()
+        .is_symlink());
     assert!(dest_base
         .join("hosts")
-        .symlink_metadata().unwrap()
+        .symlink_metadata()
+        .unwrap()
         .file_type()
         .is_symlink());
 }
@@ -677,7 +708,8 @@ fn dir_copy_with_hidden_dir(drv: &str) {
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(dest_file.exists());
@@ -718,7 +750,8 @@ fn dir_with_gitignore(drv: &str) {
         "--gitignore",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(dest_base.join("file.txt").exists());
@@ -747,7 +780,8 @@ fn copy_with_glob(drv: &str) {
         "--glob",
         dir.join("file*.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(dest.join("file1.txt").exists());
@@ -769,7 +803,8 @@ fn copy_pattern_no_glob(drv: &str) {
         drv,
         dir.join("a [b] c.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(out.status.success());
     assert!(dest.join("a [b] c.txt").exists());
@@ -792,7 +827,8 @@ fn glob_pattern_error(drv: &str) {
         "--glob",
         dir.join("file***.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
-    ]).unwrap();
+    ])
+    .unwrap();
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();

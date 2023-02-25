@@ -19,8 +19,8 @@ use crossbeam_channel as cbc;
 use log::{debug, error, info};
 use std::cmp;
 use std::fs::{create_dir_all, read_link};
-use std::os::unix::fs::symlink;
 use std::ops::Range;
+use std::os::unix::fs::symlink;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -94,7 +94,13 @@ impl Sender {
     }
 }
 
-fn queue_file_range(handle: &Arc<CopyHandle>, range: Range<u64>, pool: &ThreadPool, status_channel: &Sender, opts: &Opts,) -> Result<u64> {
+fn queue_file_range(
+    handle: &Arc<CopyHandle>,
+    range: Range<u64>,
+    pool: &ThreadPool,
+    status_channel: &Sender,
+    opts: &Opts,
+) -> Result<u64> {
     let len = range.end - range.start;
     let bsize = opts.block_size;
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
@@ -106,8 +112,7 @@ fn queue_file_range(handle: &Arc<CopyHandle>, range: Range<u64>, pool: &ThreadPo
         let off = range.start + (blkn * bsize);
 
         pool.execute(move || {
-            let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64)
-                .unwrap();
+            let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64).unwrap();
 
             stat_tx.send(StatusUpdate::Copied(r), bytes, bsize).unwrap();
         });
@@ -115,7 +120,13 @@ fn queue_file_range(handle: &Arc<CopyHandle>, range: Range<u64>, pool: &ThreadPo
     Ok(len)
 }
 
-fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_channel: &Sender, opts: &Opts,) -> Result<u64> {
+fn queue_file_blocks(
+    source: &PathBuf,
+    dest: PathBuf,
+    pool: &ThreadPool,
+    status_channel: &Sender,
+    opts: &Opts,
+) -> Result<u64> {
     let handle = init_copy(source, &dest, opts)?;
     let len = handle.metadata.len();
 
@@ -133,7 +144,6 @@ fn queue_file_blocks(source: &PathBuf, dest: PathBuf, pool: &ThreadPool, status_
             queued += queue_file_range(&harc, ext, pool, status_channel, opts)?;
         }
         Ok(queued)
-
     } else {
         queue_file_range(&harc, 0..len, pool, status_channel, opts)
     }

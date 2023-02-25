@@ -18,8 +18,8 @@ use crossbeam_channel as cbc;
 
 use indicatif;
 
-use crate::options::Opts;
 use crate::errors::Result;
+use crate::options::Opts;
 
 #[derive(Debug, Clone)]
 pub enum StatusUpdate {
@@ -54,7 +54,6 @@ pub struct BatchUpdater {
     pub batch_size: u64,
 }
 
-
 impl Updater<Result<u64>> for BatchUpdater {
     fn update(&mut self, status: Result<u64>) -> Result<()> {
         match status {
@@ -75,13 +74,11 @@ impl Updater<Result<u64>> for BatchUpdater {
     }
 }
 
-
 impl Updater<Result<StatusUpdate>> for cbc::Sender<Result<StatusUpdate>> {
     fn update(&mut self, update: Result<StatusUpdate>) -> Result<()> {
         Ok(self.send(update)?)
     }
 }
-
 
 pub struct NopUpdater {}
 
@@ -90,7 +87,6 @@ impl Updater<Result<StatusUpdate>> for NopUpdater {
         Ok(())
     }
 }
-
 
 pub struct ProgressUpdater {
     pub pb: ProgressBar,
@@ -107,7 +103,6 @@ impl Updater<Result<StatusUpdate>> for ProgressUpdater {
     }
 }
 
-
 pub enum ProgressBar {
     Visual(indicatif::ProgressBar),
     Nop,
@@ -117,7 +112,7 @@ impl ProgressBar {
     pub fn new(opts: &Opts, size: u64) -> Result<ProgressBar> {
         match opts.noprogress {
             true => Ok(ProgressBar::Nop),
-            false => iprogress_bar(size)
+            false => iprogress_bar(size),
         }
     }
 
@@ -157,13 +152,11 @@ impl ProgressBar {
     }
 }
 
-
 pub fn iprogress_bar(size: u64) -> Result<ProgressBar> {
-    let ipb = indicatif::ProgressBar::new(size)
-        .with_style(
-            indicatif::ProgressStyle::default_bar()
-                .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?
-                .progress_chars("#>-"),
-        );
+    let ipb = indicatif::ProgressBar::new(size).with_style(
+        indicatif::ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?
+            .progress_chars("#>-"),
+    );
     Ok(ProgressBar::Visual(ipb))
 }

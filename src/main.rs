@@ -14,39 +14,40 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+mod drivers;
 mod errors;
 mod operations;
-mod drivers;
 mod options;
 mod os;
 mod progress;
-mod vendor;
 mod utils;
+mod vendor;
 
 use std::path::PathBuf;
 
 use log::info;
-use simplelog::{Config, ColorChoice, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
+use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
-pub use crate::vendor::threadpool;
-use crate::errors::{Result, XcpError};
 use crate::drivers::{CopyDriver, Drivers};
-
+use crate::errors::{Result, XcpError};
+pub use crate::vendor::threadpool;
 
 fn pick_driver(opts: &options::Opts) -> Result<&dyn CopyDriver> {
     let dopt = opts.driver.unwrap_or(Drivers::ParFile);
     let driver: &dyn CopyDriver = match dopt {
-        Drivers::ParFile => &drivers::parfile::Driver{},
-        Drivers::ParBlock => &drivers::parblock::Driver{},
+        Drivers::ParFile => &drivers::parfile::Driver {},
+        Drivers::ParBlock => &drivers::parblock::Driver {},
     };
 
     if !driver.supported_platform() {
-        return Err(XcpError::UnsupportedOS("The parblock driver is not currently supported on Mac.").into())
+        return Err(XcpError::UnsupportedOS(
+            "The parblock driver is not currently supported on Mac.",
+        )
+        .into());
     }
 
     Ok(driver)
 }
-
 
 fn main() -> Result<()> {
     let opts = options::parse_args()?;
@@ -57,45 +58,47 @@ fn main() -> Result<()> {
         2 => LevelFilter::Debug,
         _ => LevelFilter::Trace,
     };
-    TermLogger::init(log_level, Config::default(), TerminalMode::Mixed, ColorChoice::Auto)
-        .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
+    TermLogger::init(
+        log_level,
+        Config::default(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )
+    .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
     let driver = pick_driver(&opts)?;
 
-    let (dest, source_patterns) = opts.paths
+    let (dest, source_patterns) = opts
+        .paths
         .split_last()
         .ok_or(XcpError::InvalidArguments("Insufficient arguments"))
-        .map(|(d, s)| {
-            (PathBuf::from(d), s)
-        })?;
+        .map(|(d, s)| (PathBuf::from(d), s))?;
 
     // Do this check before expansion otherwise it could result in
     // unexpected behaviour when the a glob expands to a single file.
     if source_patterns.len() > 1 && !dest.is_dir() {
-        return Err(XcpError::InvalidDestination("Multiple sources and destination is not a directory.")
+        return Err(XcpError::InvalidDestination(
+            "Multiple sources and destination is not a directory.",
+        )
         .into());
     }
 
     let sources = options::expand_sources(source_patterns, &opts)?;
     if sources.is_empty() {
         return Err(XcpError::InvalidSource("No source files found.").into());
-
-
     } else if sources.len() == 1 && dest.is_file() {
         // Special case; rename/overwrite existing file.
         if opts.noclobber {
             return Err(XcpError::DestinationExists(
                 "Destination file exists and --no-clobber is set.",
-                dest
-            ).into());
+                dest,
+            )
+            .into());
         }
 
         info!("Copying file {:?} to {:?}", sources[0], dest);
         driver.copy_single(&sources[0], dest, &opts)?;
-
-
     } else {
-
         // Sanity-check all sources up-front
         for source in &sources {
             info!("Copying source {:?} to {:?}", source, dest);
@@ -105,8 +108,9 @@ fn main() -> Result<()> {
 
             if source.is_dir() && !opts.recursive {
                 return Err(XcpError::InvalidSource(
-                    "Source is directory and --recursive not specified."
-                ).into())
+                    "Source is directory and --recursive not specified.",
+                )
+                .into());
             }
 
             if source == &dest {
@@ -115,8 +119,9 @@ fn main() -> Result<()> {
 
             if dest.exists() && !dest.is_dir() {
                 return Err(XcpError::InvalidDestination(
-                    "Source is directory but target exists and is not a directory"
-                ).into());
+                    "Source is directory but target exists and is not a directory",
+                )
+                .into());
             }
         }
 

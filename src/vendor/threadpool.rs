@@ -292,10 +292,9 @@ impl Builder {
     ///     .build();
     /// ```
     pub fn build(self) -> ThreadPool {
-        let (tx, rx) = self.queue_len.map_or(
-            cbc::unbounded(),
-            |len| cbc::bounded(len)
-        );
+        let (tx, rx) = self
+            .queue_len
+            .map_or(cbc::unbounded(), |len| cbc::bounded(len));
 
         let num_threads = self.num_threads.unwrap_or_else(num_cpus::get);
 
@@ -345,7 +344,8 @@ impl ThreadPoolSharedData {
     /// Notify all observers joining this pool if there is no more work to do.
     fn no_work_notify_all(&self) {
         if !self.has_work() {
-            *self.empty_trigger
+            *self
+                .empty_trigger
                 .lock()
                 .expect("Unable to notify all joining threads");
             self.empty_condvar.notify_all();
@@ -584,7 +584,8 @@ impl ThreadPool {
     /// ```
     pub fn set_num_threads(&mut self, num_threads: usize) {
         assert!(num_threads >= 1);
-        let prev_num_threads = self.shared_data
+        let prev_num_threads = self
+            .shared_data
             .max_thread_count
             .swap(num_threads, Ordering::Release);
         if let Some(num_spawn) = num_threads.checked_sub(prev_num_threads) {
@@ -642,13 +643,15 @@ impl ThreadPool {
         }
 
         // increase generation if we are the first thread to come out of the loop
-        self.shared_data.join_generation.compare_exchange(
-            generation,
-            generation.wrapping_add(1),
-            Ordering::SeqCst,
-            Ordering::SeqCst
-        ).unwrap();
-
+        self.shared_data
+            .join_generation
+            .compare_exchange(
+                generation,
+                generation.wrapping_add(1),
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .unwrap();
     }
 }
 

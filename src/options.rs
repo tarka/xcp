@@ -22,15 +22,15 @@ use glob::{glob, Paths};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use num_cpus;
 use unbytify::unbytify;
-use walkdir::{DirEntry};
+use walkdir::DirEntry;
 
-use crate::errors::Result;
 use crate::drivers::Drivers;
-
+use crate::errors::Result;
 
 #[derive(Clone, Debug, Parser)]
-#[command(name = "xcp",
-    about = "Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY.",
+#[command(
+    name = "xcp",
+    about = "Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY."
 )]
 pub struct Opts {
     /// Explain what is being done. Can be specified multiple times to
@@ -44,7 +44,7 @@ pub struct Opts {
 
     /// Number of parallel workers for recursive copies. Default is 1;
     /// if the value is negative or 0 it uses the number of logical CPUs.
-    #[arg(short, long = "workers",  default_value = "4")]
+    #[arg(short, long = "workers", default_value = "4")]
     pub workers: i64,
 
     /// Block size for operations. Accepts standard size modifiers
@@ -86,13 +86,11 @@ pub struct Opts {
     /// Analogous to cp's no-target-directory. Expected behavior is that when
     /// copying a directory to another directory, instead of creating a sub-folder
     /// in target, overwrite target.
-    #[arg(short = 'T', long = "no-target-directory" )]
+    #[arg(short = 'T', long = "no-target-directory")]
     pub no_target_directory: bool,
 
     pub paths: Vec<String>,
-
 }
-
 
 // StructOpt/Clap handles optional flags with optional values as nested Options.
 pub fn num_workers(opts: &Opts) -> u64 {
@@ -102,7 +100,6 @@ pub fn num_workers(opts: &Opts) -> u64 {
         opts.workers as u64
     }
 }
-
 
 // Expand a list of file-paths or glob-patterns into a list of concrete paths.
 //
@@ -133,10 +130,7 @@ pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
 }
 
 pub fn to_pathbufs(paths: &[String]) -> Vec<PathBuf> {
-    paths
-        .iter()
-        .map(PathBuf::from)
-        .collect::<Vec<PathBuf>>()
+    paths.iter().map(PathBuf::from).collect::<Vec<PathBuf>>()
 }
 
 pub fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
@@ -158,7 +152,6 @@ pub fn parse_ignore(source: &PathBuf, opts: &Opts) -> Result<Option<Gitignore>> 
     };
     Ok(gitignore)
 }
-
 
 pub fn ignore_filter(entry: &DirEntry, ignore: &Option<Gitignore>) -> bool {
     match ignore {

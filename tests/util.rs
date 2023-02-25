@@ -21,14 +21,13 @@ use rand_xorshift::XorShiftRng;
 use std::cmp;
 use std::env::current_dir;
 use std::fs::{create_dir_all, File};
-use std::io::{BufRead, BufReader, Read, Write, Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::result;
-use tempfile::{TempDir, tempdir_in};
+use tempfile::{tempdir_in, TempDir};
 use uuid::Uuid;
 use walkdir::WalkDir;
-
 
 pub type TResult = result::Result<(), Error>;
 
@@ -68,8 +67,7 @@ pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
     let len = 4096u64 * 4096 + data.len() as u64 + tail;
 
     let out = Command::new("/usr/bin/truncate")
-        .args(&["-s", len.to_string().as_str(),
-                file.to_str().unwrap()])
+        .args(&["-s", len.to_string().as_str(), file.to_str().unwrap()])
         .output()?;
     assert!(out.status.success());
 
@@ -81,10 +79,10 @@ pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
     fd.seek(SeekFrom::Start(head))?;
     write!(fd, "{}", data)?;
 
-    fd.seek(SeekFrom::Start(1024*4096))?;
+    fd.seek(SeekFrom::Start(1024 * 4096))?;
     write!(fd, "{}", data)?;
 
-    fd.seek(SeekFrom::Start(4096*4096))?;
+    fd.seek(SeekFrom::Start(4096 * 4096))?;
     write!(fd, "{}", data)?;
 
     Ok(len as u64)
@@ -104,8 +102,8 @@ pub fn files_match(a: &Path, b: &Path) -> bool {
     if a.metadata().unwrap().len() != b.metadata().unwrap().len() {
         return false;
     }
-    let mut abr = BufReader::with_capacity(1024*1024, File::open(a).unwrap());
-    let mut bbr = BufReader::with_capacity(1024*1024, File::open(b).unwrap());
+    let mut abr = BufReader::with_capacity(1024 * 1024, File::open(a).unwrap());
+    let mut bbr = BufReader::with_capacity(1024 * 1024, File::open(b).unwrap());
     loop {
         let read = {
             let ab = abr.fill_buf().unwrap();
@@ -122,7 +120,6 @@ pub fn files_match(a: &Path, b: &Path) -> bool {
         bbr.consume(read);
     }
 }
-
 
 #[test]
 fn test_hasher() -> TResult {
@@ -147,12 +144,10 @@ fn test_hasher() -> TResult {
     Ok(())
 }
 
-
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn quickstat(file: &Path) -> Result<(i32, i32, i32), Error> {
     let out = Command::new("stat")
-        .args(&["--format", "%s %b %B",
-                file.to_str().unwrap()])
+        .args(&["--format", "%s %b %B", file.to_str().unwrap()])
         .output()?;
     assert!(out.status.success());
 
@@ -179,7 +174,8 @@ pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
 const MAXDEPTH: u64 = 2;
 
 pub fn gen_file_name(rng: &mut dyn RngCore, len: u64) -> String {
-    let r = rng.sample_iter(Alphanumeric)
+    let r = rng
+        .sample_iter(Alphanumeric)
         .take(len as usize)
         .collect::<Vec<u8>>();
     String::from_utf8(r).unwrap()
@@ -215,9 +211,9 @@ pub fn gen_file(path: &Path, rng: &mut dyn RngCore, size: usize, sparse: bool) -
 pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64, with_sparse: bool) -> TResult {
     create_dir_all(base)?;
 
-    let dist0 = Triangular::new(0.0, 64.0, 64.0/5.0).unwrap();
-    let dist1 = Triangular::new(1.0, 64.0, 64.0/5.0).unwrap();
-    let distf = Pareto::new(50.0*1024.0, 1.0).unwrap();
+    let dist0 = Triangular::new(0.0, 64.0, 64.0 / 5.0).unwrap();
+    let dist1 = Triangular::new(1.0, 64.0, 64.0 / 5.0).unwrap();
+    let distf = Pareto::new(50.0 * 1024.0, 1.0).unwrap();
 
     let nfiles = rng.sample(dist0) as u64;
     for _ in 0..nfiles {
@@ -235,7 +231,7 @@ pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64, with_sparse: 
             let fnlen = rng.sample(dist1) as u64;
             let fname = gen_file_name(rng, fnlen);
             let path = base.join(fname);
-            gen_subtree(&path, rng, depth+1, with_sparse)?;
+            gen_subtree(&path, rng, depth + 1, with_sparse)?;
         }
     }
 
@@ -256,8 +252,10 @@ pub fn compare_trees(src: &Path, dest: &Path) -> TResult {
 
         assert!(to.exists());
         assert_eq!(from.is_dir(), to.is_dir());
-        assert_eq!(from.metadata()?.file_type().is_symlink(),
-                   to.metadata()?.file_type().is_symlink());
+        assert_eq!(
+            from.metadata()?.file_type().is_symlink(),
+            to.metadata()?.file_type().is_symlink()
+        );
 
         if from.is_file() {
             assert_eq!(probably_sparse(&to)?, probably_sparse(&to)?);
@@ -267,7 +265,6 @@ pub fn compare_trees(src: &Path, dest: &Path) -> TResult {
             // low-level filesystem details (SEEK_HOLE behaviour,
             // tail-packing, compression, etc.)
         }
-
     }
     Ok(())
 }

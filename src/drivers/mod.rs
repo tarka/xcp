@@ -14,23 +14,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pub mod parfile;
 pub mod parblock;
+pub mod parfile;
 
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::result;
 use std::str::FromStr;
 
-use crate::options::Opts;
 use crate::errors::{Result, XcpError};
-
+use crate::options::Opts;
 
 pub trait CopyDriver {
     fn supported_platform(&self) -> bool;
     fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>;
     fn copy_single(&self, source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()>;
 }
-
 
 #[derive(Debug, Clone, Copy)]
 pub enum Drivers {
@@ -48,5 +46,4 @@ impl FromStr for Drivers {
             _ => Err(XcpError::UnknownDriver(s.to_owned()).into()),
         }
     }
-
 }
