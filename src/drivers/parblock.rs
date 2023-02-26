@@ -42,13 +42,7 @@ pub struct Driver {}
 
 impl CopyDriver for Driver {
     fn supported_platform(&self) -> bool {
-        cfg_if! {
-            if #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd", target_os = "netbsd", target_os="dragonfly"))] {
-                true
-            } else {
-                false
-            }
-        }
+        true
     }
 
     fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
