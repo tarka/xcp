@@ -30,6 +30,7 @@ use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, Term
 
 use crate::drivers::{CopyDriver, Drivers};
 use crate::errors::{Result, XcpError};
+use crate::os::is_same_file;
 pub use crate::vendor::threadpool;
 
 fn pick_driver(opts: &options::Opts) -> Result<&dyn CopyDriver> {
@@ -86,6 +87,7 @@ fn main() -> Result<()> {
     let sources = options::expand_sources(source_patterns, &opts)?;
     if sources.is_empty() {
         return Err(XcpError::InvalidSource("No source files found.").into());
+
     } else if sources.len() == 1 && dest.is_file() {
         // Special case; rename/overwrite existing file.
         if opts.noclobber {
@@ -96,8 +98,19 @@ fn main() -> Result<()> {
             .into());
         }
 
+        // Special case: Attempt to overwrite a file with
+        // itself. Always disallow for now.
+        if is_same_file(&sources[0], &dest)? {
+            return Err(XcpError::DestinationExists(
+                "Source and destination is the same file.",
+                dest,
+            )
+            .into());
+        }
+
         info!("Copying file {:?} to {:?}", sources[0], dest);
         driver.copy_single(&sources[0], dest, &opts)?;
+
     } else {
         // Sanity-check all sources up-front
         for source in &sources {

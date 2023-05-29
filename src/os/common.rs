@@ -21,7 +21,9 @@ use std::fs::File;
 use std::io;
 use std::io::{ErrorKind, Read, Write};
 use std::ops::Range;
+use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
+use std::path::PathBuf;
 use xattr::FileExt;
 
 use crate::errors::{Result, XcpError};
@@ -212,6 +214,17 @@ pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
 
     Ok(merged)
 }
+
+
+pub fn is_same_file(src: &PathBuf, dest: &PathBuf) -> Result<bool> {
+    let sstat = src.metadata()?;
+    let dstat = dest.metadata()?;
+    let same = (sstat.ino() == dstat.ino())
+        && (sstat.dev() == dstat.dev());
+
+    Ok(same)
+}
+
 
 #[cfg(test)]
 mod tests {

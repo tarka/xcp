@@ -23,14 +23,15 @@ cfg_if! {
         pub use common::{
             allocate_file,
             copy_permissions,
-            merge_extents
+            merge_extents,
+            is_same_file,
         };
         pub use linux::{
             copy_file_bytes,
             copy_file_offset,
             probably_sparse,
             next_sparse_segments,
-            map_extents
+            map_extents,
         };
 
     } else {
@@ -42,7 +43,8 @@ cfg_if! {
             probably_sparse,
             next_sparse_segments,
             merge_extents,
-            map_extents
+            map_extents,
+            is_same_file,
         };
     }
 }

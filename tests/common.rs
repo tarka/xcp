@@ -173,6 +173,27 @@ fn dest_file_exists_overwrites(drv: &str) {
 
 #[test_case("parfile"; "Test with parallel file driver")]
 #[test_case("parblock"; "Test with parallel block driver")]
+fn same_file_no_overwrite(drv: &str) {
+    let dir = tempdir().unwrap();
+    let source_path = dir.path().join("source.txt");
+
+    {
+        create_file(&source_path, "falskjdfa;lskdjfa").unwrap();
+    }
+
+    let out = run(&[
+        "--driver",
+        drv,
+        source_path.to_str().unwrap(),
+        source_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(! out.status.success());
+}
+
+#[test_case("parfile"; "Test with parallel file driver")]
+#[test_case("parblock"; "Test with parallel block driver")]
 fn dest_file_exists_noclobber(drv: &str) {
     let dir = tempdir().unwrap();
     let source_path = dir.path().join("source.txt");
