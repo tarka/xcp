@@ -20,6 +20,7 @@ use std::result;
 use clap::{ArgAction, Parser};
 use glob::{glob, Paths};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
+use log::info;
 use num_cpus;
 use unbytify::unbytify;
 use walkdir::DirEntry;
@@ -143,8 +144,10 @@ pub fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf
 
 pub fn parse_ignore(source: &PathBuf, opts: &Opts) -> Result<Option<Gitignore>> {
     let gitignore = if opts.gitignore {
+        let gifile = source.join(".gitignore");
+        info!("Using .gitignore file {:?}", gifile);
         let mut builder = GitignoreBuilder::new(&source);
-        builder.add(&source.join(".gitignore"));
+        builder.add(&gifile);
         let ignore = builder.build()?;
         Some(ignore)
     } else {
