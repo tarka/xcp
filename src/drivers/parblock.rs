@@ -120,6 +120,7 @@ fn queue_file_range(
     Ok(len)
 }
 
+
 fn queue_file_blocks(
     source: &PathBuf,
     dest: PathBuf,
@@ -136,16 +137,24 @@ fn queue_file_blocks(
     // opening the files in the workers would also be valid.)
     let harc = Arc::new(handle);
 
-    if probably_sparse(&harc.infd)? {
-        let sparse_map = merge_extents(map_extents(&harc.infd)?)?;
-        let mut queued = 0;
-        for ext in sparse_map {
-            println!("EXT: {:?}", ext);
-            queued += queue_file_range(&harc, ext, pool, status_channel, opts)?;
-        }
-        Ok(queued)
-    } else {
+    let queue_whole_file = || {
         queue_file_range(&harc, 0..len, pool, status_channel, opts)
+    };
+
+    if probably_sparse(&harc.infd)? {
+        if let Some(extents) = map_extents(&harc.infd)? {
+            let sparse_map = merge_extents(extents)?;
+            let mut queued = 0;
+            for ext in sparse_map {
+                println!("EXT: {:?}", ext);
+                queued += queue_file_range(&harc, ext, pool, status_channel, opts)?;
+            }
+            return Ok(queued)
+        } else {
+            queue_whole_file()
+        }
+    } else {
+        queue_whole_file()
     }
 }
 

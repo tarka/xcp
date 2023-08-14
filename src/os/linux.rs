@@ -255,14 +255,18 @@ impl FiemapReq {
     }
 }
 
-pub fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
+pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     let mut req = FiemapReq::new();
     let req_ptr: *const FiemapReq = &req;
     let mut extents = Vec::with_capacity(PAGE_SIZE);
 
     loop {
         if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr) } != 0 {
-            return Err(io::Error::last_os_error().into());
+            let oserr = io::Error::last_os_error();
+            if oserr.raw_os_error() == Some(95) {
+                return Ok(None)
+            }
+            return Err(oserr.into());
         }
         if req.fm_mapped_extents == 0 {
             break;
@@ -284,7 +288,7 @@ pub fn map_extents(fd: &File) -> Result<Vec<Range<u64>>> {
         req.fm_start = last.fe_logical + last.fe_length;
     }
 
-    Ok(extents)
+    Ok(Some(extents))
 }
 
 pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64, u64)> {
@@ -308,7 +312,7 @@ mod tests {
     use super::*;
     use crate::os::allocate_file;
     use std::env::current_dir;
-    use std::fs::{read, OpenOptions};
+    use std::fs::{read, OpenOptions, read_to_string};
     use std::io::{Seek, SeekFrom, Write};
     use std::iter;
     use std::path::PathBuf;
@@ -578,7 +582,9 @@ mod tests {
 
         let fd = File::open(file)?;
 
-        let extents = map_extents(&fd)?;
+        let extents_p = map_extents(&fd)?;
+        assert!(extents_p.is_some());
+        let extents = extents_p.unwrap();
         assert_eq!(extents.len(), 0);
 
         Ok(())
@@ -618,7 +624,9 @@ mod tests {
 
         let fd = File::open(file)?;
 
-        let extents = map_extents(&fd)?;
+        let extents_p = map_extents(&fd)?;
+        assert!(extents_p.is_some());
+        let extents = extents_p.unwrap();
         assert_eq!(extents.len(), 1);
         assert_eq!(extents[0].start, offset as u64);
         assert_eq!(extents[0].end, offset as u64 + 4 * 1024 - 1); // FIXME: Assume 4k blocks
@@ -648,8 +656,46 @@ mod tests {
             fd.write_all(block.as_slice())?;
         }
 
-        let extents = map_extents(&fd)?;
+        let extents_p = map_extents(&fd)?;
+        assert!(extents_p.is_some());
+        let extents = extents_p.unwrap();
         assert_eq!(extents.len(), fsize as usize / bsize / 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extent_not_sparse() -> Result<()> {
+        let dir = tempdir()?;
+        let file = dir.path().join("file.bin");
+        let size = 128 * 1024;
+
+        {
+            let mut fd: File = File::create(&file)?;
+            let data = iter::repeat("X").take(size).collect::<String>();
+            write!(fd, "{}", data)?;
+        }
+
+        let fd = File::open(file)?;
+        let extents_p = map_extents(&fd)?;
+        assert!(extents_p.is_some());
+        let extents = extents_p.unwrap();
+
+        assert_eq!(1, extents.len());
+        assert_eq!(0..size as u64 - 1, extents[0]);
+
+        Ok(())
+
+    }
+
+    #[test]
+    fn test_extent_unsupported_fs() -> Result<()> {
+        let file = "/proc/cpuinfo";
+        let content = read_to_string(file)?;
+
+        let fd = File::open(file)?;
+        let extents_p = map_extents(&fd)?;
+        assert!(extents_p.is_none());
 
         Ok(())
     }
