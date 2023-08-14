@@ -691,8 +691,6 @@ mod tests {
     #[test]
     fn test_extent_unsupported_fs() -> Result<()> {
         let file = "/proc/cpuinfo";
-        let content = read_to_string(file)?;
-
         let fd = File::open(file)?;
         let extents_p = map_extents(&fd)?;
         assert!(extents_p.is_none());
