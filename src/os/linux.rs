@@ -337,12 +337,21 @@ mod tests {
             Ok(fs) => {
                 !unsupported.contains(&fs.as_str())
             },
-            Err(_) => true // assume 'normal' linux environment.
+            Err(_) => true // Not CI, assume 'normal' linux environment.
         }
+    }
+
+    fn fs_supports_sparse() -> bool {
+        // FIXME: Same set for now.
+        fs_supports_extents()
     }
 
     #[test]
     fn test_sparse_detection() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
         assert!(!probably_sparse(&File::open("Cargo.toml")?)?);
 
         let dir = tempdir()?;
@@ -367,6 +376,10 @@ mod tests {
 
     #[test]
     fn test_copy_bytes_sparse() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -395,6 +408,10 @@ mod tests {
 
     #[test]
     fn test_sparse_copy_middle() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -441,6 +458,10 @@ mod tests {
 
     #[test]
     fn test_copy_range_middle() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -481,6 +502,10 @@ mod tests {
 
     #[test]
     fn test_lseek_data() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -520,6 +545,10 @@ mod tests {
 
     #[test]
     fn test_sparse_rust_seek() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
         let dir = PathBuf::from("target");
         let file = dir.join("sparse.bin");
 
@@ -553,6 +582,10 @@ mod tests {
 
     #[test]
     fn test_lseek_no_data() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
 
@@ -571,6 +604,10 @@ mod tests {
 
     #[test]
     fn test_allocate_file_is_sparse() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let len = 32 * 1024 * 1024;
