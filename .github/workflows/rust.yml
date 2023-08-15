@@ -61,36 +61,50 @@ jobs:
       - name: Run tests on ext2
         run: cargo test
         working-directory: /fs/ext2/src
+        env:
+          XCP_TEST_FS: ext2
         if: always()
 
       - name: Run tests on ext4
         run: cargo test
         working-directory: /fs/ext4/src
+        env:
+          XCP_TEST_FS: ext4
         if: always()
 
       - name: Run tests on XFS
         run: cargo test
         working-directory: /fs/xfs/src
+        env:
+          XCP_TEST_FS: xfs
         if: always()
 
       - name: Run tests on btrfs
         run: cargo test
         working-directory: /fs/btrfs/src
+        env:
+          XCP_TEST_FS: btrfs
         if: always()
 
       - name: Run tests on ntfs
         run: cargo test
         working-directory: /fs/ntfs/src
+        env:
+          XCP_TEST_FS: ntfs
         if: always()
 
       - name: Run tests on fat
         run: cargo test
         working-directory: /fs/fat/src
+        env:
+          XCP_TEST_FS: fat
         if: always()
 
       - name: Run tests on ZFS
         run: cargo test
         working-directory: /fs/zfs/src
+        env:
+          XCP_TEST_FS: zfs
         if: always()
 
       - name: Run expensive tests

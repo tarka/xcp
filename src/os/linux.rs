@@ -316,7 +316,7 @@ pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64,
 mod tests {
     use super::*;
     use crate::os::allocate_file;
-    use std::env::current_dir;
+    use std::env::{current_dir, var};
     use std::fs::{read, OpenOptions};
     use std::io::{Seek, SeekFrom, Write};
     use std::iter;
@@ -328,6 +328,17 @@ mod tests {
         // Force into local dir as /tmp might be tmpfs, which doesn't
         // support all VFS options (notably fiemap).
         Ok(tempdir_in(current_dir()?.join("target"))?)
+    }
+
+    fn fs_supports_extents() -> bool {
+        // See `.github/workflows/rust.yml`
+        let unsupported = vec!["ext2", "ntfs", "fat", "zfs"];
+        match var("XCP_TEST_FS") {
+            Ok(fs) => {
+                !unsupported.contains(&fs.as_str())
+            },
+            Err(_) => true // assume 'normal' linux environment.
+        }
     }
 
     #[test]
@@ -577,6 +588,9 @@ mod tests {
 
     #[test]
     fn test_empty_extent() -> Result<()> {
+        if !fs_supports_extents() {
+            return Ok(())
+        }
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
 
@@ -597,6 +611,9 @@ mod tests {
 
     #[test]
     fn test_extent_fetch() -> Result<()> {
+        if !fs_supports_extents() {
+            return Ok(())
+        }
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -641,6 +658,9 @@ mod tests {
 
     #[test]
     fn test_extent_fetch_many() -> Result<()> {
+        if !fs_supports_extents() {
+            return Ok(())
+        }
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
 
@@ -671,6 +691,9 @@ mod tests {
 
     #[test]
     fn test_extent_not_sparse() -> Result<()> {
+        if !fs_supports_extents() {
+            return Ok(())
+        }
         let dir = tempdir()?;
         let file = dir.path().join("file.bin");
         let size = 128 * 1024;
@@ -690,11 +713,13 @@ mod tests {
         assert_eq!(0..size as u64 - 1, extents[0]);
 
         Ok(())
-
     }
 
     #[test]
     fn test_extent_unsupported_fs() -> Result<()> {
+        if !fs_supports_extents() {
+            return Ok(())
+        }
         let file = "/proc/cpuinfo";
         let fd = File::open(file)?;
         let extents_p = map_extents(&fd)?;
