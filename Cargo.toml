@@ -18,8 +18,9 @@ circle-ci = { repository = "tarka/xcp" }
 travis-ci = { repository = "tarka/xcp" }
 
 [features]
-default = ["kernel_copy_file_range"]
+default = ["kernel_copy_file_range", "parblock"]
 kernel_copy_file_range = []
+parblock = []
 
 [profile.release]
 overflow-checks = true

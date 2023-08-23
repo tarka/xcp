@@ -25,29 +25,13 @@ mod vendor;
 
 use std::path::PathBuf;
 
-use log::{info, error};
+use log::info;
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
-use crate::drivers::{CopyDriver, Drivers};
+use crate::drivers::pick_driver;
 use crate::errors::{Result, XcpError};
 use crate::os::is_same_file;
 pub use crate::vendor::threadpool;
-
-fn pick_driver(opts: &options::Opts) -> Result<&dyn CopyDriver> {
-    let dopt = opts.driver.unwrap_or(Drivers::ParFile);
-    let driver: &dyn CopyDriver = match dopt {
-        Drivers::ParFile => &drivers::parfile::Driver {},
-        Drivers::ParBlock => &drivers::parblock::Driver {},
-    };
-
-    if !driver.supported_platform() {
-        let msg = "The parblock driver is not currently supported on Mac.";
-        error!("{}", msg);
-        return Err(XcpError::UnsupportedOS(msg).into());
-    }
-
-    Ok(driver)
-}
 
 fn main() -> Result<()> {
     let opts = options::parse_args()?;

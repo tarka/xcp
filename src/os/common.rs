@@ -188,6 +188,7 @@ pub fn next_sparse_segments(_infd: &File, _outfd: &File, _pos: u64) -> Result<(u
     Err(XcpError::UnsupportedOperation {}.into())
 }
 
+#[allow(dead_code)]
 pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
     let mut merged: Vec<Range<u64>> = vec![];
 

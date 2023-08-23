@@ -24,7 +24,7 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     use crate::util::*;
 
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[test_case("parblock"; "Test with parallel block driver")]
+    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     #[ignore] // Expensive so skip for local dev
     fn copy_generated_tree_sparse(drv: &str) {
         let dir = tempdir().unwrap();
@@ -51,7 +51,7 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     }
 
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[test_case("parblock"; "Test with parallel block driver")]
+    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     fn test_sparse(drv: &str) {
         use std::fs::read;
 
@@ -81,7 +81,7 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     }
 
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[test_case("parblock"; "Test with parallel block driver")]
+    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     fn test_sparse_leading_gap(drv: &str) {
         use std::fs::read;
 
@@ -110,7 +110,7 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     }
 
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[test_case("parblock"; "Test with parallel block driver")]
+    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     fn test_sparse_trailng_gap(drv: &str) {
         use std::fs::read;
 
@@ -139,7 +139,7 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     }
 
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[test_case("parblock"; "Test with parallel block driver")]
+    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     fn test_sparse_single_overwrite(drv: &str) {
         use std::fs::read;
 
@@ -168,7 +168,7 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     }
 
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[test_case("parblock"; "Test with parallel block driver")]
+    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     fn test_empty_sparse(drv: &str) {
         use std::fs::read;
 

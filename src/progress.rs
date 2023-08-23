@@ -116,6 +116,7 @@ impl ProgressBar {
         }
     }
 
+    #[allow(unused)]
     pub fn set_size(&self, size: u64) {
         match self {
             ProgressBar::Visual(pb) => pb.set_length(size),
@@ -137,6 +138,7 @@ impl ProgressBar {
         }
     }
 
+    #[allow(unused)]
     pub fn inc(&self, size: u64) {
         match self {
             ProgressBar::Visual(pb) => pb.inc(size),
@@ -152,7 +154,7 @@ impl ProgressBar {
     }
 }
 
-pub fn iprogress_bar(size: u64) -> Result<ProgressBar> {
+fn iprogress_bar(size: u64) -> Result<ProgressBar> {
     let ipb = indicatif::ProgressBar::new(size).with_style(
         indicatif::ProgressStyle::default_bar()
             .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?

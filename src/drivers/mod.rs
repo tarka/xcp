@@ -14,12 +14,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pub mod parblock;
 pub mod parfile;
+#[cfg(feature = "parblock")]
+pub mod parblock;
 
 use std::path::PathBuf;
 use std::result;
 use std::str::FromStr;
+
+use log::error;
 
 use crate::errors::{Result, XcpError};
 use crate::options::Opts;
@@ -33,6 +36,7 @@ pub trait CopyDriver {
 #[derive(Debug, Clone, Copy)]
 pub enum Drivers {
     ParFile,
+    #[cfg(feature = "parblock")]
     ParBlock,
 }
 
@@ -42,8 +46,26 @@ impl FromStr for Drivers {
     fn from_str(s: &str) -> result::Result<Self, Self::Err> {
         match s {
             "parfile" => Ok(Drivers::ParFile),
+            #[cfg(feature = "parblock")]
             "parblock" => Ok(Drivers::ParBlock),
             _ => Err(XcpError::UnknownDriver(s.to_owned()).into()),
         }
     }
+}
+
+pub fn pick_driver(opts: &Opts) -> Result<&dyn CopyDriver> {
+    let dopt = opts.driver.unwrap_or(Drivers::ParFile);
+    let driver: &dyn CopyDriver = match dopt {
+        Drivers::ParFile => &parfile::Driver {},
+        #[cfg(feature = "parblock")]
+        Drivers::ParBlock => &parblock::Driver {},
+    };
+
+    if !driver.supported_platform() {
+        let msg = "The parblock driver is not currently supported on Mac.";
+        error!("{}", msg);
+        return Err(XcpError::UnsupportedOS(msg).into());
+    }
+
+    Ok(driver)
 }

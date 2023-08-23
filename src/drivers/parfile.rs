@@ -28,7 +28,7 @@ use crate::errors::{Error, Result, XcpError};
 use crate::operations::copy_file;
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use crate::progress::{
-    iprogress_bar, BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
+    BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
     BATCH_DEFAULT,
 };
 use crate::utils::{empty, FileType, ToFileType};
@@ -198,7 +198,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     let (pb, batch_size) = if opts.noprogress {
         (ProgressBar::Nop, usize::max_value() as u64)
     } else {
-        (iprogress_bar(0)?, BATCH_DEFAULT)
+        (ProgressBar::new(opts, 0)?, BATCH_DEFAULT)
     };
 
     // Use scoped threads here so we can pass down e.g. Opts without
@@ -224,18 +224,13 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             s.spawn(|_s| tree_walker(sources, &dest, opts, work_tx, size_stat))
         };
 
-        let mut copied = 0;
-        let mut total = 0;
-
         for stat in stat_rx {
             match stat? {
                 StatusUpdate::Size(s) => {
-                    total += s;
-                    pb.set_size(total);
+                    pb.inc_size(s);
                 }
                 StatusUpdate::Copied(s) => {
-                    copied += s;
-                    pb.set_position(copied);
+                    pb.inc(s);
                 }
             }
         }
@@ -263,7 +258,7 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
         let size = source.metadata()?.len();
         BatchUpdater {
             sender: Box::new(ProgressUpdater {
-                pb: iprogress_bar(size)?,
+                pb: ProgressBar::new(opts, size)?,
                 written: 0,
             }),
             stat: StatusUpdate::Copied(0),

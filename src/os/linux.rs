@@ -203,7 +203,9 @@ pub fn lseek(fd: &File, off: i64, whence: Whence) -> Result<SeekOff> {
 }
 
 // See ioctl_list(2)
+#[allow(unused)]
 const FS_IOC_FIEMAP: libc::c_ulong = 0xC020660B;
+#[allow(unused)]
 const FIEMAP_EXTENT_LAST: u32 = 0x00000001;
 const PAGE_SIZE: usize = 32;
 
@@ -217,6 +219,7 @@ struct FiemapExtent {
     fe_flags: u32, // FIEMAP_EXTENT_* flags for this extent
     fe_reserved: [u32; 3],
 }
+#[allow(unused)]
 impl FiemapExtent {
     fn new() -> FiemapExtent {
         FiemapExtent {
@@ -241,6 +244,7 @@ struct FiemapReq {
     fm_reserved: u32,
     fm_extents: [FiemapExtent; PAGE_SIZE], // Array of mapped extents (out)
 }
+#[allow(unused)]
 impl FiemapReq {
     fn new() -> FiemapReq {
         FiemapReq {
@@ -255,6 +259,7 @@ impl FiemapReq {
     }
 }
 
+#[allow(unused)]
 pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     let mut req = FiemapReq::new();
     let req_ptr: *const FiemapReq = &req;
