@@ -15,7 +15,7 @@ jobs:
         run: cargo test
 
       - name: Run expensive tests
-        run: ~/.cargo/bin/cargo test -- --ignored --nocapture
+        run: ~/.cargo/bin/cargo test -- --ignored
 
   macos:
     runs-on: macos-latest
@@ -32,4 +32,4 @@ jobs:
         run: ~/.cargo/bin/cargo test --no-default-features
 
       - name: Run expensive tests
-        run: ~/.cargo/bin/cargo test --no-default-features -- --ignored --nocapture
+        run: ~/.cargo/bin/cargo test --no-default-features -- --ignored
