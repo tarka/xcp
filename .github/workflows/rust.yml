@@ -14,6 +14,9 @@ jobs:
       - name: Run tests
         run: cargo test
 
+      - name: Run expensive tests
+        run: ~/.cargo/bin/cargo test -- --ignored --nocapture
+
   macos:
     runs-on: macos-latest
     steps:
@@ -26,7 +29,7 @@ jobs:
         run: ~/.cargo/bin/rustup update
 
       - name: Run tests
-        run: ~/.cargo/bin/cargo test
+        run: ~/.cargo/bin/cargo test --no-default-features
 
       - name: Run expensive tests
-        run: ~/.cargo/bin/cargo test -- --ignored --nocapture
+        run: ~/.cargo/bin/cargo test --no-default-features -- --ignored --nocapture
