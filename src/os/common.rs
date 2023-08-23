@@ -178,7 +178,7 @@ pub fn probably_sparse(_fd: &File) -> Result<bool> {
 }
 
 #[allow(dead_code)]
-pub fn map_extents(_fd: &File) -> Result<Vec<Range<u64>>> {
+pub fn map_extents(_fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     // FIXME: Implement for *BSD with lseek?
     Err(XcpError::UnsupportedOperation {}.into())
 }

@@ -312,7 +312,7 @@ mod tests {
     use super::*;
     use crate::os::allocate_file;
     use std::env::current_dir;
-    use std::fs::{read, OpenOptions, read_to_string};
+    use std::fs::{read, OpenOptions};
     use std::io::{Seek, SeekFrom, Write};
     use std::iter;
     use std::path::PathBuf;
