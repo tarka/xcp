@@ -25,7 +25,7 @@ mod vendor;
 
 use std::path::PathBuf;
 
-use log::info;
+use log::{info, error};
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
 use crate::drivers::{CopyDriver, Drivers};
@@ -41,10 +41,9 @@ fn pick_driver(opts: &options::Opts) -> Result<&dyn CopyDriver> {
     };
 
     if !driver.supported_platform() {
-        return Err(XcpError::UnsupportedOS(
-            "The parblock driver is not currently supported on Mac.",
-        )
-        .into());
+        let msg = "The parblock driver is not currently supported on Mac.";
+        error!("{}", msg);
+        return Err(XcpError::UnsupportedOS(msg).into());
     }
 
     Ok(driver)
