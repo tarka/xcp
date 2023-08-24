@@ -107,6 +107,14 @@ jobs:
           XCP_TEST_FS: zfs
         if: always()
 
+  expensive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Update Rust to latest
+        run: ~/.cargo/bin/rustup update
+
       - name: Run expensive tests
         run: ~/.cargo/bin/cargo test -- --ignored
 
