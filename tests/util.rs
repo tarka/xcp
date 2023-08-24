@@ -31,6 +31,7 @@ use walkdir::WalkDir;
 
 pub type TResult = result::Result<(), Error>;
 
+#[allow(unused)]
 fn fs_supports(unsupported: Vec<&str>) -> bool {
     // See `.github/workflows/rust.yml`
     match var("XCP_TEST_FS") {
@@ -41,10 +42,12 @@ fn fs_supports(unsupported: Vec<&str>) -> bool {
     }
 }
 
+#[allow(unused)]
 pub fn fs_supports_symlinks() -> bool {
     fs_supports(vec!["fat"])
 }
 
+#[allow(unused)]
 pub fn fs_supports_xattr() -> bool {
     fs_supports(vec!["fat"])
 }
