@@ -53,6 +53,9 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     fn test_sparse(drv: &str) {
+        if !fs_supports_sparse() {
+            return
+        }
         use std::fs::read;
 
         let dir = tempdir_rel().unwrap();
@@ -83,6 +86,9 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     fn test_sparse_leading_gap(drv: &str) {
+        if !fs_supports_sparse() {
+            return
+        }
         use std::fs::read;
 
         let dir = tempdir().unwrap();
@@ -112,6 +118,9 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     fn test_sparse_trailng_gap(drv: &str) {
+        if !fs_supports_sparse() {
+            return
+        }
         use std::fs::read;
 
         let dir = tempdir().unwrap();
@@ -141,6 +150,9 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     fn test_sparse_single_overwrite(drv: &str) {
+        if !fs_supports_sparse() {
+            return
+        }
         use std::fs::read;
 
         let dir = tempdir().unwrap();
@@ -170,6 +182,9 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     fn test_empty_sparse(drv: &str) {
+        if !fs_supports_sparse() {
+            return
+        }
         use std::fs::read;
 
         let dir = tempdir().unwrap();
