@@ -31,6 +31,7 @@ use walkdir::WalkDir;
 
 pub type TResult = result::Result<(), Error>;
 
+#[allow(unused)]
 pub fn fs_supports_extents() -> bool {
     // See `.github/workflows/rust.yml`
     let unsupported = vec!["ext2", "ntfs", "fat", "zfs"];
@@ -42,6 +43,7 @@ pub fn fs_supports_extents() -> bool {
     }
 }
 
+#[allow(unused)]
 pub fn fs_supports_sparse() -> bool {
     // FIXME: Same set for now.
     fs_supports_extents()
