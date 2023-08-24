@@ -31,16 +31,27 @@ use walkdir::WalkDir;
 
 pub type TResult = result::Result<(), Error>;
 
-#[allow(unused)]
-pub fn fs_supports_extents() -> bool {
+fn fs_supports(unsupported: Vec<&str>) -> bool {
     // See `.github/workflows/rust.yml`
-    let unsupported = vec!["ext2", "ntfs", "fat", "zfs"];
     match var("XCP_TEST_FS") {
         Ok(fs) => {
             !unsupported.contains(&fs.as_str())
         },
         Err(_) => true // Not CI, assume 'normal' linux environment.
     }
+}
+
+pub fn fs_supports_symlinks() -> bool {
+    fs_supports(vec!["fat"])
+}
+
+pub fn fs_supports_xattr() -> bool {
+    fs_supports(vec!["fat"])
+}
+
+#[allow(unused)]
+pub fn fs_supports_extents() -> bool {
+    fs_supports(vec!["ext2", "ntfs", "fat", "zfs"])
 }
 
 #[allow(unused)]

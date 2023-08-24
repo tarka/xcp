@@ -253,7 +253,9 @@ fn file_copy_perms(drv: &str) {
 
     create_file(&source_path, text).unwrap();
 
-    xattr::set(&source_path, "user.test", b"my test").unwrap();
+    if fs_supports_xattr() {
+        xattr::set(&source_path, "user.test", b"my test").unwrap();
+    }
 
     let mut perms = metadata(&source_path).unwrap().permissions();
     perms.set_readonly(true);
@@ -275,10 +277,12 @@ fn file_copy_perms(drv: &str) {
         metadata(&dest_path).unwrap().permissions().readonly()
     );
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-    assert_eq!(
-        xattr::get(&dest_path, "user.test").unwrap().unwrap(),
-        b"my test"
-    );
+    if fs_supports_xattr() {
+        assert_eq!(
+            xattr::get(&dest_path, "user.test").unwrap().unwrap(),
+            b"my test"
+        );
+    }
 }
 
 #[test_case("parfile"; "Test with parallel file driver")]
@@ -672,6 +676,10 @@ fn dir_overwrite_with_noclobber(drv: &str) {
 #[test_case("parfile"; "Test with parallel file driver")]
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 fn dir_copy_containing_symlinks(drv: &str) {
+    if !fs_supports_symlinks() {
+        return
+    }
+
     let dir = tempdir_rel().unwrap();
 
     let source_path = dir.join("mydir");
