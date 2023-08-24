@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v1
       - run: ~/.cargo/bin/rustup update
       - name: Create filesystem
-        run: .github/workflows/make-filesystems.sh ext2
+        run: .github/workflows/make-fs.sh ext2
       - name: Run tests
         run: cargo test && cargo test -- --ignored
         working-directory: /fs/ext2/src
@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v1
       - run: ~/.cargo/bin/rustup update
       - name: Create filesystem
-        run: .github/workflows/make-filesystems.sh ext4
+        run: .github/workflows/make-fs.sh ext4
       - name: Run tests
         run: cargo test && cargo test -- --ignored
         working-directory: /fs/ext4/src
@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@v1
       - run: ~/.cargo/bin/rustup update
       - name: Create filesystem
-        run: .github/workflows/make-filesystems.sh xfs
+        run: .github/workflows/make-fs.sh xfs
       - name: Run tests
         run: cargo test && cargo test -- --ignored
         working-directory: /fs/xfs/src
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v1
       - run: ~/.cargo/bin/rustup update
       - name: Create filesystem
-        run: .github/workflows/make-filesystems.sh btrfs
+        run: .github/workflows/make-fs.sh btrfs
       - name: Run tests
         run: cargo test && cargo test -- --ignored
         working-directory: /fs/btrfs/src
@@ -65,7 +65,7 @@ jobs:
       - uses: actions/checkout@v1
       - run: ~/.cargo/bin/rustup update
       - name: Create filesystem
-        run: .github/workflows/make-filesystems.sh ntfs
+        run: .github/workflows/make-fs.sh ntfs
       - name: Run tests
         run: cargo test && cargo test -- --ignored
         working-directory: /fs/ntfs/src
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v1
       - run: ~/.cargo/bin/rustup update
       - name: Create filesystem
-        run: .github/workflows/make-filesystems.sh fat
+        run: .github/workflows/make-fs.sh fat
       - name: Run tests
         run: cargo test && cargo test -- --ignored
         working-directory: /fs/fat/src
@@ -91,7 +91,7 @@ jobs:
       - uses: actions/checkout@v1
       - run: ~/.cargo/bin/rustup update
       - name: Create filesystem
-        run: .github/workflows/make-filesystems.sh zfs
+        run: .github/workflows/make-fs.sh zfs
       - name: Run tests
         run: cargo test && cargo test -- --ignored
         working-directory: /fs/zfs/src
