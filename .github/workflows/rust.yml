@@ -2,80 +2,101 @@ name: Rust
 
 on: [push]
 
+# f2fs and exfat modules are in linux-modules-extra-azure
+# and cannot be installed reliably:
+# https://github.com/actions/runner-images/issues/7587
+
 jobs:
-  ubuntu:
+  ext2:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-
-      - name: Update Rust to latest
-        run: ~/.cargo/bin/rustup update
-
-      - name: Create filesystems
-        # f2fs and exfat modules are in linux-modules-extra-azure
-        # and cannot be installed reliably:
-        # https://github.com/actions/runner-images/issues/7587
-        run: .github/workflows/make-filesystems.sh ext2 ext4 xfs btrfs ntfs fat zfs
-
-      - name: Run tests on ext2
-        run: cargo test
+      - run: ~/.cargo/bin/rustup update
+      - name: Create filesystem
+        run: .github/workflows/make-filesystems.sh ext2
+      - name: Run tests
+        run: cargo test && cargo test --ignored
         working-directory: /fs/ext2/src
         env:
           XCP_TEST_FS: ext2
-        if: always()
 
-      - name: Run tests on ext4
-        run: cargo test
-        working-directory: /fs/ext4/src
-        env:
-          XCP_TEST_FS: ext4
-        if: always()
-
-      - name: Run tests on XFS
-        run: cargo test
-        working-directory: /fs/xfs/src
-        env:
-          XCP_TEST_FS: xfs
-        if: always()
-
-      - name: Run tests on btrfs
-        run: cargo test
-        working-directory: /fs/btrfs/src
-        env:
-          XCP_TEST_FS: btrfs
-        if: always()
-
-      - name: Run tests on ntfs
-        run: cargo test
-        working-directory: /fs/ntfs/src
-        env:
-          XCP_TEST_FS: ntfs
-        if: always()
-
-      - name: Run tests on fat
-        run: cargo test
-        working-directory: /fs/fat/src
-        env:
-          XCP_TEST_FS: fat
-        if: always()
-
-      - name: Run tests on ZFS
-        run: cargo test
-        working-directory: /fs/zfs/src
-        env:
-          XCP_TEST_FS: zfs
-        if: always()
-
-  expensive:
+  ext4:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+      - run: ~/.cargo/bin/rustup update
+      - name: Create filesystem
+        run: .github/workflows/make-filesystems.sh ext4
+      - name: Run tests
+        run: cargo test && cargo test --ignored
+        working-directory: /fs/ext4/src
+        env:
+          XCP_TEST_FS: ext4
 
-      - name: Update Rust to latest
-        run: ~/.cargo/bin/rustup update
+  xfs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: ~/.cargo/bin/rustup update
+      - name: Create filesystem
+        run: .github/workflows/make-filesystems.sh xfs
+      - name: Run tests
+        run: cargo test && cargo test --ignored
+        working-directory: /fs/xfs/src
+        env:
+          XCP_TEST_FS: xfs
 
-      - name: Run expensive tests
-        run: ~/.cargo/bin/cargo test -- --ignored
+  btrfs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: ~/.cargo/bin/rustup update
+      - name: Create filesystem
+        run: .github/workflows/make-filesystems.sh btrfs
+      - name: Run tests
+        run: cargo test && cargo test --ignored
+        working-directory: /fs/btrfs/src
+        env:
+          XCP_TEST_FS: btrfs
+
+  ntfs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: ~/.cargo/bin/rustup update
+      - name: Create filesystem
+        run: .github/workflows/make-filesystems.sh ntfs
+      - name: Run tests
+        run: cargo test && cargo test --ignored
+        working-directory: /fs/ntfs/src
+        env:
+          XCP_TEST_FS: ntfs
+
+  fat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: ~/.cargo/bin/rustup update
+      - name: Create filesystem
+        run: .github/workflows/make-filesystems.sh fat
+      - name: Run tests
+        run: cargo test && cargo test --ignored
+        working-directory: /fs/fat/src
+        env:
+          XCP_TEST_FS: fat
+
+  zfs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: ~/.cargo/bin/rustup update
+      - name: Create filesystem
+        run: .github/workflows/make-filesystems.sh zfs
+      - name: Run tests
+        run: cargo test && cargo test --ignored
+        working-directory: /fs/zfs/src
+        env:
+          XCP_TEST_FS: zfs
 
   macos:
     runs-on: macos-latest
