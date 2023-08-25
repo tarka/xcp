@@ -14,7 +14,7 @@ img=$root.img
 echo >&2 "==== creating $fs in $root ===="
 
 sudo mkdir --parents $root
-sudo fallocate --length 32G $img
+sudo fallocate --length 22G $img
 
 case $fs in
     zfs)  sudo zpool create -m $root test $img ;;
