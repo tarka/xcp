@@ -1,0 +1,17 @@
+name: FAT
+
+on: [push]
+
+jobs:
+  fat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: ~/.cargo/bin/rustup update
+      - name: Create filesystem
+        run: .github/workflows/make-fs.sh fat
+      - name: Run tests
+        run: cargo test && cargo test -- --ignored
+        working-directory: /fs/fat/src
+        env:
+          XCP_TEST_FS: fat

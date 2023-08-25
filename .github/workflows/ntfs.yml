@@ -1,0 +1,17 @@
+name: NTFS
+
+on: [push]
+
+jobs:
+  ntfs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: ~/.cargo/bin/rustup update
+      - name: Create filesystem
+        run: .github/workflows/make-fs.sh ntfs
+      - name: Run tests
+        run: cargo test && cargo test -- --ignored
+        working-directory: /fs/ntfs/src
+        env:
+          XCP_TEST_FS: ntfs
