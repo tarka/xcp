@@ -1,9 +1,5 @@
 #!/bin/bash -x
 
-# f2fs and exfat modules are in linux-modules-extra-azure
-# and cannot be installed reliably:
-# https://github.com/actions/runner-images/issues/7587
-
 fs=$1
 
 sudo apt update
