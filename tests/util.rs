@@ -44,17 +44,17 @@ fn fs_supports(unsupported: Vec<&str>) -> bool {
 
 #[allow(unused)]
 pub fn fs_supports_symlinks() -> bool {
-    fs_supports(vec!["fat"])
+    fs_supports(vec!["fat", "vfat"])
 }
 
 #[allow(unused)]
 pub fn fs_supports_xattr() -> bool {
-    fs_supports(vec!["fat"])
+    fs_supports(vec!["fat", "vfat"])
 }
 
 #[allow(unused)]
 pub fn fs_supports_extents() -> bool {
-    fs_supports(vec!["ext2", "ntfs", "fat", "zfs"])
+    fs_supports(vec!["ext2", "ntfs", "fat", "vfat", "zfs"])
 }
 
 #[allow(unused)]
@@ -243,9 +243,9 @@ pub fn gen_file(path: &Path, rng: &mut dyn RngCore, size: usize, sparse: bool) -
 pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64, with_sparse: bool) -> TResult {
     create_dir_all(base)?;
 
-    let dist0 = Triangular::new(0.0, 64.0, 64.0 / 5.0).unwrap();
-    let dist1 = Triangular::new(1.0, 64.0, 64.0 / 5.0).unwrap();
-    let distf = Pareto::new(50.0 * 1024.0, 1.0).unwrap();
+    let dist0 = Triangular::new(0.0, 64.0, 64.0 / 5.0)?;
+    let dist1 = Triangular::new(1.0, 64.0, 64.0 / 5.0)?;
+    let distf = Pareto::new(50.0 * 1024.0, 1.0)?;
 
     let nfiles = rng.sample(dist0) as u64;
     for _ in 0..nfiles {

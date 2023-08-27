@@ -332,7 +332,7 @@ mod tests {
 
     fn fs_supports_extents() -> bool {
         // See `.github/workflows/rust.yml`
-        let unsupported = vec!["ext2", "ntfs", "fat", "zfs"];
+        let unsupported = vec!["ext2", "ntfs", "fat", "vfat", "zfs"];
         match var("XCP_TEST_FS") {
             Ok(fs) => {
                 !unsupported.contains(&fs.as_str())
