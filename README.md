@@ -20,7 +20,7 @@ branch [issue24-add-tests-for-virtual-files](https://github.com/tarka/xcp/tree/i
 
 ## Installation
 
-*NOTE*: `xcp` requires Rust 1.67 or higher.
+*NOTE*: `xcp` requires Rust 1.70 or higher.
 
 ### Cargo
 
