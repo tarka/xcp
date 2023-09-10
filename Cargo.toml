@@ -28,7 +28,7 @@ overflow-checks = true
 [dependencies]
 anyhow = "1.0.75"
 cfg-if = "1.0.0"
-clap = { version = "4.4.0", features = ["derive"] }
+clap = { version = "4.4.2", features = ["derive"] }
 crossbeam-channel = "0.5.8"
 crossbeam-utils = "0.8.16"
 glob = "0.3.1"
@@ -38,9 +38,9 @@ libc = "0.2.147"
 log = "0.4.20"
 num_cpus = "1.16.0"
 simplelog = "0.12.1"
-thiserror = "1.0.47"
+thiserror = "1.0.48"
 unbytify = "0.2.0"
-walkdir = "2.3.3"
+walkdir = "2.4.0"
 xattr = "1.0.1"
 
 [dev-dependencies]
