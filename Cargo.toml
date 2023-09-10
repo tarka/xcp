@@ -13,10 +13,6 @@ keywords = ["coreutils", "cp", "files", "filesystem"]
 categories =["command-line-utilities"]
 license = "GPL-3.0-only"
 
-[badges]
-circle-ci = { repository = "tarka/xcp" }
-travis-ci = { repository = "tarka/xcp" }
-
 [features]
 default = ["kernel_copy_file_range", "parblock"]
 kernel_copy_file_range = []
