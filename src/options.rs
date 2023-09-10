@@ -21,7 +21,7 @@ use clap::{ArgAction, Parser};
 use glob::{glob, Paths};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use log::info;
-use num_cpus;
+
 use unbytify::unbytify;
 use walkdir::DirEntry;
 
@@ -113,7 +113,7 @@ pub fn num_workers(opts: &Opts) -> u64 {
 pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
     let mut globs = patterns
         .iter()
-        .map(|s| glob(&*s.as_str())) // -> Vec<Result<Paths>>
+        .map(|s| glob(s.as_str())) // -> Vec<Result<Paths>>
         .collect::<result::Result<Vec<Paths>, _>>()?; // -> Result<Vec<Paths>>
     let path_vecs = globs
         .iter_mut()
@@ -136,7 +136,7 @@ pub fn to_pathbufs(paths: &[String]) -> Vec<PathBuf> {
 
 pub fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
     if opts.glob {
-        expand_globs(&source_list)
+        expand_globs(source_list)
     } else {
         Ok(to_pathbufs(source_list))
     }
@@ -146,7 +146,7 @@ pub fn parse_ignore(source: &PathBuf, opts: &Opts) -> Result<Option<Gitignore>> 
     let gitignore = if opts.gitignore {
         let gifile = source.join(".gitignore");
         info!("Using .gitignore file {:?}", gifile);
-        let mut builder = GitignoreBuilder::new(&source);
+        let mut builder = GitignoreBuilder::new(source);
         builder.add(&gifile);
         let ignore = builder.build()?;
         Some(ignore)
@@ -161,7 +161,7 @@ pub fn ignore_filter(entry: &DirEntry, ignore: &Option<Gitignore>) -> bool {
         None => true,
         Some(gi) => {
             let path = entry.path();
-            let m = gi.matched(&path, path.is_dir());
+            let m = gi.matched(path, path.is_dir());
             !m.is_ignore()
         }
     }

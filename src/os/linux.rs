@@ -14,7 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use libc;
+
 use std::cell::RefCell;
 use std::fs::File;
 use std::io;
@@ -332,7 +332,7 @@ mod tests {
 
     fn fs_supports_extents() -> bool {
         // See `.github/workflows/rust.yml`
-        let unsupported = vec!["ext2", "ntfs", "fat", "vfat", "zfs"];
+        let unsupported = ["ext2", "ntfs", "fat", "vfat", "zfs"];
         match var("XCP_TEST_FS") {
             Ok(fs) => {
                 !unsupported.contains(&fs.as_str())
@@ -357,7 +357,7 @@ mod tests {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let out = Command::new("/usr/bin/truncate")
-            .args(&["-s", "1M", file.to_str().unwrap()])
+            .args(["-s", "1M", file.to_str().unwrap()])
             .output()?;
         assert!(out.status.success());
 
@@ -367,7 +367,7 @@ mod tests {
         }
         {
             let mut fd = OpenOptions::new().write(true).append(false).open(&file)?;
-            write!(fd, "{}", "test")?;
+            write!(fd, "test")?;
             assert!(probably_sparse(&fd)?);
         }
 
@@ -391,7 +391,7 @@ mod tests {
         }
 
         let out = Command::new("/usr/bin/truncate")
-            .args(&["-s", "1M", file.to_str().unwrap()])
+            .args(["-s", "1M", file.to_str().unwrap()])
             .output()?;
         assert!(out.status.success());
 
@@ -423,7 +423,7 @@ mod tests {
         }
 
         let out = Command::new("/usr/bin/truncate")
-            .args(&["-s", "1M", file.to_str().unwrap()])
+            .args(["-s", "1M", file.to_str().unwrap()])
             .output()?;
         assert!(out.status.success());
 
@@ -475,7 +475,7 @@ mod tests {
         }
 
         let out = Command::new("/usr/bin/truncate")
-            .args(&["-s", "1M", file.to_str().unwrap()])
+            .args(["-s", "1M", file.to_str().unwrap()])
             .output()?;
         assert!(out.status.success());
 
@@ -518,7 +518,7 @@ mod tests {
         }
 
         let out = Command::new("/usr/bin/truncate")
-            .args(&["-s", "1M", file.to_str().unwrap()])
+            .args(["-s", "1M", file.to_str().unwrap()])
             .output()?;
         assert!(out.status.success());
         {
@@ -590,7 +590,7 @@ mod tests {
         let file = dir.path().join("sparse.bin");
 
         let out = Command::new("/usr/bin/truncate")
-            .args(&["-s", "1M", file.to_str().unwrap()])
+            .args(["-s", "1M", file.to_str().unwrap()])
             .output()?;
         assert!(out.status.success());
         assert!(probably_sparse(&File::open(&file)?)?);
@@ -632,7 +632,7 @@ mod tests {
         let file = dir.path().join("sparse.bin");
 
         let out = Command::new("/usr/bin/truncate")
-            .args(&["-s", "1M", file.to_str().unwrap()])
+            .args(["-s", "1M", file.to_str().unwrap()])
             .output()?;
         assert!(out.status.success());
 
@@ -662,7 +662,7 @@ mod tests {
         }
 
         let out = Command::new("/usr/bin/truncate")
-            .args(&["-s", "1M", file.to_str().unwrap()])
+            .args(["-s", "1M", file.to_str().unwrap()])
             .output()?;
         assert!(out.status.success());
 
@@ -702,14 +702,14 @@ mod tests {
         let file = dir.path().join("sparse.bin");
 
         let out = Command::new("/usr/bin/truncate")
-            .args(&["-s", "1M", file.to_str().unwrap()])
+            .args(["-s", "1M", file.to_str().unwrap()])
             .output()?;
         assert!(out.status.success());
 
         let fsize = 1024 * 1024;
         // FIXME: Assumes 4k blocks
         let bsize = 4 * 1024;
-        let block = iter::repeat(0xff as u8).take(bsize).collect::<Vec<u8>>();
+        let block = iter::repeat(0xff_u8).take(bsize).collect::<Vec<u8>>();
 
         let mut fd = OpenOptions::new().write(true).append(false).open(&file)?;
         // Skip every-other block
@@ -737,7 +737,7 @@ mod tests {
 
         {
             let mut fd: File = File::create(&file)?;
-            let data = iter::repeat("X").take(size).collect::<String>();
+            let data = "X".repeat(size);
             write!(fd, "{}", data)?;
         }
 

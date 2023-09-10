@@ -120,7 +120,7 @@ fn copy_source(
 
     let gitignore = parse_ignore(source, opts)?;
 
-    for entry in WalkDir::new(&source)
+    for entry in WalkDir::new(source)
         .into_iter()
         .filter_entry(|e| ignore_filter(e, &gitignore))
     {
@@ -128,9 +128,9 @@ fn copy_source(
         let e = entry?;
         let from = e.into_path();
         let meta = from.symlink_metadata()?;
-        let path = from.strip_prefix(&source)?;
-        let target = if !empty(&path) {
-            target_base.join(&path)
+        let path = from.strip_prefix(source)?;
+        let target = if !empty(path) {
+            target_base.join(path)
         } else {
             target_base.clone()
         };
@@ -184,7 +184,7 @@ fn tree_walker(
     debug!("Starting walk worker {:?}", thread::current().id());
 
     for source in sources {
-        copy_source(&source, &dest, opts, &work_tx, &mut updates)?;
+        copy_source(&source, dest, opts, &work_tx, &mut updates)?;
     }
     work_tx.send(Operation::End)?;
     debug!("Walk-worker finished: {:?}", thread::current().id());
@@ -209,7 +209,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
                 let copy_stat = BatchUpdater {
                     sender: Box::new(stat_tx.clone()),
                     stat: StatusUpdate::Copied(0),
-                    batch_size: batch_size,
+                    batch_size,
                 };
                 let wrx = work_rx.clone();
                 s.spawn(|_s| copy_worker(wrx, opts, copy_stat))
@@ -219,7 +219,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             let size_stat = BatchUpdater {
                 sender: Box::new(stat_tx),
                 stat: StatusUpdate::Size(0),
-                batch_size: batch_size,
+                batch_size,
             };
             s.spawn(|_s| tree_walker(sources, &dest, opts, work_tx, size_stat))
         };

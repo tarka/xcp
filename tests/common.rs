@@ -17,7 +17,7 @@
 use std::fs::{create_dir_all, metadata, set_permissions, write, File};
 use std::os::unix::fs::symlink;
 use test_case::test_case;
-use xattr;
+
 
 mod util;
 use crate::util::*;
@@ -129,7 +129,7 @@ fn dest_file_in_dir_exists(drv: &str) {
 
     {
         File::create(&source_path).unwrap();
-        File::create(&dest_path).unwrap();
+        File::create(dest_path).unwrap();
     }
 
     let out = run(&[

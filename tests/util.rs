@@ -87,7 +87,7 @@ pub fn tempdir_rel() -> Result<PathBuf, Error> {
 }
 
 pub fn create_file(path: &Path, text: &str) -> Result<(), Error> {
-    let file = File::create(&path)?;
+    let file = File::create(path)?;
     write!(&file, "{}", text)?;
     Ok(())
 }
@@ -99,14 +99,14 @@ pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
     let len = 4096u64 * 4096 + data.len() as u64 + tail;
 
     let out = Command::new("/usr/bin/truncate")
-        .args(&["-s", len.to_string().as_str(), file.to_str().unwrap()])
+        .args(["-s", len.to_string().as_str(), file.to_str().unwrap()])
         .output()?;
     assert!(out.status.success());
 
     let mut fd = std::fs::OpenOptions::new()
         .write(true)
         .append(false)
-        .open(&file)?;
+        .open(file)?;
 
     fd.seek(SeekFrom::Start(head))?;
     write!(fd, "{}", data)?;
@@ -117,7 +117,7 @@ pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
     fd.seek(SeekFrom::Start(4096 * 4096))?;
     write!(fd, "{}", data)?;
 
-    Ok(len as u64)
+    Ok(len)
 }
 
 #[allow(unused)]
@@ -179,7 +179,7 @@ fn test_hasher() -> TResult {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub fn quickstat(file: &Path) -> Result<(i32, i32, i32), Error> {
     let out = Command::new("stat")
-        .args(&["--format", "%s %b %B", file.to_str().unwrap()])
+        .args(["--format", "%s %b %B", file.to_str().unwrap()])
         .output()?;
     assert!(out.status.success());
 

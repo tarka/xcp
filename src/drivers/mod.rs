@@ -48,7 +48,7 @@ impl FromStr for Drivers {
             "parfile" => Ok(Drivers::ParFile),
             #[cfg(feature = "parblock")]
             "parblock" => Ok(Drivers::ParBlock),
-            _ => Err(XcpError::UnknownDriver(s.to_owned()).into()),
+            _ => Err(XcpError::UnknownDriver(s.to_owned())),
         }
     }
 }

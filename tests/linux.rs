@@ -192,7 +192,7 @@ cfg_if! {if #[cfg(target_os = "linux")] {
         let to = dir.path().join("target.bin");
 
         let out = Command::new("/usr/bin/truncate")
-            .args(&["-s", "1M", from.to_str().unwrap()])
+            .args(["-s", "1M", from.to_str().unwrap()])
             .output().unwrap();
         assert!(out.status.success());
         assert_eq!(from.metadata().unwrap().len(), 1024 * 1024);

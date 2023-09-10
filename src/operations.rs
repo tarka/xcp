@@ -73,7 +73,7 @@ pub fn copy_sparse(handle: &CopyHandle, updates: &mut BatchUpdater) -> Result<u6
     while pos < len {
         let (next_data, next_hole) = next_sparse_segments(&handle.infd, &handle.outfd, pos)?;
 
-        let _written = copy_bytes(&handle, next_hole - next_data, updates)?;
+        let _written = copy_bytes(handle, next_hole - next_data, updates)?;
         pos = next_hole;
     }
 

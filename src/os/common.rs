@@ -14,7 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use libc;
+
 use log::{debug, warn};
 use std::cmp;
 use std::fs::File;
@@ -154,7 +154,7 @@ pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) ->
 /// syscall. see copy_file_range(2) for details.
 #[allow(dead_code)]
 pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
-    Ok(copy_bytes_uspace(infd, outfd, bytes as usize)?)
+    copy_bytes_uspace(infd, outfd, bytes as usize)
 }
 
 // Copy a single file block.
@@ -231,7 +231,6 @@ pub fn is_same_file(src: &PathBuf, dest: &PathBuf) -> Result<bool> {
 mod tests {
     use super::*;
     use std::fs::read;
-    use std::iter;
     use tempfile::tempdir;
 
     #[test]
@@ -240,7 +239,7 @@ mod tests {
         let from = dir.path().join("from.bin");
         let to = dir.path().join("to.bin");
         let size = 128 * 1024;
-        let data = iter::repeat("X").take(size).collect::<String>();
+        let data = "X".repeat(size);
 
         {
             let mut fd: File = File::create(&from).unwrap();
@@ -270,7 +269,7 @@ mod tests {
         let from = dir.path().join("from.bin");
         let to = dir.path().join("to.bin");
         let size = 128 * 1024;
-        let data = iter::repeat("X").take(size).collect::<String>();
+        let data = "X".repeat(size);
 
         {
             let mut fd: File = File::create(&from).unwrap();

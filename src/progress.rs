@@ -16,7 +16,7 @@
 
 use crossbeam_channel as cbc;
 
-use indicatif;
+
 
 use crate::errors::Result;
 use crate::options::Opts;

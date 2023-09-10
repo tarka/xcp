@@ -76,7 +76,7 @@ impl Sender {
     fn new(chan: cbc::Sender<StatusUpdate>, opts: &Opts) -> Sender {
         Sender {
             noop: opts.noprogress,
-            chan: chan,
+            chan,
         }
     }
 
@@ -149,7 +149,7 @@ fn queue_file_blocks(
                 println!("EXT: {:?}", ext);
                 queued += queue_file_range(&harc, ext, pool, status_channel, opts)?;
             }
-            return Ok(queued)
+            Ok(queued)
         } else {
             queue_whole_file()
         }
@@ -238,8 +238,8 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             let from = e.into_path();
             let meta = from.symlink_metadata()?;
             let path = from.strip_prefix(&source)?;
-            let target = if !empty(&path) {
-                target_base.join(&path)
+            let target = if !empty(path) {
+                target_base.join(path)
             } else {
                 target_base.clone()
             };
@@ -256,8 +256,8 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
                 FileType::File => {
                     debug!("Start copy operation {:?} to {:?}", from, target);
                     file_tx.send(CopyOp {
-                        from: from,
-                        target: target,
+                        from,
+                        target,
                     })?;
                     total += meta.len();
                 }
