@@ -110,10 +110,10 @@ fn copy_file_range(
 
             // Clean-up the allocated memory by pulling it back into a Box.
             if !in_ptr.is_null() {
-                unsafe { Box::from_raw(in_ptr) };
+                drop(unsafe { Box::from_raw(in_ptr) });
             }
             if !out_ptr.is_null() {
-                unsafe { Box::from_raw(out_ptr) };
+                drop(unsafe { Box::from_raw(out_ptr) });
             }
 
             match r {
