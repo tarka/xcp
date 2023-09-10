@@ -1,4 +1,4 @@
-name: Rust
+name: Functional Tests
 
 on: [push]
 
