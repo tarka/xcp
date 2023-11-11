@@ -14,7 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::result;
 
 use clap::{ArgAction, Parser};
@@ -142,7 +142,7 @@ pub fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf
     }
 }
 
-pub fn parse_ignore(source: &PathBuf, opts: &Opts) -> Result<Option<Gitignore>> {
+pub fn parse_ignore(source: &Path, opts: &Opts) -> Result<Option<Gitignore>> {
     let gitignore = if opts.gitignore {
         let gifile = source.join(".gitignore");
         info!("Using .gitignore file {:?}", gifile);

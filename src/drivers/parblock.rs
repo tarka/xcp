@@ -21,7 +21,7 @@ use std::cmp;
 use std::fs::{create_dir_all, read_link};
 use std::ops::Range;
 use std::os::unix::fs::symlink;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -51,11 +51,11 @@ impl CopyDriver for Driver {
         }
     }
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
         copy_all(sources, dest, opts)
     }
 
-    fn copy_single(&self, source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
+    fn copy_single(&self, source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
         copy_single_file(source, dest, opts)
     }
 }
@@ -122,13 +122,13 @@ fn queue_file_range(
 
 
 fn queue_file_blocks(
-    source: &PathBuf,
-    dest: PathBuf,
+    source: &Path,
+    dest: &Path,
     pool: &ThreadPool,
     status_channel: &Sender,
     opts: &Opts,
 ) -> Result<u64> {
-    let handle = init_copy(source, &dest, opts)?;
+    let handle = init_copy(source, dest, opts)?;
     let len = handle.metadata.len();
 
     // Put the open files in an Arc, which we drop once work has
@@ -158,7 +158,7 @@ fn queue_file_blocks(
     }
 }
 
-pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
+pub fn copy_single_file(source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
     let nworkers = num_workers(opts);
     let pool = ThreadPool::new(nworkers as usize);
 
@@ -186,7 +186,7 @@ struct CopyOp {
     target: PathBuf,
 }
 
-pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
+pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
     let pb = ProgressBar::new(opts, 0)?;
     let mut total = 0;
 
@@ -206,7 +206,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
             .queue_len(128)
             .build();
         for op in file_rx {
-            queue_file_blocks(&op.from, op.target, &pool, &sender, &qopts).unwrap();
+            queue_file_blocks(&op.from, &op.target, &pool, &sender, &qopts).unwrap();
             // FIXME
         }
         info!("Queuing complete");
@@ -223,7 +223,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
         let target_base = if dest.exists() {
             dest.join(sourcedir)
         } else {
-            dest.clone()
+            dest.to_path_buf()
         };
         debug!("Target base is {:?}", target_base);
 

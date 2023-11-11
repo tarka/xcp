@@ -19,7 +19,7 @@ use crossbeam_utils::thread as cbt;
 use log::{debug, error, info};
 use std::fs::{create_dir_all, read_link};
 use std::os::unix::fs::symlink;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::thread;
 use walkdir::WalkDir;
 
@@ -42,11 +42,11 @@ impl CopyDriver for Driver {
         true // No known platform issues
     }
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
         copy_all(sources, dest, opts)
     }
 
-    fn copy_single(&self, source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
+    fn copy_single(&self, source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
         copy_single_file(source, dest, opts)
     }
 }
@@ -101,8 +101,8 @@ fn copy_worker(
 }
 
 fn copy_source(
-    source: &PathBuf,
-    dest: &PathBuf,
+    source: &Path,
+    dest: &Path,
     opts: &Opts,
     work_tx: &cbc::Sender<Operation>,
     updates: &mut BatchUpdater,
@@ -114,7 +114,7 @@ fn copy_source(
     let target_base = if dest.exists() && !opts.no_target_directory {
         dest.join(sourcedir)
     } else {
-        dest.clone()
+        dest.to_path_buf()
     };
     debug!("Target base is {:?}", target_base);
 
@@ -176,7 +176,7 @@ fn copy_source(
 
 fn tree_walker(
     sources: Vec<PathBuf>,
-    dest: &PathBuf,
+    dest: &Path,
     opts: &Opts,
     work_tx: cbc::Sender<Operation>,
     mut updates: BatchUpdater,
@@ -191,7 +191,7 @@ fn tree_walker(
     Ok(())
 }
 
-pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()> {
+pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
     let (work_tx, work_rx) = cbc::unbounded();
     let (stat_tx, stat_rx) = cbc::unbounded();
 
@@ -221,7 +221,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
                 stat: StatusUpdate::Size(0),
                 batch_size,
             };
-            s.spawn(|_s| tree_walker(sources, &dest, opts, work_tx, size_stat))
+            s.spawn(|_s| tree_walker(sources, dest, opts, work_tx, size_stat))
         };
 
         for stat in stat_rx {
@@ -247,7 +247,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>
     Ok(())
 }
 
-pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()> {
+pub fn copy_single_file(source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
     let mut copy_stat = if opts.noprogress {
         BatchUpdater {
             sender: Box::new(NopUpdater {}),
@@ -266,7 +266,7 @@ pub fn copy_single_file(source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<
         }
     };
 
-    copy_file(source, &dest, opts, &mut copy_stat)?;
+    copy_file(source, dest, opts, &mut copy_stat)?;
 
     Ok(())
 }

@@ -92,7 +92,7 @@ fn main() -> Result<()> {
         }
 
         info!("Copying file {:?} to {:?}", sources[0], dest);
-        driver.copy_single(&sources[0], dest, &opts)?;
+        driver.copy_single(&sources[0], &dest, &opts)?;
 
     } else {
         // Sanity-check all sources up-front
@@ -121,7 +121,7 @@ fn main() -> Result<()> {
             }
         }
 
-        driver.copy_all(sources, dest, &opts)?;
+        driver.copy_all(sources, &dest, &opts)?;
     }
 
     Ok(())

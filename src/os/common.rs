@@ -23,7 +23,7 @@ use std::io::{ErrorKind, Read, Write};
 use std::ops::Range;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
-use std::path::PathBuf;
+use std::path::Path;
 use xattr::FileExt;
 
 use crate::errors::{Result, XcpError};
@@ -55,14 +55,11 @@ fn copy_xattr(hdl: &CopyHandle, _opts: &Opts) -> Result<()> {
 pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
     if !opts.no_perms {
         let xr = copy_xattr(hdl, opts);
-        match xr {
-            Err(e) => {
-                // FIXME: We don't have a way of detecting if the
-                // target FS supports XAttr, so assume any error is
-                // "Unsupported" for now.
-                warn!("Failed to copy xattrs from {:?}: {}", hdl.infd, e);
-            }
-            _ => {}
+        if let Err(e) = xr {
+            // FIXME: We don't have a way of detecting if the
+            // target FS supports XAttr, so assume any error is
+            // "Unsupported" for now.
+            warn!("Failed to copy xattrs from {:?}: {}", hdl.infd, e);
         }
 
         // FIXME: ACLs, selinux, etc.
@@ -217,7 +214,7 @@ pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
 }
 
 
-pub fn is_same_file(src: &PathBuf, dest: &PathBuf) -> Result<bool> {
+pub fn is_same_file(src: &Path, dest: &Path) -> Result<bool> {
     let sstat = src.metadata()?;
     let dstat = dest.metadata()?;
     let same = (sstat.ino() == dstat.ino())

@@ -18,7 +18,7 @@ pub mod parfile;
 #[cfg(feature = "parblock")]
 pub mod parblock;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::result;
 use std::str::FromStr;
 
@@ -29,8 +29,8 @@ use crate::options::Opts;
 
 pub trait CopyDriver {
     fn supported_platform(&self) -> bool;
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: PathBuf, opts: &Opts) -> Result<()>;
-    fn copy_single(&self, source: &PathBuf, dest: PathBuf, opts: &Opts) -> Result<()>;
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()>;
+    fn copy_single(&self, source: &Path, dest: &Path, opts: &Opts) -> Result<()>;
 }
 
 #[derive(Debug, Clone, Copy)]
