@@ -67,7 +67,7 @@ mod ffi {
 macro_rules! box_ptr_or_null(
     ($e:expr) =>
         (match $e {
-            Some(b) =>  Box::into_raw(Box::new(b)),
+            Some(b) => Box::into_raw(Box::new(b)),
             None => ptr::null_mut()
         })
 );
