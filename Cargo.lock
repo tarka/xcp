@@ -84,6 +84,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "327762f6e5a765692301e5bb513e0d9fef63be86bbc14528052b1cd3e6f03e07"
 
 [[package]]
+name = "blocking-threadpool"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bee15c2a0ae09fd678e0a690d92f9ab2f485d7939f0b26a31eb25bc0bd45f5dc"
+dependencies = [
+ "crossbeam-channel",
+ "num_cpus",
+]
+
+[[package]]
 name = "bstr"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -928,6 +938,7 @@ name = "xcp"
 version = "0.12.0"
 dependencies = [
  "anyhow",
+ "blocking-threadpool",
  "cfg-if",
  "clap",
  "crossbeam-channel",

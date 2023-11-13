@@ -21,7 +21,6 @@ mod options;
 mod os;
 mod progress;
 mod utils;
-mod vendor;
 
 use std::path::PathBuf;
 
@@ -31,7 +30,6 @@ use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, Term
 use crate::drivers::pick_driver;
 use crate::errors::{Result, XcpError};
 use crate::os::is_same_file;
-pub use crate::vendor::threadpool;
 
 fn main() -> Result<()> {
     let opts = options::parse_args()?;

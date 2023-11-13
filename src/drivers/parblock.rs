@@ -14,9 +14,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use cfg_if::cfg_if;
-use crossbeam_channel as cbc;
-use log::{debug, error, info};
 use std::cmp;
 use std::fs::{create_dir_all, read_link};
 use std::ops::Range;
@@ -25,6 +22,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
+
+use cfg_if::cfg_if;
+use crossbeam_channel as cbc;
+use log::{debug, error, info};
+use blocking_threadpool::{Builder, ThreadPool};
 use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
@@ -33,7 +35,6 @@ use crate::operations::{init_copy, CopyHandle};
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use crate::os::{copy_file_offset, map_extents, merge_extents, probably_sparse};
 use crate::progress::{ProgressBar, StatusUpdate};
-use crate::threadpool::{Builder, ThreadPool};
 use crate::utils::{empty, FileType, ToFileType};
 
 // ********************************************************************** //
