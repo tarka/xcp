@@ -95,10 +95,43 @@ impl Sender {
     }
 }
 
+struct WorkerPool {
+    pool: ThreadPool,
+}
+
+impl WorkerPool {
+    fn new(nworkers: usize) -> Self {
+        let pool = Builder::new()
+            .num_threads(nworkers)
+            // Use bounded queue for backpressure; this limits open
+            // files in-flight so we don't run out of file handles.
+            // FIXME: Number is arbitrary ATM, we should be able to
+            // calculate it from ulimits.
+            .queue_len(128)
+            .build();
+        Self {
+            pool,
+        }
+    }
+
+    fn execute<F>(&self, job: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.pool.execute(job)
+    }
+
+    fn join(&self) {
+        self.pool.join()
+    }
+
+}
+
+
 fn queue_file_range(
     handle: &Arc<CopyHandle>,
     range: Range<u64>,
-    pool: &ThreadPool,
+    pool: &WorkerPool,
     status_channel: &Sender,
     opts: &Opts,
 ) -> Result<u64> {
@@ -125,7 +158,7 @@ fn queue_file_range(
 fn queue_file_blocks(
     source: &Path,
     dest: &Path,
-    pool: &ThreadPool,
+    pool: &WorkerPool,
     status_channel: &Sender,
     opts: &Opts,
 ) -> Result<u64> {
@@ -160,8 +193,8 @@ fn queue_file_blocks(
 }
 
 pub fn copy_single_file(source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
-    let nworkers = num_workers(opts);
-    let pool = ThreadPool::new(nworkers as usize);
+    let nworkers = num_workers(opts) as usize;
+    let pool = WorkerPool::new(nworkers);
 
     let len = source.metadata()?.len();
     let pb = ProgressBar::new(opts, len)?;
@@ -198,14 +231,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
     let qopts = opts.clone(); // FIXME: Would be better to use scoped thread?
     let sender = Sender::new(stat_tx, opts);
     let _dispatcher = thread::spawn(move || {
-        let pool = Builder::new()
-            .num_threads(nworkers)
-            // Use bounded queue for backpressure; this limits open
-            // files in-flight so we don't run out of file handles.
-            // FIXME: Number is arbitrary ATM, we should be able to
-            // calculate it from ulimits.
-            .queue_len(128)
-            .build();
+        let pool = WorkerPool::new(nworkers);
         for op in file_rx {
             queue_file_blocks(&op.from, &op.target, &pool, &sender, &qopts).unwrap();
             // FIXME
