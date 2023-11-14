@@ -20,6 +20,7 @@ mod operations;
 mod options;
 mod os;
 mod progress;
+mod semaphore;
 mod utils;
 
 use std::path::PathBuf;
