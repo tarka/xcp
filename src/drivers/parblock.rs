@@ -35,6 +35,7 @@ use crate::operations::{init_copy, CopyHandle};
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use crate::os::{copy_file_offset, map_extents, merge_extents, probably_sparse};
 use crate::progress::{ProgressBar, StatusUpdate};
+use crate::semaphore::Semaphore;
 use crate::utils::{empty, FileType, ToFileType};
 
 // ********************************************************************** //
@@ -95,22 +96,27 @@ impl Sender {
     }
 }
 
+// Use semaphore for backpressure; this limits open files
+// in-flight so we don't run out of file handles.  FIXME: Number is
+// arbitrary ATM, we should be able to calculate it from ulimits.
+// .queue_len(MAX_CONCURRENT)
+const MAX_CONCURRENT: usize = 128;
+
 struct WorkerPool {
     pool: ThreadPool,
+    counter: Semaphore,
 }
+
 
 impl WorkerPool {
     fn new(nworkers: usize) -> Self {
         let pool = Builder::new()
             .num_threads(nworkers)
-            // Use bounded queue for backpressure; this limits open
-            // files in-flight so we don't run out of file handles.
-            // FIXME: Number is arbitrary ATM, we should be able to
-            // calculate it from ulimits.
-            .queue_len(128)
             .build();
+        let counter = Semaphore::new(MAX_CONCURRENT);
         Self {
             pool,
+            counter,
         }
     }
 
@@ -118,7 +124,11 @@ impl WorkerPool {
     where
         F: FnOnce() + Send + 'static,
     {
-        self.pool.execute(job)
+        let permit = self.counter.acquire();
+        self.pool.execute(move || {
+           let _held_permit = permit;
+            job()
+        });
     }
 
     fn join(&self) {
