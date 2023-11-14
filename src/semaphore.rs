@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::sync::Arc;
+use log::trace;
 
 use parking_lot::{Mutex, Condvar};
 
@@ -10,11 +11,11 @@ pub struct Semaphore {
     notifier: Arc<Condvar>,
 }
 
-pub struct SemaphorePermit<'s> {
-    sem: &'s Semaphore,
+pub struct SemaphorePermit {
+    sem: Semaphore,
 }
 
-impl<'s> Drop for SemaphorePermit<'s> {
+impl Drop for SemaphorePermit {
     fn drop(&mut self) {
         self.sem.release();
     }
@@ -29,14 +30,18 @@ impl Semaphore {
     }
 
     pub fn acquire(&self) -> SemaphorePermit {
+        trace!("Thread {:?} attempting to acquire permit", std::thread::current().id());
         let mut lcount = self.count.lock();
+        trace!("Thread {:?} acq. lock; sem-count {}", std::thread::current().id(), lcount);
         if *lcount == 0 {
+            trace!("Thread {:?} waiting", std::thread::current().id());
             self.notifier.wait(&mut lcount);
         }
+        trace!("Thread {:?} acquired permit {}", std::thread::current().id(), lcount);
         *lcount -= 1;
 
         SemaphorePermit {
-            sem: &self,
+            sem: self.clone(),
         }
     }
 
@@ -48,13 +53,16 @@ impl Semaphore {
         *lcount -= 1;
 
         Some(SemaphorePermit {
-            sem: &self,
+            // Cloning the semaaphore object simplifies passing the
+            // permit between threads.
+            sem: self.clone(),
         })
     }
 
     fn release(&self) {
         let mut lcount = self.count.lock();
         *lcount += 1;
+        trace!("Thread {:?} released permit {}", std::thread::current().id(), lcount);
         self.notifier.notify_one();
     }
 
