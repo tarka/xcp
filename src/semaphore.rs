@@ -63,7 +63,21 @@ impl Semaphore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{thread, sync::atomic::{AtomicU64, Ordering, AtomicUsize}, time::Duration};
+    use std::{thread, sync::atomic::{Ordering, AtomicUsize}, time::Duration};
+
+    fn wait_for(count: &Arc<AtomicUsize>, val: usize) -> bool {
+        let mut times = 0;
+        loop {
+            if count.load(Ordering::SeqCst) == val {
+                break true;
+            }
+            times += 1;
+            if times >= 1000 {
+                break false;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
 
     #[test]
     fn test_simple_acquire() {
@@ -93,7 +107,7 @@ mod tests {
     fn test_acquire_blocking() {
         let sem = Semaphore::new(1);
         let permit = sem.acquire();
-        let thread_state = Arc::new(AtomicU64::new(0));
+        let thread_state = Arc::new(AtomicUsize::new(0));
 
         let tjoin = {
             let tsem = sem.clone();
@@ -105,19 +119,7 @@ mod tests {
             })
         };
 
-        let blocked = {
-            let mut times = 0;
-            loop {
-                if thread_state.load(Ordering::SeqCst) == 1 {
-                    break true;
-                }
-                times += 1;
-                if times >= 1000 {
-                    break false;
-                }
-                thread::sleep(Duration::from_millis(100));
-            }
-        };
+        let blocked = wait_for(&thread_state, 1);
         assert!(blocked);
 
         drop(permit);
@@ -148,20 +150,7 @@ mod tests {
             threads.push(t);
         }
 
-        let all_acquired = {
-            let mut times = 0;
-            loop {
-                if acquired.load(Ordering::SeqCst) == nthreads {
-                    break true;
-                }
-                times += 1;
-                if times >= 1000 {
-                    break false;
-                }
-                thread::sleep(Duration::from_millis(100));
-            }
-        };
-
+        let all_acquired = wait_for(&acquired, nthreads);
         assert!(all_acquired);
         for t in &threads {
             assert!(!t.is_finished());
@@ -175,19 +164,7 @@ mod tests {
         }
 
 
-        let all_released = {
-            let mut times = 0;
-            loop {
-                if acquired.load(Ordering::SeqCst) == 0 {
-                    break true;
-                }
-                times += 1;
-                if times >= 1000 {
-                    break false;
-                }
-                thread::sleep(Duration::from_millis(100));
-            }
-        };
+        let all_released = wait_for(&acquired, 0);
         assert!(all_released);
     }
 
