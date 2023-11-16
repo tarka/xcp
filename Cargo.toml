@@ -23,7 +23,7 @@ overflow-checks = true
 
 [dependencies]
 anyhow = "1.0.75"
-blocking-threadpool = "1.0.0"
+blocking-threadpool = "1.0.1"
 cfg-if = "1.0.0"
 clap = { version = "4.4.8", features = ["derive"] }
 crossbeam-channel = "0.5.8"
