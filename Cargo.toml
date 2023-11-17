@@ -3,6 +3,7 @@ name = "xcp"
 description = "xcp is an experimental and incomplete clone of the Unix `cp` command, with some more user-friendly feedback and some performance optimisations. NOTE: See the README for current limitations."
 version = "0.12.0"
 edition = "2021"
+rust-version = "1.70.0"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
 homepage = "https://github.com/tarka/xcp/"
