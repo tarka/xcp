@@ -39,7 +39,7 @@ use crate::utils::{empty, FileType, ToFileType};
 
 // ********************************************************************** //
 
-pub struct Driver {}
+pub struct Driver;
 
 impl CopyDriver for Driver {
     fn supported_platform(&self) -> bool {

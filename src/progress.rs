@@ -16,8 +16,6 @@
 
 use crossbeam_channel as cbc;
 
-
-
 use crate::errors::Result;
 use crate::options::Opts;
 
@@ -80,7 +78,7 @@ impl Updater<Result<StatusUpdate>> for cbc::Sender<Result<StatusUpdate>> {
     }
 }
 
-pub struct NopUpdater {}
+pub struct NopUpdater;
 
 impl Updater<Result<StatusUpdate>> for NopUpdater {
     fn update(&mut self, _update: Result<StatusUpdate>) -> Result<()> {
