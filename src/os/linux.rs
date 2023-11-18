@@ -168,8 +168,9 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
 // expected for its stated size. This is the same test used by
 // coreutils `cp`.
 pub fn probably_sparse(fd: &File) -> Result<bool> {
+    const ST_NBLOCKSIZE: u64 = 512;
     let stat = fd.metadata()?;
-    Ok(stat.st_blocks() < stat.st_size() / stat.st_blksize())
+    Ok(stat.st_blocks() < stat.st_size() / ST_NBLOCKSIZE)
 }
 
 /// Corresponds to lseek(2) `whence`
@@ -347,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sparse_detection() -> Result<()> {
+    fn test_sparse_detection_small_data() -> Result<()> {
         if !fs_supports_sparse() {
             return Ok(())
         }
@@ -368,6 +369,30 @@ mod tests {
         {
             let mut fd = OpenOptions::new().write(true).append(false).open(&file)?;
             write!(fd, "test")?;
+            assert!(probably_sparse(&fd)?);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sparse_detection_half() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
+        assert!(!probably_sparse(&File::open("Cargo.toml")?)?);
+
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
+        let out = Command::new("/usr/bin/truncate")
+            .args(["-s", "1M", file.to_str().unwrap()])
+            .output()?;
+        assert!(out.status.success());
+        {
+            let mut fd = OpenOptions::new().write(true).append(false).open(&file)?;
+            let s = "x".repeat(512*1024);
+            fd.write(s.as_bytes())?;
             assert!(probably_sparse(&fd)?);
         }
 
