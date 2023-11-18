@@ -280,7 +280,7 @@ pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
         for i in 0..req.fm_mapped_extents as usize {
             let e = req.fm_extents[i];
             let start = e.fe_logical;
-            let end = start + e.fe_length - 1;
+            let end = start + e.fe_length;
             extents.push(start..end);
         }
 
@@ -688,7 +688,7 @@ mod tests {
         let extents = extents_p.unwrap();
         assert_eq!(extents.len(), 1);
         assert_eq!(extents[0].start, offset as u64);
-        assert_eq!(extents[0].end, offset as u64 + 4 * 1024 - 1); // FIXME: Assume 4k blocks
+        assert_eq!(extents[0].end, offset as u64 + 4 * 1024); // FIXME: Assume 4k blocks
 
         Ok(())
     }
@@ -747,7 +747,7 @@ mod tests {
         let extents = extents_p.unwrap();
 
         assert_eq!(1, extents.len());
-        assert_eq!(0..size as u64 - 1, extents[0]);
+        assert_eq!(0..size as u64, extents[0]);
 
         Ok(())
     }
