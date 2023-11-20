@@ -24,7 +24,7 @@ use std::thread;
 use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
-use crate::errors::{Error, Result, XcpError};
+use crate::errors::{Result, XcpError};
 use crate::operations::copy_file;
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use crate::progress::{
@@ -235,7 +235,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
             }
         }
 
-        Ok::<(), Error>(())
+        Ok::<(), anyhow::Error>(())
     })
     .unwrap()?;
 

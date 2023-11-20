@@ -139,7 +139,7 @@ pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) ->
             Ok(0) => return Err(XcpError::InvalidSource("Source file ended prematurely.").into()),
             Ok(len) => len,
             Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
-            Err(e) => return Err(XcpError::IOError(e).into()),
+            Err(e) => return Err(e.into())
         };
         writer.write_all(&buf[..len])?;
         written += len;
