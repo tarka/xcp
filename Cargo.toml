@@ -35,7 +35,7 @@ indicatif = "0.17.7"
 libc = "0.2.150"
 log = "0.4.20"
 num_cpus = "1.16.0"
-rustix = "0.38.25"
+rustix = { version = "0.38.25", features = ["fs"] }
 simplelog = "0.12.1"
 thiserror = "1.0.50"
 unbytify = "0.2.0"

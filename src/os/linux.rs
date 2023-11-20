@@ -15,153 +15,42 @@
  */
 
 
-use std::cell::RefCell;
 use std::fs::File;
 use std::io;
 use std::ops::Range;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
-use std::ptr;
+
+use rustix::fs::copy_file_range;
 
 use crate::errors::Result;
-use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
-
-/* **** Low level operations **** */
-
-// Assumes Linux kernel >= 4.5.
-mod ffi {
-    #[cfg(feature = "kernel_copy_file_range")]
-    pub unsafe fn copy_file_range(
-        fd_in: libc::c_int,
-        off_in: *mut libc::loff_t,
-        fd_out: libc::c_int,
-        off_out: *mut libc::loff_t,
-        len: libc::size_t,
-        flags: libc::c_uint,
-    ) -> libc::ssize_t {
-        libc::syscall(
-            libc::SYS_copy_file_range,
-            fd_in,
-            off_in,
-            fd_out,
-            off_out,
-            len,
-            flags,
-        ) as libc::ssize_t
-    }
-
-    // Requires GlibC >= 2.27
-    #[cfg(not(feature = "kernel_copy_file_range"))]
-    extern "C" {
-        pub fn copy_file_range(
-            fd_in: libc::c_int,
-            off_in: *mut libc::loff_t,
-            fd_out: libc::c_int,
-            off_out: *mut libc::loff_t,
-            len: libc::size_t,
-            flags: libc::c_uint,
-        ) -> libc::ssize_t;
-    }
-}
-
-macro_rules! box_ptr_or_null(
-    ($e:expr) =>
-        (match $e {
-            Some(b) => Box::into_raw(Box::new(b)),
-            None => ptr::null_mut()
-        })
-);
-
-// Kernels prior to 4.5 don't have copy_file_range, and it may not
-// work across fs mounts, so we store the fallback to userspace in a
-// thread-local flag to avoid unnecessary syscalls.
-thread_local! {
-    static USE_CFR: RefCell<bool> = RefCell::new(true);
-}
-
-fn copy_file_range(
-    infd: &File,
-    in_off: Option<i64>,
-    outfd: &File,
-    out_off: Option<i64>,
-    bytes: u64,
-) -> Option<Result<u64>> {
-    USE_CFR.with(|cfr| {
-        if *cfr.borrow() {
-            // copy_file_range(2) takes an optional pointer to an
-            // offset. However, taking pointers to the argument values
-            // interacts badly with the optimiser and can end up
-            // pointing at invalid values. To prevent this we force
-            // the values onto the heap and take a pointer to
-            // that. Note the cleanup below.
-            let in_ptr = box_ptr_or_null!(in_off);
-            let out_ptr = box_ptr_or_null!(out_off);
-
-            let r = unsafe {
-                ffi::copy_file_range(
-                    infd.as_raw_fd(),
-                    in_ptr,
-                    outfd.as_raw_fd(),
-                    out_ptr,
-                    bytes as usize,
-                    0,
-                ) as i64
-            };
-
-            // Clean-up the allocated memory by pulling it back into a Box.
-            if !in_ptr.is_null() {
-                drop(unsafe { Box::from_raw(in_ptr) });
-            }
-            if !out_ptr.is_null() {
-                drop(unsafe { Box::from_raw(out_ptr) });
-            }
-
-            match r {
-                -1 => {
-                    let errno = io::Error::last_os_error();
-                    match errno.raw_os_error() {
-                        Some(libc::ENOSYS) | Some(libc::EPERM) | Some(libc::EXDEV) => {
-                            // Flag as unavailable and fallback to userspace.
-                            *cfr.borrow_mut() = false;
-                            None
-                        }
-                        _ => Some(Err(errno.into())),
-                    }
-                }
-                _ => Some(Ok(r as u64)),
-            }
-        } else {
-            None
-        }
-    })
-}
 
 // Wrapper for copy_file_range(2) that defers file offset tracking to
 // the underlying call. See the manpage for details.
-fn copy_bytes_kernel(infd: &File, outfd: &File, nbytes: u64) -> Option<Result<u64>> {
-    copy_file_range(infd, None, outfd, None, nbytes)
+fn copy_bytes_kernel(infd: &File, outfd: &File, nbytes: u64) -> Result<usize> {
+    Ok(copy_file_range(infd, None, outfd, None, nbytes as usize)?)
 }
 
 // Wrapper for copy_file_range(2) that copies to the same position in
 // the target file.
 #[allow(dead_code)]
-fn copy_range_kernel(infd: &File, outfd: &File, nbytes: u64, off: i64) -> Option<Result<u64>> {
-    copy_file_range(infd, Some(off), outfd, Some(off), nbytes)
+fn copy_range_kernel(infd: &File, outfd: &File, nbytes: u64, off: i64) -> Result<usize> {
+    let mut off_in = off as u64;
+    let mut off_out = off as u64;
+    Ok(copy_file_range(infd, Some(&mut off_in), outfd, Some(&mut off_out), nbytes as usize)?)
 }
 
 // Wrapper for copy_bytes_kernel that falls back to userspace if
 // copy_file_range is not available.
-pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
+pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
     copy_bytes_kernel(infd, outfd, bytes)
-        .unwrap_or_else(|| copy_bytes_uspace(infd, outfd, bytes as usize))
 }
 
 // Wrapper for copy_range_kernel that copies a block . Falls back to userspace if
 // copy_file_range is not available.
 #[allow(dead_code)]
-pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<u64> {
+pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize> {
     copy_range_kernel(infd, outfd, bytes, off)
-        .unwrap_or_else(|| copy_range_uspace(infd, outfd, bytes as usize, off as usize))
 }
 
 // Guestimate if file is sparse; if it has less blocks that would be
@@ -452,18 +341,19 @@ mod tests {
             .output()?;
         assert!(out.status.success());
 
-        let offset: usize = 512 * 1024;
+        let offset = 512 * 1024;
         {
             let infd = File::open(&from)?;
             let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
+            let mut off_in = 0;
+            let mut off_out = offset as u64;
             let copied = copy_file_range(
                 &infd,
-                Some(0),
+                Some(&mut off_in),
                 &outfd,
-                Some(offset as i64),
-                data.len() as u64,
-            )
-            .unwrap()?;
+                Some(&mut off_out),
+                data.len(),
+            )?;
             assert_eq!(copied as usize, data.len());
         }
 
@@ -508,7 +398,7 @@ mod tests {
             let infd = File::open(&from)?;
             let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
             let copied =
-                copy_range_kernel(&infd, &outfd, data.len() as u64, offset as i64).unwrap()?;
+                copy_range_kernel(&infd, &outfd, data.len() as u64, offset as i64)?;
             assert_eq!(copied as usize, data.len());
         }
 
@@ -549,14 +439,15 @@ mod tests {
         {
             let infd = File::open(&from)?;
             let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
+            let mut off_in = 0;
+            let mut off_out = offset;
             let copied = copy_file_range(
                 &infd,
-                Some(0),
+                Some(&mut off_in),
                 &outfd,
-                Some(offset as i64),
-                data.len() as u64,
-            )
-            .unwrap()?;
+                Some(&mut off_out),
+                data.len(),
+            )?;
             assert_eq!(copied as usize, data.len());
         }
 
@@ -691,18 +582,19 @@ mod tests {
             .output()?;
         assert!(out.status.success());
 
-        let offset: usize = 512 * 1024;
+        let offset = 512 * 1024;
         {
             let infd = File::open(&from)?;
             let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
+            let mut off_in = 0;
+            let mut off_out = offset;
             let copied = copy_file_range(
                 &infd,
-                Some(0),
+                Some(&mut off_in),
                 &outfd,
-                Some(offset as i64),
-                data.len() as u64,
-            )
-            .unwrap()?;
+                Some(&mut off_out),
+                data.len(),
+            )?;
             assert_eq!(copied as usize, data.len());
         }
 

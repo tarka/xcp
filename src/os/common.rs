@@ -104,7 +104,7 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
 }
 
 /// Slightly modified version of io::copy() that only copies a set amount of bytes.
-pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<u64> {
+pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<usize> {
     let mut buf = vec![0; nbytes];
 
     let mut written = 0;
@@ -119,13 +119,13 @@ pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) ->
         writer.write_all(&buf[..len])?;
         written += len;
     }
-    Ok(written as u64)
+    Ok(written)
 }
 
 /// Version of copy_file_range that defers offset-management to the
 /// syscall. see copy_file_range(2) for details.
 #[allow(dead_code)]
-pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
+pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
     copy_bytes_uspace(infd, outfd, bytes as usize)
 }
 
@@ -222,7 +222,7 @@ mod tests {
             let outfd = File::create(&to).unwrap();
             let written = copy_bytes_uspace(&infd, &outfd, size).unwrap();
 
-            assert_eq!(written, size as u64);
+            assert_eq!(written, size);
         }
 
         assert_eq!(from.metadata().unwrap().len(), to.metadata().unwrap().len());

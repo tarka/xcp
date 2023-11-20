@@ -57,7 +57,7 @@ pub fn copy_bytes(handle: &CopyHandle, len: u64, updates: &mut BatchUpdater) -> 
     let mut written = 0u64;
     while written < len {
         let bytes_to_copy = cmp::min(len - written, updates.batch_size);
-        let result = copy_file_bytes(&handle.infd, &handle.outfd, bytes_to_copy)?;
+        let result = copy_file_bytes(&handle.infd, &handle.outfd, bytes_to_copy)? as u64;
         written += result;
         updates.update(Ok(result))?;
     }
