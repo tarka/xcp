@@ -16,13 +16,13 @@
 
 
 use log::{debug, warn};
+use rustix::io::pwrite;
+use rustix::{fs::ftruncate, io::pread};
 use std::cmp;
 use std::fs::File;
-use std::io;
 use std::io::{ErrorKind, Read, Write};
 use std::ops::Range;
 use std::os::unix::fs::MetadataExt;
-use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use xattr::FileExt;
 
@@ -30,13 +30,6 @@ use crate::errors::{Result, XcpError};
 use crate::operations::CopyHandle;
 use crate::options::Opts;
 use crate::os::XATTR_SUPPORTED;
-
-pub fn result_or_errno<T>(result: i64, retval: T) -> Result<T> {
-    match result {
-        -1 => Err(io::Error::last_os_error().into()),
-        _ => Ok(retval),
-    }
-}
 
 fn copy_xattr(hdl: &CopyHandle, _opts: &Opts) -> Result<()> {
     // FIXME: Flag for xattr.
@@ -72,30 +65,12 @@ pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
     Ok(())
 }
 
-fn pread(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize> {
-    let ret = unsafe {
-        libc::pread(
-            fd.as_raw_fd(),
-            buf.as_mut_ptr() as *mut libc::c_void,
-            nbytes,
-            off as i64,
-        )
-    };
-
-    result_or_errno(ret as i64, ret as usize)
+fn read_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
+    Ok(pread(fd, buf, off as u64)?)
 }
 
-fn pwrite(fd: &File, buf: &mut [u8], nbytes: usize, off: usize) -> Result<usize> {
-    let ret = unsafe {
-        libc::pwrite(
-            fd.as_raw_fd(),
-            buf.as_mut_ptr() as *mut libc::c_void,
-            nbytes,
-            off as i64,
-        )
-    };
-
-    result_or_errno(ret as i64, ret as usize)
+fn write_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
+    Ok(pwrite(fd, buf, off as u64)?)
 }
 
 #[allow(dead_code)]
@@ -109,13 +84,13 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
         let next = cmp::min(nbytes - written, nbytes);
         let noff = off + written;
 
-        let rlen = match pread(reader, &mut buf[..next], next, noff) {
+        let rlen = match read_bytes(reader, &mut buf[..next], noff) {
             Ok(0) => return Err(XcpError::InvalidSource("Source file ended prematurely.").into()),
             Ok(len) => len,
             Err(e) => return Err(e),
         };
 
-        let _wlen = match pwrite(writer, &mut buf[..rlen], next, noff) {
+        let _wlen = match write_bytes(writer, &mut buf[..rlen], noff) {
             Ok(len) if len < rlen => {
                 return Err(XcpError::InvalidSource("Failed write to file.").into())
             }
@@ -163,8 +138,7 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
 
 /// Allocate file space on disk. Uses Posix ftruncate().
 pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
-    let r = unsafe { libc::ftruncate(fd.as_raw_fd(), len as i64) };
-    result_or_errno(r as i64, ())
+    Ok(ftruncate(fd, len)?)
 }
 
 // No sparse file handling by default, needs to be implemented
