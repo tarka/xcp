@@ -75,7 +75,7 @@ fn write_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
 
 #[allow(dead_code)]
 /// Copy a block of bytes at an offset between files. Uses Posix pread/pwrite.
-pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<u64> {
+pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<usize> {
     // FIXME: For larger buffers we should use a pre-allocated thread-local?
     let mut buf = vec![0; nbytes];
 
@@ -100,7 +100,7 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
 
         written += rlen;
     }
-    Ok(written as u64)
+    Ok(written)
 }
 
 /// Slightly modified version of io::copy() that only copies a set amount of bytes.
@@ -132,7 +132,7 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
 // Copy a single file block.
 // TODO: Not used currently, intended for parallel block copy support.
 #[allow(dead_code)]
-pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<u64> {
+pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize> {
     copy_range_uspace(infd, outfd, bytes as usize, off as usize)
 }
 
@@ -258,7 +258,7 @@ mod tests {
                 written += copy_range_uspace(&infd, &outfd, blocksize, blocksize * off).unwrap();
             }
 
-            assert_eq!(written, size as u64);
+            assert_eq!(written, size);
         }
 
         assert_eq!(from.metadata().unwrap().len(), to.metadata().unwrap().len());

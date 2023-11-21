@@ -24,11 +24,33 @@ use std::os::unix::io::AsRawFd;
 use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
 
 use crate::errors::Result;
+use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
+
+fn try_copy_file_range(
+    infd: &File,
+    in_off: Option<&mut u64>,
+    outfd: &File,
+    out_off: Option<&mut u64>,
+    bytes: u64,
+) -> Option<Result<usize>> {
+    let cfr_ret = copy_file_range(infd, in_off, outfd, out_off, bytes as usize);
+
+    match cfr_ret {
+        Ok(retval) => {
+            Some(Ok(retval))
+        },
+        Err(Errno::NOSYS) | Err(Errno::PERM) | Err(Errno::XDEV) => {
+            None
+        },
+        Err(errno) => Some(Err(errno.into()))
+    }
+}
 
 // Wrapper for copy_file_range(2) that defers file offset tracking to
 // the underlying call. See the manpage for details.
 pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
-    Ok(copy_file_range(infd, None, outfd, None, bytes as usize)?)
+    try_copy_file_range(infd, None, outfd, None, bytes)
+        .unwrap_or_else(|| copy_bytes_uspace(infd, outfd, bytes as usize))
 }
 
 // Wrapper for copy_file_range(2) that copies a block at offset `off`.
@@ -36,7 +58,8 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
 pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize> {
     let mut off_in = off as u64;
     let mut off_out = off as u64;
-    Ok(copy_file_range(infd, Some(&mut off_in), outfd, Some(&mut off_out), bytes as usize)?)
+    try_copy_file_range(infd, Some(&mut off_in), outfd, Some(&mut off_out), bytes)
+        .unwrap_or_else(|| copy_range_uspace(infd, outfd, bytes as usize, off as usize))
 }
 
 // Guestimate if file is sparse; if it has less blocks that would be
