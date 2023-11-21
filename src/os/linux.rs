@@ -26,6 +26,8 @@ use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
 use crate::errors::Result;
 use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
 
+// Wrapper for copy_file_range(2) that checks for non-fatal errors due
+// to limitations of the syscall.
 fn try_copy_file_range(
     infd: &File,
     in_off: Option<&mut u64>,
@@ -42,18 +44,23 @@ fn try_copy_file_range(
         Err(Errno::NOSYS) | Err(Errno::PERM) | Err(Errno::XDEV) => {
             None
         },
-        Err(errno) => Some(Err(errno.into()))
+        Err(errno) => {
+            Some(Err(errno.into()))
+        },
     }
 }
 
 // Wrapper for copy_file_range(2) that defers file offset tracking to
-// the underlying call. See the manpage for details.
+// the underlying call.  Falls back to user-space if
+// `copy_file_range()` ia not available for thie operation.
 pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
     try_copy_file_range(infd, None, outfd, None, bytes)
         .unwrap_or_else(|| copy_bytes_uspace(infd, outfd, bytes as usize))
 }
 
-// Wrapper for copy_file_range(2) that copies a block at offset `off`.
+// Wrapper for copy_file_range(2) that copies a block at offset
+// `off`. Falls back to user-space if `copy_file_range()` ia not
+// available for thie operation.
 #[allow(dead_code)]
 pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize> {
     let mut off_in = off as u64;
@@ -81,7 +88,7 @@ pub fn lseek(fd: &File, from: SeekFrom) -> Result<SeekOff> {
     match seek(fd, from) {
         Err(errno) if errno == Errno::NXIO => Ok(SeekOff::EOF),
         Err(err) => Err(err.into()),
-        Ok(off) => Ok(SeekOff::Offset(off as u64)),
+        Ok(off) => Ok(SeekOff::Offset(off)),
     }
 }
 
