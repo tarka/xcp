@@ -18,20 +18,36 @@ mod common;
 
 use cfg_if::cfg_if;
 cfg_if! {
-    if #[cfg(target_os = "linux")] {
+    if #[cfg(all(target_os = "linux", feature = "force_userspace"))] {
         mod linux;
+        pub use linux::{
+            probably_sparse,
+            next_sparse_segments,
+            map_extents,
+        };
         pub use common::{
             allocate_file,
+            copy_file_bytes,
+            copy_file_offset,
             copy_permissions,
             merge_extents,
             is_same_file,
         };
+
+    } else if #[cfg(target_os = "linux")] {
+        mod linux;
         pub use linux::{
             copy_file_bytes,
             copy_file_offset,
             probably_sparse,
             next_sparse_segments,
             map_extents,
+        };
+        pub use common::{
+            allocate_file,
+            copy_permissions,
+            merge_extents,
+            is_same_file,
         };
 
     } else {
