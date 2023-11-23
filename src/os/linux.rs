@@ -21,7 +21,6 @@ use std::ops::Range;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 
-use libc::EOPNOTSUPP;
 use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
 
 use crate::errors::Result;
@@ -161,7 +160,7 @@ pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
         // tricky and is unsafe anyway. This is simpler for now.
         if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr) } != 0 {
             let oserr = io::Error::last_os_error();
-            if oserr.raw_os_error() == Some(EOPNOTSUPP) {
+            if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
                 return Ok(None)
             }
             return Err(oserr.into());
