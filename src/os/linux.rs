@@ -15,13 +15,12 @@
  */
 
 
-use std::fs::File;
-use std::io;
+use std::{fs::File, os::raw::c_void};
 use std::ops::Range;
 use std::os::linux::fs::MetadataExt;
-use std::os::unix::io::AsRawFd;
 
-use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
+use rustix::fd::AsRawFd;
+use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno, ioctl::{Ioctl, IoctlOutput, Opcode, RawOpcode, ioctl}};
 
 use crate::errors::Result;
 use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
@@ -134,9 +133,9 @@ struct FiemapReq {
     fm_reserved: u32,
     fm_extents: [FiemapExtent; PAGE_SIZE], // Array of mapped extents (out)
 }
-#[allow(unused)]
-impl FiemapReq {
-    fn new() -> FiemapReq {
+
+impl Default for FiemapReq {
+    fn default() -> Self {
         FiemapReq {
             fm_start: 0,
             fm_length: u64::max_value(),
@@ -149,20 +148,49 @@ impl FiemapReq {
     }
 }
 
+unsafe impl Ioctl for FiemapReq {
+    type Output = &Self;
+    const OPCODE: Opcode = Opcode::old(FS_IOC_FIEMAP as RawOpcode);
+    const IS_MUTATING: bool = true;
+
+    fn as_ptr(&mut self) -> *mut c_void {
+        self as *const Self as *mut c_void
+    }
+
+    unsafe fn output_from_ptr(_out: IoctlOutput, optr: *mut c_void) -> rustix::io::Result<Self::Output> {
+        //Ok(optr as *const Self as &Self)
+        Ok(&*optr.cast())
+    }
+}
+
+
 #[allow(unused)]
 pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
-    let mut req = FiemapReq::new();
+    let mut req = FiemapReq::default();
     let req_ptr: *const FiemapReq = &req;
     let mut extents = Vec::with_capacity(PAGE_SIZE);
 
     loop {
-        if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr) } != 0 {
-            let oserr = io::Error::last_os_error();
-            if oserr.raw_os_error() == Some(95) {
-                return Ok(None)
+        // if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr) } != 0 {
+        //     let oserr = std::io::Error::last_os_error();
+        //     if oserr.raw_os_error() == Some(95) {
+        //         return Ok(None)
+        //     }
+        //     return Err(oserr.into());
+        // }
+        println!("TESTING");
+        match unsafe { ioctl(fd, req) } {
+            Err(Errno::OPNOTSUPP) => return Ok(None),
+            Err(errno) => {
+                println!("GOT ERRNOR: {:?}", errno);
+                return Err(errno.into())
+            },
+            Ok(_) => {
+                println!("OK");
             }
-            return Err(oserr.into());
         }
+
+        println!("EXTENTS == {}", req.fm_mapped_extents);
         if req.fm_mapped_extents == 0 {
             break;
         }
