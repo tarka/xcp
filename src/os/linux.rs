@@ -15,152 +15,57 @@
  */
 
 
-use std::cell::RefCell;
 use std::fs::File;
 use std::io;
 use std::ops::Range;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
-use std::ptr;
+
+use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
 
 use crate::errors::Result;
 use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
 
-/* **** Low level operations **** */
-
-// Assumes Linux kernel >= 4.5.
-mod ffi {
-    #[cfg(feature = "kernel_copy_file_range")]
-    pub unsafe fn copy_file_range(
-        fd_in: libc::c_int,
-        off_in: *mut libc::loff_t,
-        fd_out: libc::c_int,
-        off_out: *mut libc::loff_t,
-        len: libc::size_t,
-        flags: libc::c_uint,
-    ) -> libc::ssize_t {
-        libc::syscall(
-            libc::SYS_copy_file_range,
-            fd_in,
-            off_in,
-            fd_out,
-            off_out,
-            len,
-            flags,
-        ) as libc::ssize_t
-    }
-
-    // Requires GlibC >= 2.27
-    #[cfg(not(feature = "kernel_copy_file_range"))]
-    extern "C" {
-        pub fn copy_file_range(
-            fd_in: libc::c_int,
-            off_in: *mut libc::loff_t,
-            fd_out: libc::c_int,
-            off_out: *mut libc::loff_t,
-            len: libc::size_t,
-            flags: libc::c_uint,
-        ) -> libc::ssize_t;
-    }
-}
-
-macro_rules! box_ptr_or_null(
-    ($e:expr) =>
-        (match $e {
-            Some(b) => Box::into_raw(Box::new(b)),
-            None => ptr::null_mut()
-        })
-);
-
-// Kernels prior to 4.5 don't have copy_file_range, and it may not
-// work across fs mounts, so we store the fallback to userspace in a
-// thread-local flag to avoid unnecessary syscalls.
-thread_local! {
-    static USE_CFR: RefCell<bool> = RefCell::new(true);
-}
-
-fn copy_file_range(
+// Wrapper for copy_file_range(2) that checks for non-fatal errors due
+// to limitations of the syscall.
+fn try_copy_file_range(
     infd: &File,
-    in_off: Option<i64>,
+    in_off: Option<&mut u64>,
     outfd: &File,
-    out_off: Option<i64>,
+    out_off: Option<&mut u64>,
     bytes: u64,
-) -> Option<Result<u64>> {
-    USE_CFR.with(|cfr| {
-        if *cfr.borrow() {
-            // copy_file_range(2) takes an optional pointer to an
-            // offset. However, taking pointers to the argument values
-            // interacts badly with the optimiser and can end up
-            // pointing at invalid values. To prevent this we force
-            // the values onto the heap and take a pointer to
-            // that. Note the cleanup below.
-            let in_ptr = box_ptr_or_null!(in_off);
-            let out_ptr = box_ptr_or_null!(out_off);
+) -> Option<Result<usize>> {
+    let cfr_ret = copy_file_range(infd, in_off, outfd, out_off, bytes as usize);
 
-            let r = unsafe {
-                ffi::copy_file_range(
-                    infd.as_raw_fd(),
-                    in_ptr,
-                    outfd.as_raw_fd(),
-                    out_ptr,
-                    bytes as usize,
-                    0,
-                ) as i64
-            };
-
-            // Clean-up the allocated memory by pulling it back into a Box.
-            if !in_ptr.is_null() {
-                drop(unsafe { Box::from_raw(in_ptr) });
-            }
-            if !out_ptr.is_null() {
-                drop(unsafe { Box::from_raw(out_ptr) });
-            }
-
-            match r {
-                -1 => {
-                    let errno = io::Error::last_os_error();
-                    match errno.raw_os_error() {
-                        Some(libc::ENOSYS) | Some(libc::EPERM) | Some(libc::EXDEV) => {
-                            // Flag as unavailable and fallback to userspace.
-                            *cfr.borrow_mut() = false;
-                            None
-                        }
-                        _ => Some(Err(errno.into())),
-                    }
-                }
-                _ => Some(Ok(r as u64)),
-            }
-        } else {
+    match cfr_ret {
+        Ok(retval) => {
+            Some(Ok(retval))
+        },
+        Err(Errno::NOSYS) | Err(Errno::PERM) | Err(Errno::XDEV) => {
             None
-        }
-    })
+        },
+        Err(errno) => {
+            Some(Err(errno.into()))
+        },
+    }
 }
 
 // Wrapper for copy_file_range(2) that defers file offset tracking to
-// the underlying call. See the manpage for details.
-fn copy_bytes_kernel(infd: &File, outfd: &File, nbytes: u64) -> Option<Result<u64>> {
-    copy_file_range(infd, None, outfd, None, nbytes)
-}
-
-// Wrapper for copy_file_range(2) that copies to the same position in
-// the target file.
-#[allow(dead_code)]
-fn copy_range_kernel(infd: &File, outfd: &File, nbytes: u64, off: i64) -> Option<Result<u64>> {
-    copy_file_range(infd, Some(off), outfd, Some(off), nbytes)
-}
-
-// Wrapper for copy_bytes_kernel that falls back to userspace if
-// copy_file_range is not available.
-pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<u64> {
-    copy_bytes_kernel(infd, outfd, bytes)
+// the underlying call.  Falls back to user-space if
+// `copy_file_range()` ia not available for thie operation.
+pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
+    try_copy_file_range(infd, None, outfd, None, bytes)
         .unwrap_or_else(|| copy_bytes_uspace(infd, outfd, bytes as usize))
 }
 
-// Wrapper for copy_range_kernel that copies a block . Falls back to userspace if
-// copy_file_range is not available.
+// Wrapper for copy_file_range(2) that copies a block at offset
+// `off`. Falls back to user-space if `copy_file_range()` ia not
+// available for thie operation.
 #[allow(dead_code)]
-pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<u64> {
-    copy_range_kernel(infd, outfd, bytes, off)
+pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize> {
+    let mut off_in = off as u64;
+    let mut off_out = off as u64;
+    try_copy_file_range(infd, Some(&mut off_in), outfd, Some(&mut off_out), bytes)
         .unwrap_or_else(|| copy_range_uspace(infd, outfd, bytes as usize, off as usize))
 }
 
@@ -173,33 +78,17 @@ pub fn probably_sparse(fd: &File) -> Result<bool> {
     Ok(stat.st_blocks() < stat.st_size() / ST_NBLOCKSIZE)
 }
 
-/// Corresponds to lseek(2) `whence`
-#[allow(dead_code)]
-pub enum Whence {
-    Set = libc::SEEK_SET as isize,
-    Cur = libc::SEEK_CUR as isize,
-    End = libc::SEEK_END as isize,
-    Data = libc::SEEK_DATA as isize,
-    Hole = libc::SEEK_HOLE as isize,
-}
-
 #[derive(PartialEq, Debug)]
 pub enum SeekOff {
     Offset(u64),
     EOF,
 }
 
-pub fn lseek(fd: &File, off: i64, whence: Whence) -> Result<SeekOff> {
-    let r = unsafe { libc::lseek64(fd.as_raw_fd(), off, whence as libc::c_int) };
-
-    if r == -1 {
-        let err = io::Error::last_os_error();
-        match err.raw_os_error() {
-            Some(errno) if errno == libc::ENXIO => Ok(SeekOff::EOF),
-            _ => Err(err.into()),
-        }
-    } else {
-        Ok(SeekOff::Offset(r as u64))
+pub fn lseek(fd: &File, from: SeekFrom) -> Result<SeekOff> {
+    match seek(fd, from) {
+        Err(errno) if errno == Errno::NXIO => Ok(SeekOff::EOF),
+        Err(err) => Err(err.into()),
+        Ok(off) => Ok(SeekOff::Offset(off)),
     }
 }
 
@@ -267,9 +156,11 @@ pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     let mut extents = Vec::with_capacity(PAGE_SIZE);
 
     loop {
+        // FIXME: Rustix has an IOCTL mini-framework but it's a little
+        // tricky and is unsafe anyway. This is simpler for now.
         if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr) } != 0 {
             let oserr = io::Error::last_os_error();
-            if oserr.raw_os_error() == Some(95) {
+            if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
                 return Ok(None)
             }
             return Err(oserr.into());
@@ -298,17 +189,17 @@ pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
 }
 
 pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64, u64)> {
-    let next_data = match lseek(infd, pos as i64, Whence::Data)? {
+    let next_data = match lseek(infd, SeekFrom::Data(pos as i64))? {
         SeekOff::Offset(off) => off,
         SeekOff::EOF => infd.metadata()?.len(),
     };
-    let next_hole = match lseek(infd, next_data as i64, Whence::Hole)? {
+    let next_hole = match lseek(infd, SeekFrom::Hole(next_data as i64))? {
         SeekOff::Offset(off) => off,
         SeekOff::EOF => infd.metadata()?.len(),
     };
 
-    lseek(infd, next_data as i64, Whence::Set)?; // FIXME: EOF (but shouldn't happen)
-    lseek(outfd, next_data as i64, Whence::Set)?;
+    lseek(infd, SeekFrom::Start(next_data))?; // FIXME: EOF (but shouldn't happen)
+    lseek(outfd, SeekFrom::Start(next_data))?;
 
     Ok((next_data, next_hole))
 }
@@ -319,7 +210,7 @@ mod tests {
     use crate::os::allocate_file;
     use std::env::{current_dir, var};
     use std::fs::{read, OpenOptions};
-    use std::io::{Seek, SeekFrom, Write};
+    use std::io::{self, Seek, Write};
     use std::iter;
     use std::path::PathBuf;
     use std::process::Command;
@@ -452,18 +343,19 @@ mod tests {
             .output()?;
         assert!(out.status.success());
 
-        let offset: usize = 512 * 1024;
+        let offset = 512 * 1024;
         {
             let infd = File::open(&from)?;
             let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
+            let mut off_in = 0;
+            let mut off_out = offset as u64;
             let copied = copy_file_range(
                 &infd,
-                Some(0),
+                Some(&mut off_in),
                 &outfd,
-                Some(offset as i64),
-                data.len() as u64,
-            )
-            .unwrap()?;
+                Some(&mut off_out),
+                data.len(),
+            )?;
             assert_eq!(copied as usize, data.len());
         }
 
@@ -495,7 +387,7 @@ mod tests {
 
         {
             let mut fd = File::create(&from)?;
-            fd.seek(SeekFrom::Start(offset as u64))?;
+            fd.seek(io::SeekFrom::Start(offset as u64))?;
             write!(fd, "{}", data)?;
         }
 
@@ -508,7 +400,7 @@ mod tests {
             let infd = File::open(&from)?;
             let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
             let copied =
-                copy_range_kernel(&infd, &outfd, data.len() as u64, offset as i64).unwrap()?;
+                copy_file_offset(&infd, &outfd, data.len() as u64, offset as i64)?;
             assert_eq!(copied as usize, data.len());
         }
 
@@ -549,20 +441,21 @@ mod tests {
         {
             let infd = File::open(&from)?;
             let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
+            let mut off_in = 0;
+            let mut off_out = offset;
             let copied = copy_file_range(
                 &infd,
-                Some(0),
+                Some(&mut off_in),
                 &outfd,
-                Some(offset as i64),
-                data.len() as u64,
-            )
-            .unwrap()?;
+                Some(&mut off_out),
+                data.len(),
+            )?;
             assert_eq!(copied as usize, data.len());
         }
 
         assert!(probably_sparse(&File::open(&file)?)?);
 
-        let off = lseek(&File::open(&file)?, 0, Whence::Data)?;
+        let off = lseek(&File::open(&file)?, SeekFrom::Data(0))?;
         assert_eq!(off, SeekOff::Offset(offset));
 
         Ok(())
@@ -583,10 +476,10 @@ mod tests {
             let mut fd = File::create(&file)?;
             write!(fd, "{}", data)?;
 
-            fd.seek(SeekFrom::Start(1024 * 4096))?;
+            fd.seek(io::SeekFrom::Start(1024 * 4096))?;
             write!(fd, "{}", data)?;
 
-            fd.seek(SeekFrom::Start(4096 * 4096 - data.len() as u64))?;
+            fd.seek(io::SeekFrom::Start(4096 * 4096 - data.len() as u64))?;
             write!(fd, "{}", data)?;
         }
 
@@ -621,7 +514,7 @@ mod tests {
         assert!(probably_sparse(&File::open(&file)?)?);
 
         let fd = File::open(&file)?;
-        let off = lseek(&fd, 0, Whence::Data)?;
+        let off = lseek(&fd, SeekFrom::Data(0))?;
         assert!(off == SeekOff::EOF);
 
         Ok(())
@@ -691,18 +584,19 @@ mod tests {
             .output()?;
         assert!(out.status.success());
 
-        let offset: usize = 512 * 1024;
+        let offset = 512 * 1024;
         {
             let infd = File::open(&from)?;
             let outfd: File = OpenOptions::new().write(true).append(false).open(&file)?;
+            let mut off_in = 0;
+            let mut off_out = offset;
             let copied = copy_file_range(
                 &infd,
-                Some(0),
+                Some(&mut off_in),
                 &outfd,
-                Some(offset as i64),
-                data.len() as u64,
-            )
-            .unwrap()?;
+                Some(&mut off_out),
+                data.len(),
+            )?;
             assert_eq!(copied as usize, data.len());
         }
 
@@ -739,7 +633,7 @@ mod tests {
         let mut fd = OpenOptions::new().write(true).append(false).open(&file)?;
         // Skip every-other block
         for off in (0..fsize).step_by(bsize * 2) {
-            lseek(&fd, off, Whence::Set)?;
+            lseek(&fd, SeekFrom::Start(off))?;
             fd.write_all(block.as_slice())?;
         }
 

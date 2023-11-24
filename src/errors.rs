@@ -14,13 +14,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::io::Error as IOError;
 use std::path::PathBuf;
 
 pub use anyhow::{Error, Result};
-use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum XcpError {
     #[error("Unknown file-type: {0}")]
     UnknownFiletype(PathBuf),
@@ -39,9 +37,6 @@ pub enum XcpError {
 
     #[error("Destination Exists: {0}, {1}")]
     DestinationExists(&'static str, PathBuf),
-
-    #[error("IO Error: {0}")]
-    IOError(IOError),
 
     #[error("Early shutdown: {0}")]
     EarlyShutdown(&'static str),

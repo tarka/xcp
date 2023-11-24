@@ -115,7 +115,7 @@ fn queue_file_range(
         pool.execute(move || {
             let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64).unwrap();
 
-            stat_tx.send(StatusUpdate::Copied(r), bytes, bsize).unwrap();
+            stat_tx.send(StatusUpdate::Copied(r as u64), bytes, bsize).unwrap();
         });
     }
     Ok(len)
