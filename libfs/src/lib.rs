@@ -15,6 +15,7 @@
  */
 
 mod common;
+mod errors;
 
 use cfg_if::cfg_if;
 cfg_if! {

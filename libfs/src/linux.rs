@@ -24,7 +24,7 @@ use std::os::unix::io::AsRawFd;
 use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
 
 use crate::errors::Result;
-use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
+use crate::common::{copy_bytes_uspace, copy_range_uspace};
 
 // Wrapper for copy_file_range(2) that checks for non-fatal errors due
 // to limitations of the syscall.
@@ -207,7 +207,7 @@ pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::os::allocate_file;
+    use crate::allocate_file;
     use std::env::{current_dir, var};
     use std::fs::{read, OpenOptions};
     use std::io::{self, Seek, Write};

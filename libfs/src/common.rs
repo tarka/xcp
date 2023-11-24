@@ -27,41 +27,37 @@ use std::path::Path;
 use xattr::FileExt;
 
 use crate::errors::{Result, XcpError};
-use crate::operations::CopyHandle;
-use crate::options::Opts;
-use crate::os::XATTR_SUPPORTED;
+use crate::XATTR_SUPPORTED;
 
-fn copy_xattr(hdl: &CopyHandle, _opts: &Opts) -> Result<()> {
+fn copy_xattr(infd: &File, outfd: &File) -> Result<()> {
     // FIXME: Flag for xattr.
     if XATTR_SUPPORTED {
         debug!("Starting xattr copy...");
-        for attr in hdl.infd.list_xattr()? {
-            if let Some(val) = hdl.infd.get_xattr(&attr)? {
+        for attr in infd.list_xattr()? {
+            if let Some(val) = infd.get_xattr(&attr)? {
                 debug!("Copy xattr {:?}", attr);
-                hdl.outfd.set_xattr(attr, val.as_slice())?;
+                outfd.set_xattr(attr, val.as_slice())?;
             }
         }
     }
     Ok(())
 }
 
-pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
-    if !opts.no_perms {
-        let xr = copy_xattr(hdl, opts);
-        if let Err(e) = xr {
-            // FIXME: We don't have a way of detecting if the
-            // target FS supports XAttr, so assume any error is
-            // "Unsupported" for now.
-            warn!("Failed to copy xattrs from {:?}: {}", hdl.infd, e);
-        }
-
-        // FIXME: ACLs, selinux, etc.
-
-        debug!("Performing permissions copy");
-        hdl.outfd.set_permissions(hdl.metadata.permissions())?;
-
-        debug!("Permissions copy done");
+pub fn copy_permissions(infd: &File, outfd: &File) -> Result<()> {
+    let xr = copy_xattr(infd, outfd);
+    if let Err(e) = xr {
+        // FIXME: We don't have a way of detecting if the
+        // target FS supports XAttr, so assume any error is
+        // "Unsupported" for now.
+        warn!("Failed to copy xattrs from {:?}: {}", infd, e);
     }
+
+    // FIXME: ACLs, selinux, etc.
+
+    debug!("Performing permissions copy");
+    outfd.set_permissions(infd.metadata()?.permissions())?;
+
+    debug!("Permissions copy done");
     Ok(())
 }
 

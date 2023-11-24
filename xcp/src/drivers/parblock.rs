@@ -33,7 +33,7 @@ use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
 use crate::operations::{init_copy, CopyHandle};
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
-use crate::os::{copy_file_offset, map_extents, merge_extents, probably_sparse};
+use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
 use crate::progress::{ProgressBar, StatusUpdate};
 use crate::utils::{empty, FileType, ToFileType};
 
