@@ -15,7 +15,6 @@
  */
 
 use crossbeam_channel as cbc;
-use crossbeam_utils::thread as cbt;
 use log::{debug, error, info};
 use std::fs::{create_dir_all, read_link};
 use std::os::unix::fs::symlink;
@@ -203,7 +202,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
 
     // Use scoped threads here so we can pass down e.g. Opts without
     // repeated cloning.
-    cbt::scope(|s| {
+    thread::scope(|s| {
         for _ in 0..num_workers(opts) {
             let _copy_worker = {
                 let copy_stat = BatchUpdater {
@@ -212,7 +211,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
                     batch_size,
                 };
                 let wrx = work_rx.clone();
-                s.spawn(|_s| copy_worker(wrx, opts, copy_stat))
+                s.spawn(|| copy_worker(wrx, opts, copy_stat))
             };
         }
         let _walk_worker = {
@@ -221,7 +220,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
                 stat: StatusUpdate::Size(0),
                 batch_size,
             };
-            s.spawn(|_s| tree_walker(sources, dest, opts, work_tx, size_stat))
+            s.spawn(|| tree_walker(sources, dest, opts, work_tx, size_stat))
         };
 
         for stat in stat_rx {
@@ -236,8 +235,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
         }
 
         Ok::<(), anyhow::Error>(())
-    })
-    .unwrap()?;
+    })?;
 
     // FIXME: We should probably join the threads and consume any errors.
 
