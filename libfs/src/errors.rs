@@ -14,13 +14,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pub use anyhow::{Error, Result};
-
 #[derive(Debug, thiserror::Error)]
-pub enum XcpError {
+pub enum Error {
     #[error("Invalid source: {0}")]
     InvalidSource(&'static str),
+
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    OSError(#[from] rustix::io::Errno),
 
     #[error("Unsupported operation; this function should never be called on this OS.")]
     UnsupportedOperation,
 }
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
