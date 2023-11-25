@@ -219,7 +219,7 @@ mod tests {
     fn tempdir() -> Result<TempDir> {
         // Force into local dir as /tmp might be tmpfs, which doesn't
         // support all VFS options (notably fiemap).
-        Ok(tempdir_in(current_dir()?.join("target"))?)
+        Ok(tempdir_in(current_dir()?.join("../target"))?)
     }
 
     fn fs_supports_extents() -> bool {
@@ -467,7 +467,7 @@ mod tests {
             return Ok(())
         }
 
-        let dir = PathBuf::from("target");
+        let dir = PathBuf::from("../target");
         let file = dir.join("sparse.bin");
 
         let data = "c00lc0d3";

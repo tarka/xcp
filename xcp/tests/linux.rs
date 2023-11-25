@@ -23,8 +23,8 @@ cfg_if! {if #[cfg(target_os = "linux")] {
     mod util;
     use crate::util::*;
 
-    #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+    #[test_case("parfile"; "Test with parallel file driver")]
     #[ignore] // Expensive so skip for local dev
     fn copy_generated_tree_sparse(drv: &str) {
         let dir = tempdir().unwrap();
@@ -50,8 +50,8 @@ cfg_if! {if #[cfg(target_os = "linux")] {
         compare_trees(&src, &dest).unwrap();
     }
 
-    #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+    #[test_case("parfile"; "Test with parallel file driver")]
     fn test_sparse(drv: &str) {
         if !fs_supports_sparse() {
             return
@@ -83,8 +83,8 @@ cfg_if! {if #[cfg(target_os = "linux")] {
         assert_eq!(from_data, to_data);
     }
 
-    #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+    #[test_case("parfile"; "Test with parallel file driver")]
     fn test_sparse_leading_gap(drv: &str) {
         if !fs_supports_sparse() {
             return
@@ -115,8 +115,8 @@ cfg_if! {if #[cfg(target_os = "linux")] {
         assert_eq!(from_data, to_data);
     }
 
-    #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+    #[test_case("parfile"; "Test with parallel file driver")]
     fn test_sparse_trailng_gap(drv: &str) {
         if !fs_supports_sparse() {
             return
@@ -147,8 +147,8 @@ cfg_if! {if #[cfg(target_os = "linux")] {
         assert_eq!(from_data, to_data);
     }
 
-    #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+    #[test_case("parfile"; "Test with parallel file driver")]
     fn test_sparse_single_overwrite(drv: &str) {
         if !fs_supports_sparse() {
             return
@@ -179,8 +179,8 @@ cfg_if! {if #[cfg(target_os = "linux")] {
         assert_eq!(from_data, to_data);
     }
 
-    #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+    #[test_case("parfile"; "Test with parallel file driver")]
     fn test_empty_sparse(drv: &str) {
         if !fs_supports_sparse() {
             return
