@@ -81,14 +81,14 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
         let noff = off + written;
 
         let rlen = match read_bytes(reader, &mut buf[..next], noff) {
-            Ok(0) => return Err(Error::InvalidSource("Source file ended prematurely.").into()),
+            Ok(0) => return Err(Error::InvalidSource("Source file ended prematurely.")),
             Ok(len) => len,
             Err(e) => return Err(e),
         };
 
         let _wlen = match write_bytes(writer, &mut buf[..rlen], noff) {
             Ok(len) if len < rlen => {
-                return Err(Error::InvalidSource("Failed write to file.").into())
+                return Err(Error::InvalidSource("Failed write to file."))
             }
             Ok(len) => len,
             Err(e) => return Err(e),
@@ -107,7 +107,7 @@ pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) ->
     while written < nbytes {
         let next = cmp::min(nbytes - written, nbytes);
         let len = match reader.read(&mut buf[..next]) {
-            Ok(0) => return Err(Error::InvalidSource("Source file ended prematurely.").into()),
+            Ok(0) => return Err(Error::InvalidSource("Source file ended prematurely.")),
             Ok(len) => len,
             Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
             Err(e) => return Err(e.into())
@@ -147,12 +147,12 @@ pub fn probably_sparse(_fd: &File) -> Result<bool> {
 #[allow(dead_code)]
 pub fn map_extents(_fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     // FIXME: Implement for *BSD with lseek?
-    Err(Error::UnsupportedOperation {}.into())
+    Err(Error::UnsupportedOperation {})
 }
 
 #[allow(dead_code)]
 pub fn next_sparse_segments(_infd: &File, _outfd: &File, _pos: u64) -> Result<(u64, u64)> {
-    Err(Error::UnsupportedOperation {}.into())
+    Err(Error::UnsupportedOperation {})
 }
 
 #[allow(dead_code)]
