@@ -76,7 +76,7 @@ pub fn run(args: &[&str]) -> Result<Output, Error> {
 pub fn tempdir() -> Result<TempDir, Error> {
     // Force into local dir as /tmp might be tmpfs, which doesn't
     // support all VFS options (notably fiemap).
-    Ok(tempdir_in(current_dir()?.join("../target"))?)
+    Ok(tempdir_in(current_dir()?.join("target"))?)
 }
 
 pub fn tempdir_rel() -> Result<PathBuf, Error> {

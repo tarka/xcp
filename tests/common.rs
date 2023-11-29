@@ -483,7 +483,7 @@ fn copy_generated_tree(drv: &str) {
     let dir = tempdir().unwrap();
 
     let src = dir.path().join("generated");
-    let dest = dir.path().join("../target");
+    let dest = dir.path().join("target");
 
     // Spam some output to keep CI from timing-out (hopefully).
     println!("Generating file tree...");
