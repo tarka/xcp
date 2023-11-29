@@ -15,8 +15,7 @@ categories =["command-line-utilities"]
 license = "GPL-3.0-only"
 
 [features]
-default = ["kernel_copy_file_range", "parblock"]
-kernel_copy_file_range = []
+default = ["parblock"]
 parblock = []
 
 [dependencies]
