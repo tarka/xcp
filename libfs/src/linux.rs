@@ -59,8 +59,8 @@ pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
 }
 
 // Wrapper for copy_file_range(2) that copies a block at offset
-// `off`. Falls back to user-space if `copy_file_range()` ia not
-// available for thie operation.
+// `off`. Falls back to user-space if `copy_file_range()` is not
+// available for the operation.
 #[allow(dead_code)]
 pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize> {
     let mut off_in = off as u64;
@@ -69,9 +69,9 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
         .unwrap_or_else(|| copy_range_uspace(infd, outfd, bytes as usize, off as usize))
 }
 
-// Guestimate if file is sparse; if it has less blocks that would be
-// expected for its stated size. This is the same test used by
-// coreutils `cp`.
+/// Guestimate if file is sparse; if it has less blocks that would be
+/// expected for its stated size. This is the same test used by
+/// coreutils `cp`.
 pub fn probably_sparse(fd: &File) -> Result<bool> {
     const ST_NBLOCKSIZE: u64 = 512;
     let stat = fd.metadata()?;
@@ -79,12 +79,12 @@ pub fn probably_sparse(fd: &File) -> Result<bool> {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum SeekOff {
+enum SeekOff {
     Offset(u64),
     EOF,
 }
 
-pub fn lseek(fd: &File, from: SeekFrom) -> Result<SeekOff> {
+fn lseek(fd: &File, from: SeekFrom) -> Result<SeekOff> {
     match seek(fd, from) {
         Err(errno) if errno == Errno::NXIO => Ok(SeekOff::EOF),
         Err(err) => Err(err.into()),
