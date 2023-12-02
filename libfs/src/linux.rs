@@ -14,13 +14,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
 use std::fs::File;
 use std::io;
 use std::ops::Range;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 
+use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST};
 use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
 
 use crate::errors::Result;
@@ -92,12 +92,8 @@ pub fn lseek(fd: &File, from: SeekFrom) -> Result<SeekOff> {
     }
 }
 
-// See ioctl_list(2)
 #[allow(unused)]
-const FS_IOC_FIEMAP: libc::c_ulong = 0xC020660B;
-#[allow(unused)]
-const FIEMAP_EXTENT_LAST: u32 = 0x00000001;
-const PAGE_SIZE: usize = 32;
+const FIEMAP_PAGE_SIZE: usize = 32;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -132,7 +128,7 @@ struct FiemapReq {
     fm_mapped_extents: u32, // Number of extents that were mapped (out)
     fm_extent_count: u32,   // Size of fm_extents array (in)
     fm_reserved: u32,
-    fm_extents: [FiemapExtent; PAGE_SIZE], // Array of mapped extents (out)
+    fm_extents: [FiemapExtent; FIEMAP_PAGE_SIZE], // Array of mapped extents (out)
 }
 #[allow(unused)]
 impl FiemapReq {
@@ -142,9 +138,9 @@ impl FiemapReq {
             fm_length: u64::max_value(),
             fm_flags: 0,
             fm_mapped_extents: 0,
-            fm_extent_count: PAGE_SIZE as u32,
+            fm_extent_count: FIEMAP_PAGE_SIZE as u32,
             fm_reserved: 0,
-            fm_extents: [FiemapExtent::new(); PAGE_SIZE],
+            fm_extents: [FiemapExtent::new(); FIEMAP_PAGE_SIZE],
         }
     }
 }
@@ -153,12 +149,12 @@ impl FiemapReq {
 pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     let mut req = FiemapReq::new();
     let req_ptr: *const FiemapReq = &req;
-    let mut extents = Vec::with_capacity(PAGE_SIZE);
+    let mut extents = Vec::with_capacity(FIEMAP_PAGE_SIZE);
 
     loop {
         // FIXME: Rustix has an IOCTL mini-framework but it's a little
         // tricky and is unsafe anyway. This is simpler for now.
-        if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr) } != 0 {
+        if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP as u64, req_ptr) } != 0 {
             let oserr = io::Error::last_os_error();
             if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
                 return Ok(None)

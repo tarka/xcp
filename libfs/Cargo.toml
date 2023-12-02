@@ -16,8 +16,9 @@ license = "GPL-3.0-only"
 [dependencies]
 cfg-if = "1.0.0"
 libc = "0.2.150"
+linux-raw-sys = { version = "0.6.2", features = ["ioctl"] }
 log = "0.4.20"
-rustix = { version = "0.38.25", features = ["fs"] }
+rustix = { version = "0.38.26", features = ["fs"] }
 tempfile = "3.8.1"
 thiserror = "1.0.50"
 xattr = "1.0.1"
