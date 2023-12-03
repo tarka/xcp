@@ -15,8 +15,9 @@ categories =["command-line-utilities"]
 license = "GPL-3.0-only"
 
 [features]
-default = ["parblock"]
+default = ["parblock", "use_linux"]
 parblock = []
+use_linux = ["libfs/use_linux"]
 
 [dependencies]
 anyhow = "1.0.75"

@@ -61,17 +61,17 @@ pub fn copy_permissions(infd: &File, outfd: &File) -> Result<()> {
     Ok(())
 }
 
-fn read_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
+pub(crate) fn read_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
     Ok(pread(fd, buf, off as u64)?)
 }
 
-fn write_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
+pub(crate) fn write_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
     Ok(pwrite(fd, buf, off as u64)?)
 }
 
 #[allow(dead_code)]
 /// Copy a block of bytes at an offset between files. Uses Posix pread/pwrite.
-pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<usize> {
+pub(crate) fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<usize> {
     // FIXME: For larger buffers we should use a pre-allocated thread-local?
     let mut buf = vec![0; nbytes];
 
@@ -100,7 +100,7 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
 }
 
 /// Slightly modified version of io::copy() that only copies a set amount of bytes.
-pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<usize> {
+pub(crate) fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<usize> {
     let mut buf = vec![0; nbytes];
 
     let mut written = 0;
@@ -118,41 +118,9 @@ pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) ->
     Ok(written)
 }
 
-/// Version of copy_file_range that defers offset-management to the
-/// syscall. see copy_file_range(2) for details.
-#[allow(dead_code)]
-pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
-    copy_bytes_uspace(infd, outfd, bytes as usize)
-}
-
-// Copy a single file block.
-// TODO: Not used currently, intended for parallel block copy support.
-#[allow(dead_code)]
-pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize> {
-    copy_range_uspace(infd, outfd, bytes as usize, off as usize)
-}
-
 /// Allocate file space on disk. Uses Posix ftruncate().
 pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
     Ok(ftruncate(fd, len)?)
-}
-
-// No sparse file handling by default, needs to be implemented
-// per-OS. This effectively disables the following operations.
-#[allow(dead_code)]
-pub fn probably_sparse(_fd: &File) -> Result<bool> {
-    Ok(false)
-}
-
-#[allow(dead_code)]
-pub fn map_extents(_fd: &File) -> Result<Option<Vec<Range<u64>>>> {
-    // FIXME: Implement for *BSD with lseek?
-    Err(Error::UnsupportedOperation {})
-}
-
-#[allow(dead_code)]
-pub fn next_sparse_segments(_infd: &File, _outfd: &File, _pos: u64) -> Result<(u64, u64)> {
-    Err(Error::UnsupportedOperation {})
 }
 
 #[allow(dead_code)]

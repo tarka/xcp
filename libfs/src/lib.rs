@@ -19,36 +19,28 @@ mod errors;
 
 use cfg_if::cfg_if;
 cfg_if! {
-    if #[cfg(target_os = "linux")] {
+    if #[cfg(all(target_os = "linux", feature = "use_linux"))] {
         mod linux;
-        pub use common::{
-            allocate_file,
-            copy_permissions,
-            merge_extents,
-            is_same_file,
-        };
-        pub use linux::{
-            copy_file_bytes,
-            copy_file_offset,
-            probably_sparse,
-            next_sparse_segments,
-            map_extents,
-        };
-
+        use linux as backend;
     } else {
-        pub use common::{
-            allocate_file,
-            copy_file_bytes,
-            copy_file_offset,
-            copy_permissions,
-            probably_sparse,
-            next_sparse_segments,
-            merge_extents,
-            map_extents,
-            is_same_file,
-        };
+        mod fallback;
+        use fallback as backend;
     }
 }
+pub use backend::{
+    copy_file_bytes,
+    copy_file_offset,
+    probably_sparse,
+    next_sparse_segments,
+    map_extents,
+};
+pub use common::{
+    allocate_file,
+    copy_permissions,
+    merge_extents,
+    is_same_file,
+};
+
 
 // NOTE: The xattr crate has a SUPPORTED_PLATFORM flag, however it
 // allows NetBSD, which fails for us, so we stick to platforms we've

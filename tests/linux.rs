@@ -15,8 +15,8 @@
  */
 
 use cfg_if::cfg_if;
-cfg_if! {if #[cfg(target_os = "linux")] {
 
+cfg_if! {if #[cfg(all(target_os = "linux", feature = "use_linux"))] {
     use std::process::Command;
     use test_case::test_case;
 

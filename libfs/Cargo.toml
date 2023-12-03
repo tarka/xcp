@@ -13,6 +13,10 @@ keywords = ["coreutils", "cp", "files", "filesystem"]
 categories =["filesystem"]
 license = "GPL-3.0-only"
 
+[features]
+default = ["use_linux"]
+use_linux = []
+
 [dependencies]
 cfg-if = "1.0.0"
 libc = "0.2.150"

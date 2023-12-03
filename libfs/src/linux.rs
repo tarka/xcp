@@ -92,7 +92,6 @@ fn lseek(fd: &File, from: SeekFrom) -> Result<SeekOff> {
     }
 }
 
-#[allow(unused)]
 const FIEMAP_PAGE_SIZE: usize = 32;
 
 #[repr(C)]
@@ -105,7 +104,6 @@ struct FiemapExtent {
     fe_flags: u32, // FIEMAP_EXTENT_* flags for this extent
     fe_reserved: [u32; 3],
 }
-#[allow(unused)]
 impl FiemapExtent {
     fn new() -> FiemapExtent {
         FiemapExtent {
@@ -130,7 +128,6 @@ struct FiemapReq {
     fm_reserved: u32,
     fm_extents: [FiemapExtent; FIEMAP_PAGE_SIZE], // Array of mapped extents (out)
 }
-#[allow(unused)]
 impl FiemapReq {
     fn new() -> FiemapReq {
         FiemapReq {
@@ -145,7 +142,6 @@ impl FiemapReq {
     }
 }
 
-#[allow(unused)]
 pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     let mut req = FiemapReq::new();
     let req_ptr: *const FiemapReq = &req;
