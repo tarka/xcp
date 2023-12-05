@@ -34,8 +34,13 @@ pub use backend::{
     next_sparse_segments,
     map_extents,
 };
-pub use common::*;
-pub use errors::Error;
+pub use common::{
+    allocate_file,
+    copy_permissions,
+    merge_extents,
+    is_same_file,
+};
+
 
 // NOTE: The xattr crate has a SUPPORTED_PLATFORM flag, however it
 // allows NetBSD, which fails for us, so we stick to platforms we've
