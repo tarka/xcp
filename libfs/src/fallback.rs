@@ -41,7 +41,7 @@ pub fn probably_sparse(_fd: &File) -> Result<bool> {
 
 pub fn map_extents(_fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     // FIXME: Implement for *BSD with lseek?
-    Err(Error::UnsupportedOperation {})
+    Ok(None)
 }
 
 pub fn next_sparse_segments(_infd: &File, _outfd: &File, _pos: u64) -> Result<(u64, u64)> {

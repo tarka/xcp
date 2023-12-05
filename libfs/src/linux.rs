@@ -50,18 +50,19 @@ fn try_copy_file_range(
     }
 }
 
-// Wrapper for copy_file_range(2) that defers file offset tracking to
-// the underlying call.  Falls back to user-space if
-// `copy_file_range()` ia not available for thie operation.
+/// File copy operation that defers file offset tracking to the
+/// underlying call.  On Linux this attempts to use
+/// [copy_file_range](https://man7.org/linux/man-pages/man2/copy_file_range.2.html)
+/// and falls back to user-space if that is not available.
 pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
     try_copy_file_range(infd, None, outfd, None, bytes)
         .unwrap_or_else(|| copy_bytes_uspace(infd, outfd, bytes as usize))
 }
 
-// Wrapper for copy_file_range(2) that copies a block at offset
-// `off`. Falls back to user-space if `copy_file_range()` is not
-// available for the operation.
-#[allow(dead_code)]
+/// File copy operation that that copies a block at offset`off`.  On
+/// Linux this attempts to use
+/// [copy_file_range](https://man7.org/linux/man-pages/man2/copy_file_range.2.html)
+/// and falls back to user-space if that is not available.
 pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize> {
     let mut off_in = off as u64;
     let mut off_out = off as u64;
@@ -72,6 +73,7 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
 /// Guestimate if file is sparse; if it has less blocks that would be
 /// expected for its stated size. This is the same test used by
 /// coreutils `cp`.
+// FIXME: Should work on *BSD?
 pub fn probably_sparse(fd: &File) -> Result<bool> {
     const ST_NBLOCKSIZE: u64 = 512;
     let stat = fd.metadata()?;
@@ -142,6 +144,11 @@ impl FiemapReq {
     }
 }
 
+/// Attempt to retrieve a map of the underlying allocated extents for
+/// a file. Will return [None] if the filesystem doesn't support
+/// extents. On Linux this is the raw list from
+/// [fiemap](https://docs.kernel.org/filesystems/fiemap.html). See
+/// [merge_extents](super::merge_extents) for a tool to merge contiguous extents.
 pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     let mut req = FiemapReq::new();
     let req_ptr: *const FiemapReq = &req;
@@ -180,6 +187,9 @@ pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     Ok(Some(extents))
 }
 
+/// Search the file for the next non-sparse file section. Returns the
+/// start and end of the data segment.
+// FIXME: Should work on *BSD too?
 pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64, u64)> {
     let next_data = match lseek(infd, SeekFrom::Data(pos as i64))? {
         SeekOff::Offset(off) => off,

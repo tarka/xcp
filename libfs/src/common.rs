@@ -43,6 +43,9 @@ fn copy_xattr(infd: &File, outfd: &File) -> Result<()> {
     Ok(())
 }
 
+/// Copy file permissions. Will also copy
+/// [xattr](https://man7.org/linux/man-pages/man7/xattr.7.html)'s if
+/// possible.
 pub fn copy_permissions(infd: &File, outfd: &File) -> Result<()> {
     let xr = copy_xattr(infd, outfd);
     if let Err(e) = xr {
@@ -69,7 +72,6 @@ pub(crate) fn write_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize
     Ok(pwrite(fd, buf, off as u64)?)
 }
 
-#[allow(dead_code)]
 /// Copy a block of bytes at an offset between files. Uses Posix pread/pwrite.
 pub(crate) fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<usize> {
     // FIXME: For larger buffers we should use a pre-allocated thread-local?
@@ -123,7 +125,7 @@ pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
     Ok(ftruncate(fd, len)?)
 }
 
-#[allow(dead_code)]
+/// Merge any contiguous extents in a list. See [merge_extents].
 pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
     let mut merged: Vec<Range<u64>> = vec![];
 
@@ -152,6 +154,7 @@ pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
 }
 
 
+/// Determine if two files are the same by examining their inodes.
 pub fn is_same_file(src: &Path, dest: &Path) -> Result<bool> {
     let sstat = src.metadata()?;
     let dstat = dest.metadata()?;
@@ -160,7 +163,6 @@ pub fn is_same_file(src: &Path, dest: &Path) -> Result<bool> {
 
     Ok(same)
 }
-
 
 #[cfg(test)]
 mod tests {
