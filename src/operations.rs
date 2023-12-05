@@ -14,12 +14,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::cmp;
 use std::fs::{File, Metadata};
 use std::path::Path;
 
 use libfs::{
-    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, copy_bytes_batched,
+    allocate_file, copy_permissions, next_sparse_segments, probably_sparse, copy_bytes_batched, Error,
 };
 
 use crate::errors::Result;
@@ -55,12 +54,15 @@ pub fn init_copy(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
     Ok(handle)
 }
 
+
 /// Copy len bytes from wherever the descriptor cursors are set.
 pub fn copy_bytes(handle: &CopyHandle, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
-    copy_bytes_batched(&handle.infd, &handle.outfd, len,
+    let copied = copy_bytes_batched(&handle.infd, &handle.outfd, len,
         updates.batch_size, |c| {
             updates.update(Ok(c))
-        })
+                .map_err(|e| Error::CallbackError(e.to_string()))
+        })?;
+    Ok(copied)
 }
 
 /// Wrapper around copy_bytes that looks for sparse blocks and skips them.

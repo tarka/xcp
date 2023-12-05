@@ -27,6 +27,9 @@ pub enum Error {
 
     #[error("Unsupported operation; this function should never be called on this OS.")]
     UnsupportedOperation,
+
+    #[error("Error processing callback: {0}")]
+    CallbackError(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

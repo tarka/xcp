@@ -162,8 +162,8 @@ pub fn is_same_file(src: &Path, dest: &Path) -> Result<bool> {
 }
 
 
-pub fn copy_bytes_batched<F, E>(infd: &File, outfd: &File, len: u64, batch_size: u64, mut callback: F) -> std::result::Result<u64, E>
-    where F: FnMut(u64) -> std::result::Result<(), E>
+pub fn copy_bytes_batched<F>(infd: &File, outfd: &File, len: u64, batch_size: u64, mut callback: F) -> Result<u64>
+    where F: FnMut(u64) -> Result<()>,
 {
     let mut written = 0u64;
     while written < len {
