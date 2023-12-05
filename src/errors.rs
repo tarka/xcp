@@ -26,6 +26,9 @@ pub enum XcpError {
     #[error("Unknown driver: {0}")]
     UnknownDriver(String),
 
+    #[error(transparent)]
+    FSError(#[from] libfs::Error),
+
     #[error("Invalid arguments: {0}")]
     InvalidArguments(&'static str),
 

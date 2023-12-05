@@ -27,7 +27,7 @@ use std::path::Path;
 use xattr::FileExt;
 
 use crate::errors::{Result, Error};
-use crate::XATTR_SUPPORTED;
+use crate::{XATTR_SUPPORTED, copy_file_bytes};
 
 fn copy_xattr(infd: &File, outfd: &File) -> Result<()> {
     // FIXME: Flag for xattr.
@@ -159,6 +159,21 @@ pub fn is_same_file(src: &Path, dest: &Path) -> Result<bool> {
         && (sstat.dev() == dstat.dev());
 
     Ok(same)
+}
+
+
+pub fn copy_bytes_batched<F, E>(infd: &File, outfd: &File, len: u64, batch_size: u64, mut callback: F) -> std::result::Result<u64, E>
+    where F: FnMut(u64) -> std::result::Result<(), E>
+{
+    let mut written = 0u64;
+    while written < len {
+        let bytes_to_copy = cmp::min(len - written, batch_size);
+        let result = copy_file_bytes(infd, outfd, bytes_to_copy)? as u64;
+        written += result;
+        callback(result)?;
+    }
+
+    Ok(written)
 }
 
 
