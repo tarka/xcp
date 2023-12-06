@@ -30,11 +30,13 @@ cfg_if! {
 pub use backend::{
     copy_file_bytes,
     copy_file_offset,
+    copy_sparse,
     probably_sparse,
     next_sparse_segments,
     map_extents,
 };
 pub use common::{
+    copy_file,
     allocate_file,
     copy_permissions,
     merge_extents,

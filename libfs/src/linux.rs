@@ -14,7 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fs::File;
+use std::{fs::File, path::Path};
 use std::io;
 use std::ops::Range;
 use std::os::linux::fs::MetadataExt;
@@ -23,6 +23,7 @@ use std::os::unix::io::AsRawFd;
 use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST};
 use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
 
+use crate::allocate_file;
 use crate::errors::Result;
 use crate::common::{copy_bytes_uspace, copy_range_uspace};
 
@@ -205,6 +206,23 @@ pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64,
 
     Ok((next_data, next_hole))
 }
+
+/// Copy data between files, looking for sparse blocks and skipping
+/// them.
+pub fn copy_sparse(infd: &File, outfd: &File) -> Result<u64> {
+    let len = infd.metadata()?.len();
+
+    let mut pos = 0;
+    while pos < len {
+        let (next_data, next_hole) = next_sparse_segments(infd, outfd, pos)?;
+
+        let _written = copy_file_bytes(infd, outfd, next_hole - next_data)?;
+        pos = next_hole;
+    }
+
+    Ok(len)
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -682,6 +700,33 @@ mod tests {
         let fd = File::open(file)?;
         let extents_p = map_extents(&fd)?;
         assert!(extents_p.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_copy_file_sparse() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
+        let dir = tempdir()?;
+        let from = dir.path().join("sparse.bin");
+        let len = 32 * 1024 * 1024;
+
+        {
+            let fd = File::create(&from)?;
+            allocate_file(&fd, len)?;
+        }
+
+        assert_eq!(len, from.metadata()?.len());
+        assert!(probably_sparse(&File::open(&from)?)?);
+
+        let to = dir.path().join("sparse.copy.bin");
+        crate::copy_file(&from, &to)?;
+
+        assert_eq!(len, to.metadata()?.len());
+        assert!(probably_sparse(&File::open(&to)?)?);
 
         Ok(())
     }

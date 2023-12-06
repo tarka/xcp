@@ -27,7 +27,7 @@ use std::path::Path;
 use xattr::FileExt;
 
 use crate::errors::{Result, Error};
-use crate::XATTR_SUPPORTED;
+use crate::{XATTR_SUPPORTED, copy_sparse, probably_sparse, copy_file_bytes};
 
 fn copy_xattr(infd: &File, outfd: &File) -> Result<()> {
     // FIXME: Flag for xattr.
@@ -164,6 +164,24 @@ pub fn is_same_file(src: &Path, dest: &Path) -> Result<bool> {
     Ok(same)
 }
 
+/// Copy a file. This differs from [std::fs::copy] in that it looks
+/// for sparse blocks and skips them.
+pub fn copy_file(from: &Path, to: &Path) -> Result<u64> {
+    let infd = File::open(from)?;
+    let len = infd.metadata()?.len();
+
+    let outfd = File::create(to)?;
+    allocate_file(&outfd, len)?;
+
+    let total = if probably_sparse(&infd)? {
+        copy_sparse(&infd, &outfd)?
+    } else {
+        copy_file_bytes(&infd, &outfd, len)? as u64
+    };
+
+    Ok(total)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256,4 +274,28 @@ mod tests {
         );
         Ok(())
     }
+
+
+    #[test]
+    fn test_copy_file() -> Result<()> {
+        let dir = tempdir()?;
+        let from = dir.path().join("file.bin");
+        let len = 32 * 1024 * 1024;
+
+        {
+            let mut fd = File::create(&from)?;
+            let data = "X".repeat(len);
+            write!(fd, "{}", data).unwrap();
+        }
+
+        assert_eq!(len, from.metadata()?.len() as usize);
+
+        let to = dir.path().join("sparse.copy.bin");
+        crate::copy_file(&from, &to)?;
+
+        assert_eq!(len, to.metadata()?.len() as usize);
+
+        Ok(())
+    }
+
 }
