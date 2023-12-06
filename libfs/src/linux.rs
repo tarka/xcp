@@ -14,17 +14,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
 use std::fs::File;
 use std::io;
 use std::ops::Range;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 
+use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST};
 use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
 
 use crate::errors::Result;
-use crate::os::common::{copy_bytes_uspace, copy_range_uspace};
+use crate::common::{copy_bytes_uspace, copy_range_uspace};
 
 // Wrapper for copy_file_range(2) that checks for non-fatal errors due
 // to limitations of the syscall.
@@ -50,18 +50,19 @@ fn try_copy_file_range(
     }
 }
 
-// Wrapper for copy_file_range(2) that defers file offset tracking to
-// the underlying call.  Falls back to user-space if
-// `copy_file_range()` ia not available for thie operation.
+/// File copy operation that defers file offset tracking to the
+/// underlying call.  On Linux this attempts to use
+/// [copy_file_range](https://man7.org/linux/man-pages/man2/copy_file_range.2.html)
+/// and falls back to user-space if that is not available.
 pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
     try_copy_file_range(infd, None, outfd, None, bytes)
         .unwrap_or_else(|| copy_bytes_uspace(infd, outfd, bytes as usize))
 }
 
-// Wrapper for copy_file_range(2) that copies a block at offset
-// `off`. Falls back to user-space if `copy_file_range()` ia not
-// available for thie operation.
-#[allow(dead_code)]
+/// File copy operation that that copies a block at offset`off`.  On
+/// Linux this attempts to use
+/// [copy_file_range](https://man7.org/linux/man-pages/man2/copy_file_range.2.html)
+/// and falls back to user-space if that is not available.
 pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize> {
     let mut off_in = off as u64;
     let mut off_out = off as u64;
@@ -69,9 +70,10 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
         .unwrap_or_else(|| copy_range_uspace(infd, outfd, bytes as usize, off as usize))
 }
 
-// Guestimate if file is sparse; if it has less blocks that would be
-// expected for its stated size. This is the same test used by
-// coreutils `cp`.
+/// Guestimate if file is sparse; if it has less blocks that would be
+/// expected for its stated size. This is the same test used by
+/// coreutils `cp`.
+// FIXME: Should work on *BSD?
 pub fn probably_sparse(fd: &File) -> Result<bool> {
     const ST_NBLOCKSIZE: u64 = 512;
     let stat = fd.metadata()?;
@@ -79,12 +81,12 @@ pub fn probably_sparse(fd: &File) -> Result<bool> {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum SeekOff {
+enum SeekOff {
     Offset(u64),
     EOF,
 }
 
-pub fn lseek(fd: &File, from: SeekFrom) -> Result<SeekOff> {
+fn lseek(fd: &File, from: SeekFrom) -> Result<SeekOff> {
     match seek(fd, from) {
         Err(errno) if errno == Errno::NXIO => Ok(SeekOff::EOF),
         Err(err) => Err(err.into()),
@@ -92,12 +94,7 @@ pub fn lseek(fd: &File, from: SeekFrom) -> Result<SeekOff> {
     }
 }
 
-// See ioctl_list(2)
-#[allow(unused)]
-const FS_IOC_FIEMAP: libc::c_ulong = 0xC020660B;
-#[allow(unused)]
-const FIEMAP_EXTENT_LAST: u32 = 0x00000001;
-const PAGE_SIZE: usize = 32;
+const FIEMAP_PAGE_SIZE: usize = 32;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -109,7 +106,6 @@ struct FiemapExtent {
     fe_flags: u32, // FIEMAP_EXTENT_* flags for this extent
     fe_reserved: [u32; 3],
 }
-#[allow(unused)]
 impl FiemapExtent {
     fn new() -> FiemapExtent {
         FiemapExtent {
@@ -132,9 +128,8 @@ struct FiemapReq {
     fm_mapped_extents: u32, // Number of extents that were mapped (out)
     fm_extent_count: u32,   // Size of fm_extents array (in)
     fm_reserved: u32,
-    fm_extents: [FiemapExtent; PAGE_SIZE], // Array of mapped extents (out)
+    fm_extents: [FiemapExtent; FIEMAP_PAGE_SIZE], // Array of mapped extents (out)
 }
-#[allow(unused)]
 impl FiemapReq {
     fn new() -> FiemapReq {
         FiemapReq {
@@ -142,23 +137,27 @@ impl FiemapReq {
             fm_length: u64::max_value(),
             fm_flags: 0,
             fm_mapped_extents: 0,
-            fm_extent_count: PAGE_SIZE as u32,
+            fm_extent_count: FIEMAP_PAGE_SIZE as u32,
             fm_reserved: 0,
-            fm_extents: [FiemapExtent::new(); PAGE_SIZE],
+            fm_extents: [FiemapExtent::new(); FIEMAP_PAGE_SIZE],
         }
     }
 }
 
-#[allow(unused)]
+/// Attempt to retrieve a map of the underlying allocated extents for
+/// a file. Will return [None] if the filesystem doesn't support
+/// extents. On Linux this is the raw list from
+/// [fiemap](https://docs.kernel.org/filesystems/fiemap.html). See
+/// [merge_extents](super::merge_extents) for a tool to merge contiguous extents.
 pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     let mut req = FiemapReq::new();
     let req_ptr: *const FiemapReq = &req;
-    let mut extents = Vec::with_capacity(PAGE_SIZE);
+    let mut extents = Vec::with_capacity(FIEMAP_PAGE_SIZE);
 
     loop {
         // FIXME: Rustix has an IOCTL mini-framework but it's a little
         // tricky and is unsafe anyway. This is simpler for now.
-        if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP, req_ptr) } != 0 {
+        if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP as u64, req_ptr) } != 0 {
             let oserr = io::Error::last_os_error();
             if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
                 return Ok(None)
@@ -188,6 +187,9 @@ pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     Ok(Some(extents))
 }
 
+/// Search the file for the next non-sparse file section. Returns the
+/// start and end of the data segment.
+// FIXME: Should work on *BSD too?
 pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64, u64)> {
     let next_data = match lseek(infd, SeekFrom::Data(pos as i64))? {
         SeekOff::Offset(off) => off,
@@ -204,10 +206,27 @@ pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64,
     Ok((next_data, next_hole))
 }
 
+/// Copy data between files, looking for sparse blocks and skipping
+/// them.
+pub fn copy_sparse(infd: &File, outfd: &File) -> Result<u64> {
+    let len = infd.metadata()?.len();
+
+    let mut pos = 0;
+    while pos < len {
+        let (next_data, next_hole) = next_sparse_segments(infd, outfd, pos)?;
+
+        let _written = copy_file_bytes(infd, outfd, next_hole - next_data)?;
+        pos = next_hole;
+    }
+
+    Ok(len)
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::os::allocate_file;
+    use crate::allocate_file;
     use std::env::{current_dir, var};
     use std::fs::{read, OpenOptions};
     use std::io::{self, Seek, Write};
@@ -219,7 +238,7 @@ mod tests {
     fn tempdir() -> Result<TempDir> {
         // Force into local dir as /tmp might be tmpfs, which doesn't
         // support all VFS options (notably fiemap).
-        Ok(tempdir_in(current_dir()?.join("target"))?)
+        Ok(tempdir_in(current_dir()?.join("../target"))?)
     }
 
     fn fs_supports_extents() -> bool {
@@ -467,7 +486,7 @@ mod tests {
             return Ok(())
         }
 
-        let dir = PathBuf::from("target");
+        let dir = PathBuf::from("../target");
         let file = dir.join("sparse.bin");
 
         let data = "c00lc0d3";
@@ -680,6 +699,33 @@ mod tests {
         let fd = File::open(file)?;
         let extents_p = map_extents(&fd)?;
         assert!(extents_p.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_copy_file_sparse() -> Result<()> {
+        if !fs_supports_sparse() {
+            return Ok(())
+        }
+
+        let dir = tempdir()?;
+        let from = dir.path().join("sparse.bin");
+        let len = 32 * 1024 * 1024;
+
+        {
+            let fd = File::create(&from)?;
+            allocate_file(&fd, len)?;
+        }
+
+        assert_eq!(len, from.metadata()?.len());
+        assert!(probably_sparse(&File::open(&from)?)?);
+
+        let to = dir.path().join("sparse.copy.bin");
+        crate::copy_file(&from, &to)?;
+
+        assert_eq!(len, to.metadata()?.len());
+        assert!(probably_sparse(&File::open(&to)?)?);
 
         Ok(())
     }

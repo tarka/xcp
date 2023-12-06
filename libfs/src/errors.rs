@@ -14,33 +14,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::PathBuf;
-
-pub use anyhow::{Error, Result};
-
 #[derive(Debug, thiserror::Error)]
-pub enum XcpError {
-    #[error("Unknown file-type: {0}")]
-    UnknownFiletype(PathBuf),
-
-    #[error("Unknown driver: {0}")]
-    UnknownDriver(String),
-
-    #[error("Invalid arguments: {0}")]
-    InvalidArguments(&'static str),
-
+pub enum Error {
     #[error("Invalid source: {0}")]
     InvalidSource(&'static str),
 
-    #[error("Invalid destination: {0}")]
-    InvalidDestination(&'static str),
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
 
-    #[error("Destination Exists: {0}, {1}")]
-    DestinationExists(&'static str, PathBuf),
+    #[error(transparent)]
+    OSError(#[from] rustix::io::Errno),
 
-    #[error("Early shutdown: {0}")]
-    EarlyShutdown(&'static str),
-
-    #[error("Unsupported OS")]
-    UnsupportedOS(&'static str),
+    #[error("Unsupported operation; this function should never be called on this OS.")]
+    UnsupportedOperation,
 }
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;

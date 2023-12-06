@@ -18,18 +18,16 @@ mod drivers;
 mod errors;
 mod operations;
 mod options;
-mod os;
 mod progress;
 mod utils;
 
 use std::path::PathBuf;
-
+use libfs::is_same_file;
 use log::info;
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
 use crate::drivers::pick_driver;
 use crate::errors::{Result, XcpError};
-use crate::os::is_same_file;
 
 fn main() -> Result<()> {
     let opts = options::parse_args()?;

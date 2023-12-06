@@ -18,11 +18,12 @@ use std::cmp;
 use std::fs::{File, Metadata};
 use std::path::Path;
 
-use crate::errors::Result;
-use crate::options::Opts;
-use crate::os::{
+use libfs::{
     allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse,
 };
+
+use crate::errors::Result;
+use crate::options::Opts;
 use crate::progress::{BatchUpdater, Updater};
 
 #[derive(Debug)]
@@ -47,7 +48,9 @@ pub fn init_copy(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
 
     // FIXME: This should happen at the end of the file copy, but with
     // the parblock handler this may be tricky. This works in practice.
-    copy_permissions(&handle, opts)?;
+    if !opts.no_perms {
+        copy_permissions(&handle.infd, &handle.outfd)?;
+    }
 
     Ok(handle)
 }

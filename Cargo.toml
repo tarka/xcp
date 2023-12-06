@@ -6,8 +6,8 @@ edition = "2021"
 rust-version = "1.70.0"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
-homepage = "https://github.com/tarka/xcp/"
-repository = "https://github.com/tarka/xcp/"
+homepage = "https://github.com/tarka/xcp/xcp"
+repository = "https://github.com/tarka/xcp/xcp"
 readme = "README.md"
 
 keywords = ["coreutils", "cp", "files", "filesystem"]
@@ -15,31 +15,26 @@ categories =["command-line-utilities"]
 license = "GPL-3.0-only"
 
 [features]
-default = ["kernel_copy_file_range", "parblock"]
-kernel_copy_file_range = []
+default = ["parblock", "use_linux"]
 parblock = []
-
-[profile.release]
-overflow-checks = true
+use_linux = ["libfs/use_linux"]
 
 [dependencies]
 anyhow = "1.0.75"
 blocking-threadpool = "1.0.1"
 cfg-if = "1.0.0"
-clap = { version = "4.4.8", features = ["derive"] }
+clap = { version = "4.4.10", features = ["derive"] }
 crossbeam-channel = "0.5.8"
 glob = "0.3.1"
-ignore = "0.4.20"
+ignore = "0.4.21"
 indicatif = "0.17.7"
-libc = "0.2.150"
+libfs = { path = "libfs" }
 log = "0.4.20"
 num_cpus = "1.16.0"
-rustix = { version = "0.38.25", features = ["fs"] }
 simplelog = "0.12.1"
 thiserror = "1.0.50"
 unbytify = "0.2.0"
 walkdir = "2.4.0"
-xattr = "1.0.1"
 
 [dev-dependencies]
 rand = "0.8.5"
@@ -48,3 +43,11 @@ rand_xorshift = "0.3.0"
 tempfile = "3.8.1"
 test-case = "3.3.1"
 uuid = { version = "1.6.1", features = ["v4"] }
+xattr = "1.0.1"
+
+[workspace]
+members = [
+        "libfs",
+]
+
+resolver = "2"

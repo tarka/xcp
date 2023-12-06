@@ -26,56 +26,54 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use xattr::FileExt;
 
-use crate::errors::{Result, XcpError};
-use crate::operations::CopyHandle;
-use crate::options::Opts;
-use crate::os::XATTR_SUPPORTED;
+use crate::errors::{Result, Error};
+use crate::{XATTR_SUPPORTED, copy_sparse, probably_sparse, copy_file_bytes};
 
-fn copy_xattr(hdl: &CopyHandle, _opts: &Opts) -> Result<()> {
+fn copy_xattr(infd: &File, outfd: &File) -> Result<()> {
     // FIXME: Flag for xattr.
     if XATTR_SUPPORTED {
         debug!("Starting xattr copy...");
-        for attr in hdl.infd.list_xattr()? {
-            if let Some(val) = hdl.infd.get_xattr(&attr)? {
+        for attr in infd.list_xattr()? {
+            if let Some(val) = infd.get_xattr(&attr)? {
                 debug!("Copy xattr {:?}", attr);
-                hdl.outfd.set_xattr(attr, val.as_slice())?;
+                outfd.set_xattr(attr, val.as_slice())?;
             }
         }
     }
     Ok(())
 }
 
-pub fn copy_permissions(hdl: &CopyHandle, opts: &Opts) -> Result<()> {
-    if !opts.no_perms {
-        let xr = copy_xattr(hdl, opts);
-        if let Err(e) = xr {
-            // FIXME: We don't have a way of detecting if the
-            // target FS supports XAttr, so assume any error is
-            // "Unsupported" for now.
-            warn!("Failed to copy xattrs from {:?}: {}", hdl.infd, e);
-        }
-
-        // FIXME: ACLs, selinux, etc.
-
-        debug!("Performing permissions copy");
-        hdl.outfd.set_permissions(hdl.metadata.permissions())?;
-
-        debug!("Permissions copy done");
+/// Copy file permissions. Will also copy
+/// [xattr](https://man7.org/linux/man-pages/man7/xattr.7.html)'s if
+/// possible.
+pub fn copy_permissions(infd: &File, outfd: &File) -> Result<()> {
+    let xr = copy_xattr(infd, outfd);
+    if let Err(e) = xr {
+        // FIXME: We don't have a way of detecting if the
+        // target FS supports XAttr, so assume any error is
+        // "Unsupported" for now.
+        warn!("Failed to copy xattrs from {:?}: {}", infd, e);
     }
+
+    // FIXME: ACLs, selinux, etc.
+
+    debug!("Performing permissions copy");
+    outfd.set_permissions(infd.metadata()?.permissions())?;
+
+    debug!("Permissions copy done");
     Ok(())
 }
 
-fn read_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
+pub(crate) fn read_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
     Ok(pread(fd, buf, off as u64)?)
 }
 
-fn write_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
+pub(crate) fn write_bytes(fd: &File, buf: &mut [u8], off: usize) -> Result<usize> {
     Ok(pwrite(fd, buf, off as u64)?)
 }
 
-#[allow(dead_code)]
 /// Copy a block of bytes at an offset between files. Uses Posix pread/pwrite.
-pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<usize> {
+pub(crate) fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize) -> Result<usize> {
     // FIXME: For larger buffers we should use a pre-allocated thread-local?
     let mut buf = vec![0; nbytes];
 
@@ -85,14 +83,14 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
         let noff = off + written;
 
         let rlen = match read_bytes(reader, &mut buf[..next], noff) {
-            Ok(0) => return Err(XcpError::InvalidSource("Source file ended prematurely.").into()),
+            Ok(0) => return Err(Error::InvalidSource("Source file ended prematurely.")),
             Ok(len) => len,
             Err(e) => return Err(e),
         };
 
         let _wlen = match write_bytes(writer, &mut buf[..rlen], noff) {
             Ok(len) if len < rlen => {
-                return Err(XcpError::InvalidSource("Failed write to file.").into())
+                return Err(Error::InvalidSource("Failed write to file."))
             }
             Ok(len) => len,
             Err(e) => return Err(e),
@@ -104,14 +102,14 @@ pub fn copy_range_uspace(reader: &File, writer: &File, nbytes: usize, off: usize
 }
 
 /// Slightly modified version of io::copy() that only copies a set amount of bytes.
-pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<usize> {
+pub(crate) fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) -> Result<usize> {
     let mut buf = vec![0; nbytes];
 
     let mut written = 0;
     while written < nbytes {
         let next = cmp::min(nbytes - written, nbytes);
         let len = match reader.read(&mut buf[..next]) {
-            Ok(0) => return Err(XcpError::InvalidSource("Source file ended prematurely.").into()),
+            Ok(0) => return Err(Error::InvalidSource("Source file ended prematurely.")),
             Ok(len) => len,
             Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
             Err(e) => return Err(e.into())
@@ -122,44 +120,12 @@ pub fn copy_bytes_uspace(mut reader: &File, mut writer: &File, nbytes: usize) ->
     Ok(written)
 }
 
-/// Version of copy_file_range that defers offset-management to the
-/// syscall. see copy_file_range(2) for details.
-#[allow(dead_code)]
-pub fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize> {
-    copy_bytes_uspace(infd, outfd, bytes as usize)
-}
-
-// Copy a single file block.
-// TODO: Not used currently, intended for parallel block copy support.
-#[allow(dead_code)]
-pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize> {
-    copy_range_uspace(infd, outfd, bytes as usize, off as usize)
-}
-
 /// Allocate file space on disk. Uses Posix ftruncate().
 pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
     Ok(ftruncate(fd, len)?)
 }
 
-// No sparse file handling by default, needs to be implemented
-// per-OS. This effectively disables the following operations.
-#[allow(dead_code)]
-pub fn probably_sparse(_fd: &File) -> Result<bool> {
-    Ok(false)
-}
-
-#[allow(dead_code)]
-pub fn map_extents(_fd: &File) -> Result<Option<Vec<Range<u64>>>> {
-    // FIXME: Implement for *BSD with lseek?
-    Err(XcpError::UnsupportedOperation {}.into())
-}
-
-#[allow(dead_code)]
-pub fn next_sparse_segments(_infd: &File, _outfd: &File, _pos: u64) -> Result<(u64, u64)> {
-    Err(XcpError::UnsupportedOperation {}.into())
-}
-
-#[allow(dead_code)]
+/// Merge any contiguous extents in a list. See [merge_extents].
 pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
     let mut merged: Vec<Range<u64>> = vec![];
 
@@ -188,6 +154,7 @@ pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
 }
 
 
+/// Determine if two files are the same by examining their inodes.
 pub fn is_same_file(src: &Path, dest: &Path) -> Result<bool> {
     let sstat = src.metadata()?;
     let dstat = dest.metadata()?;
@@ -197,6 +164,23 @@ pub fn is_same_file(src: &Path, dest: &Path) -> Result<bool> {
     Ok(same)
 }
 
+/// Copy a file. This differs from [std::fs::copy] in that it looks
+/// for sparse blocks and skips them.
+pub fn copy_file(from: &Path, to: &Path) -> Result<u64> {
+    let infd = File::open(from)?;
+    let len = infd.metadata()?.len();
+
+    let outfd = File::create(to)?;
+    allocate_file(&outfd, len)?;
+
+    let total = if probably_sparse(&infd)? {
+        copy_sparse(&infd, &outfd)?
+    } else {
+        copy_file_bytes(&infd, &outfd, len)? as u64
+    };
+
+    Ok(total)
+}
 
 #[cfg(test)]
 mod tests {
@@ -290,4 +274,28 @@ mod tests {
         );
         Ok(())
     }
+
+
+    #[test]
+    fn test_copy_file() -> Result<()> {
+        let dir = tempdir()?;
+        let from = dir.path().join("file.bin");
+        let len = 32 * 1024 * 1024;
+
+        {
+            let mut fd = File::create(&from)?;
+            let data = "X".repeat(len);
+            write!(fd, "{}", data).unwrap();
+        }
+
+        assert_eq!(len, from.metadata()?.len() as usize);
+
+        let to = dir.path().join("sparse.copy.bin");
+        crate::copy_file(&from, &to)?;
+
+        assert_eq!(len, to.metadata()?.len() as usize);
+
+        Ok(())
+    }
+
 }
