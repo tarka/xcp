@@ -45,10 +45,12 @@ pub use common::{
 pub use errors::Error;
 
 
-// NOTE: The xattr crate has a SUPPORTED_PLATFORM flag, however it
-// allows NetBSD, which fails for us, so we stick to platforms we've
-// tested.
+/// Flag whether the current OS support
+/// [xattrs](https://man7.org/linux/man-pages/man7/xattr.7.html).
 pub const XATTR_SUPPORTED: bool = {
+    // NOTE: The xattr crate has a SUPPORTED_PLATFORM flag, however it
+    // allows NetBSD, which fails for us, so we stick to platforms we've
+    // tested.
     cfg_if! {
         if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
             true
