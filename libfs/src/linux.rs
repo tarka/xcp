@@ -14,7 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{fs::File, path::Path};
+use std::fs::File;
 use std::io;
 use std::ops::Range;
 use std::os::linux::fs::MetadataExt;
@@ -23,7 +23,6 @@ use std::os::unix::io::AsRawFd;
 use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST};
 use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
 
-use crate::allocate_file;
 use crate::errors::Result;
 use crate::common::{copy_bytes_uspace, copy_range_uspace};
 
