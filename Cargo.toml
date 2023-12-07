@@ -6,8 +6,8 @@ edition = "2021"
 rust-version = "1.70.0"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
-homepage = "https://github.com/tarka/xcp/xcp"
-repository = "https://github.com/tarka/xcp/xcp"
+homepage = "https://github.com/tarka/xcp"
+repository = "https://github.com/tarka/xcp"
 readme = "README.md"
 
 keywords = ["coreutils", "cp", "files", "filesystem"]
