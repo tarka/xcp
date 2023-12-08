@@ -90,6 +90,10 @@ pub struct Opts {
     #[arg(short = 'T', long = "no-target-directory")]
     pub no_target_directory: bool,
 
+    /// Sync each file to disk after fully written.
+    #[arg(long = "fsync")]
+    pub fsync: bool,
+
     pub paths: Vec<String>,
 }
 

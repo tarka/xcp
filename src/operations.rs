@@ -19,8 +19,9 @@ use std::fs::{File, Metadata};
 use std::path::Path;
 
 use libfs::{
-    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse,
+    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync,
 };
+use log::debug;
 
 use crate::errors::Result;
 use crate::options::Opts;
@@ -90,6 +91,11 @@ pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater
     } else {
         copy_bytes(&handle, handle.metadata.len(), updates)?
     };
+
+    if opts.fsync {
+        debug!("Syncing file {}", from.to_string_lossy());
+        sync(&handle.outfd)?;
+    }
 
     Ok(total)
 }
