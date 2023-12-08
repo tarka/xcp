@@ -31,7 +31,7 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{init_copy, CopyHandle};
+use crate::operations::CopyHandle;
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
 use crate::progress::{ProgressBar, StatusUpdate};
@@ -129,7 +129,7 @@ fn queue_file_blocks(
     status_channel: &Sender,
     opts: &Opts,
 ) -> Result<u64> {
-    let handle = init_copy(source, dest, opts)?;
+    let handle = CopyHandle::new(source, dest, opts)?;
     let len = handle.metadata.len();
 
     // Put the open files in an Arc, which we drop once work has

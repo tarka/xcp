@@ -34,26 +34,28 @@ pub struct CopyHandle {
     pub metadata: Metadata,
 }
 
-pub fn init_copy(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
-    let infd = File::open(from)?;
-    let metadata = infd.metadata()?;
+impl CopyHandle {
+    pub fn new(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
+        let infd = File::open(from)?;
+        let metadata = infd.metadata()?;
 
-    let outfd = File::create(to)?;
-    allocate_file(&outfd, metadata.len())?;
+        let outfd = File::create(to)?;
+        allocate_file(&outfd, metadata.len())?;
 
-    let handle = CopyHandle {
-        infd,
-        outfd,
-        metadata,
-    };
+        let handle = CopyHandle {
+            infd,
+            outfd,
+            metadata,
+        };
 
-    // FIXME: This should happen at the end of the file copy, but with
-    // the parblock handler this may be tricky. This works in practice.
-    if !opts.no_perms {
-        copy_permissions(&handle.infd, &handle.outfd)?;
+        // FIXME: This should happen at the end of the file copy, but with
+        // the parblock handler this may be tricky. This works in practice.
+        if !opts.no_perms {
+            copy_permissions(&handle.infd, &handle.outfd)?;
+        }
+
+        Ok(handle)
     }
-
-    Ok(handle)
 }
 
 /// Copy len bytes from wherever the descriptor cursors are set.
@@ -85,7 +87,7 @@ pub fn copy_sparse(handle: &CopyHandle, updates: &mut BatchUpdater) -> Result<u6
 }
 
 pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
-    let handle = init_copy(from, to, opts)?;
+    let handle = CopyHandle::new(from, to, opts)?;
     let total = if probably_sparse(&handle.infd)? {
         copy_sparse(&handle, updates)?
     } else {
