@@ -113,6 +113,7 @@ fn queue_file_range(
         let off = range.start + (blkn * bsize);
 
         pool.execute(move || {
+            // FIXME: Move into CopyHandle once settled.
             let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64).unwrap();
 
             stat_tx.send(StatusUpdate::Copied(r as u64), bytes, bsize).unwrap();

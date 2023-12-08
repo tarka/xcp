@@ -56,48 +56,47 @@ impl CopyHandle {
 
         Ok(handle)
     }
-}
 
-/// Copy len bytes from wherever the descriptor cursors are set.
-pub fn copy_bytes(handle: &CopyHandle, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
-    let mut written = 0u64;
-    while written < len {
-        let bytes_to_copy = cmp::min(len - written, updates.batch_size);
-        let result = copy_file_bytes(&handle.infd, &handle.outfd, bytes_to_copy)? as u64;
-        written += result;
-        updates.update(Ok(result))?;
+    /// Copy len bytes from wherever the descriptor cursors are set.
+    fn copy_bytes(&self, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
+        let mut written = 0u64;
+        while written < len {
+            let bytes_to_copy = cmp::min(len - written, updates.batch_size);
+            let result = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
+            written += result;
+            updates.update(Ok(result))?;
+        }
+
+        Ok(written)
     }
 
-    Ok(written)
-}
+    /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
+    fn copy_sparse(&self, updates: &mut BatchUpdater) -> Result<u64> {
+        let len = self.metadata.len();
+        let mut pos = 0;
 
-/// Wrapper around copy_bytes that looks for sparse blocks and skips them.
-pub fn copy_sparse(handle: &CopyHandle, updates: &mut BatchUpdater) -> Result<u64> {
-    let len = handle.metadata.len();
-    let mut pos = 0;
+        while pos < len {
+            let (next_data, next_hole) = next_sparse_segments(&self.infd, &self.outfd, pos)?;
 
-    while pos < len {
-        let (next_data, next_hole) = next_sparse_segments(&handle.infd, &handle.outfd, pos)?;
+            let _written = self.copy_bytes(next_hole - next_data, updates)?;
+            pos = next_hole;
+        }
 
-        let _written = copy_bytes(handle, next_hole - next_data, updates)?;
-        pos = next_hole;
+        Ok(len)
     }
 
-    Ok(len)
-}
+    pub fn copy_file(&self, opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
+        let total = if probably_sparse(&self.infd)? {
+            self.copy_sparse(updates)?
+        } else {
+            self.copy_bytes(self.metadata.len(), updates)?
+        };
 
-pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
-    let handle = CopyHandle::new(from, to, opts)?;
-    let total = if probably_sparse(&handle.infd)? {
-        copy_sparse(&handle, updates)?
-    } else {
-        copy_bytes(&handle, handle.metadata.len(), updates)?
-    };
+        if opts.fsync {
+            debug!("Syncing file {:?}", self.outfd);
+            sync(&self.outfd)?;
+        }
 
-    if opts.fsync {
-        debug!("Syncing file {}", from.to_string_lossy());
-        sync(&handle.outfd)?;
+        Ok(total)
     }
-
-    Ok(total)
 }

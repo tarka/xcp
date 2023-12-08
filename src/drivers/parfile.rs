@@ -24,7 +24,7 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::copy_file;
+use crate::operations::CopyHandle;
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use crate::progress::{
     BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
@@ -78,7 +78,8 @@ fn copy_worker(
                 // copy_file sends back its own updates, but we should
                 // send back any errors as they may have occurred
                 // before the copy started..
-                let r = copy_file(&from, &to, opts, &mut updates);
+                let handle = CopyHandle::new(&from, &to, opts)?;
+                let r = handle.copy_file(opts, &mut updates);
                 if r.is_err() {
                     updates.update(r)?;
                 }
@@ -264,7 +265,8 @@ pub fn copy_single_file(source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
         }
     };
 
-    copy_file(source, dest, opts, &mut copy_stat)?;
+    let handle = CopyHandle::new(source, dest, opts)?;
+    handle.copy_file(opts, &mut copy_stat)?;
 
     Ok(())
 }
