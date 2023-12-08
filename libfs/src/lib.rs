@@ -36,11 +36,12 @@ pub use backend::{
     map_extents,
 };
 pub use common::{
-    copy_file,
     allocate_file,
+    copy_file,
     copy_permissions,
-    merge_extents,
     is_same_file,
+    merge_extents,
+    sync,
 };
 pub use errors::Error;
 

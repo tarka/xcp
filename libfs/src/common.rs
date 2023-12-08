@@ -16,6 +16,7 @@
 
 
 use log::{debug, warn};
+use rustix::fs::fsync;
 use rustix::io::pwrite;
 use rustix::{fs::ftruncate, io::pread};
 use std::cmp;
@@ -180,6 +181,11 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<u64> {
     };
 
     Ok(total)
+}
+
+/// Sync an open file to disk. Uses `fsync(2)`.
+pub fn sync(fd: &File) -> Result<()> {
+    Ok(fsync(fd)?)
 }
 
 #[cfg(test)]
