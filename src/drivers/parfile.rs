@@ -19,6 +19,7 @@ use log::{debug, error, info};
 use std::fs::{create_dir_all, read_link};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::thread;
 use walkdir::WalkDir;
 
@@ -41,11 +42,11 @@ impl CopyDriver for Driver {
         true // No known platform issues
     }
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
         copy_all(sources, dest, opts)
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
+    fn copy_single(&self, source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
         copy_single_file(source, dest, opts)
     }
 }
@@ -61,7 +62,7 @@ enum Operation {
 
 fn copy_worker(
     work: cbc::Receiver<Operation>,
-    opts: &Opts,
+    opts: Arc<Opts>,
     mut updates: BatchUpdater,
 ) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
@@ -78,8 +79,8 @@ fn copy_worker(
                 // copy_file sends back its own updates, but we should
                 // send back any errors as they may have occurred
                 // before the copy started..
-                let handle = CopyHandle::new(&from, &to, opts)?;
-                let r = handle.copy_file(opts, &mut updates);
+                let handle = CopyHandle::new(&from, &to, opts.clone())?;
+                let r = handle.copy_file(&mut updates);
                 if r.is_err() {
                     updates.update(r)?;
                 }
@@ -191,20 +192,21 @@ fn tree_walker(
     Ok(())
 }
 
-pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
+pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
     let (work_tx, work_rx) = cbc::unbounded();
     let (stat_tx, stat_rx) = cbc::unbounded();
 
     let (pb, batch_size) = if opts.noprogress {
         (ProgressBar::Nop, usize::max_value() as u64)
     } else {
-        (ProgressBar::new(opts, 0)?, BATCH_DEFAULT)
+        (ProgressBar::new(&opts, 0)?, BATCH_DEFAULT)
     };
 
     // Use scoped threads here so we can pass down e.g. Opts without
     // repeated cloning.
     thread::scope(|s| {
-        for _ in 0..num_workers(opts) {
+        for _ in 0..num_workers(&opts) {
+            let cw_opts = opts.clone();
             let _copy_worker = {
                 let copy_stat = BatchUpdater {
                     sender: Box::new(stat_tx.clone()),
@@ -212,7 +214,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
                     batch_size,
                 };
                 let wrx = work_rx.clone();
-                s.spawn(|| copy_worker(wrx, opts, copy_stat))
+                s.spawn(|| copy_worker(wrx, cw_opts, copy_stat))
             };
         }
         let _walk_worker = {
@@ -221,7 +223,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
                 stat: StatusUpdate::Size(0),
                 batch_size,
             };
-            s.spawn(|| tree_walker(sources, dest, opts, work_tx, size_stat))
+            s.spawn(|| tree_walker(sources, dest, &opts.clone(), work_tx, size_stat))
         };
 
         for stat in stat_rx {
@@ -246,7 +248,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
     Ok(())
 }
 
-pub fn copy_single_file(source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
+fn copy_single_file(source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
     let mut copy_stat = if opts.noprogress {
         BatchUpdater {
             sender: Box::new(NopUpdater {}),
@@ -257,7 +259,7 @@ pub fn copy_single_file(source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
         let size = source.metadata()?.len();
         BatchUpdater {
             sender: Box::new(ProgressUpdater {
-                pb: ProgressBar::new(opts, size)?,
+                pb: ProgressBar::new(&opts, size)?,
                 written: 0,
             }),
             stat: StatusUpdate::Copied(0),
@@ -266,7 +268,7 @@ pub fn copy_single_file(source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
     };
 
     let handle = CopyHandle::new(source, dest, opts)?;
-    handle.copy_file(opts, &mut copy_stat)?;
+    handle.copy_file(&mut copy_stat)?;
 
     Ok(())
 }

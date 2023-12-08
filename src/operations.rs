@@ -17,6 +17,7 @@
 use std::cmp;
 use std::fs::{File, Metadata};
 use std::path::Path;
+use std::sync::Arc;
 
 use libfs::{
     allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync,
@@ -32,10 +33,11 @@ pub struct CopyHandle {
     pub infd: File,
     pub outfd: File,
     pub metadata: Metadata,
+    pub opts: Arc<Opts>,
 }
 
 impl CopyHandle {
-    pub fn new(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
+    pub fn new(from: &Path, to: &Path, opts: Arc<Opts>) -> Result<CopyHandle> {
         let infd = File::open(from)?;
         let metadata = infd.metadata()?;
 
@@ -46,6 +48,7 @@ impl CopyHandle {
             infd,
             outfd,
             metadata,
+            opts: opts.clone(),
         };
 
         // FIXME: This should happen at the end of the file copy, but with
@@ -85,14 +88,14 @@ impl CopyHandle {
         Ok(len)
     }
 
-    pub fn copy_file(&self, opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
+    pub fn copy_file(&self, updates: &mut BatchUpdater) -> Result<u64> {
         let total = if probably_sparse(&self.infd)? {
             self.copy_sparse(updates)?
         } else {
             self.copy_bytes(self.metadata.len(), updates)?
         };
 
-        if opts.fsync {
+        if self.opts.fsync {
             debug!("Syncing file {:?}", self.outfd);
             sync(&self.outfd)?;
         }

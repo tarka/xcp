@@ -21,6 +21,7 @@ pub mod parblock;
 use std::path::{Path, PathBuf};
 use std::result;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use log::error;
 
@@ -29,8 +30,8 @@ use crate::options::Opts;
 
 pub trait CopyDriver {
     fn supported_platform(&self) -> bool;
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()>;
-    fn copy_single(&self, source: &Path, dest: &Path, opts: &Opts) -> Result<()>;
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()>;
+    fn copy_single(&self, source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()>;
 }
 
 #[derive(Debug, Clone, Copy)]

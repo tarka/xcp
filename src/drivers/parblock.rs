@@ -52,11 +52,11 @@ impl CopyDriver for Driver {
         }
     }
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
         copy_all(sources, dest, opts)
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
+    fn copy_single(&self, source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
         copy_single_file(source, dest, opts)
     }
 }
@@ -100,10 +100,9 @@ fn queue_file_range(
     range: Range<u64>,
     pool: &ThreadPool,
     status_channel: &Sender,
-    opts: &Opts,
 ) -> Result<u64> {
     let len = range.end - range.start;
-    let bsize = opts.block_size;
+    let bsize = handle.opts.block_size;
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
     for blkn in 0..blocks {
@@ -128,7 +127,7 @@ fn queue_file_blocks(
     dest: &Path,
     pool: &ThreadPool,
     status_channel: &Sender,
-    opts: &Opts,
+    opts: Arc<Opts>,
 ) -> Result<u64> {
     let handle = CopyHandle::new(source, dest, opts)?;
     let len = handle.metadata.len();
@@ -140,7 +139,7 @@ fn queue_file_blocks(
     let harc = Arc::new(handle);
 
     let queue_whole_file = || {
-        queue_file_range(&harc, 0..len, pool, status_channel, opts)
+        queue_file_range(&harc, 0..len, pool, status_channel)
     };
 
     if probably_sparse(&harc.infd)? {
@@ -148,7 +147,7 @@ fn queue_file_blocks(
             let sparse_map = merge_extents(extents)?;
             let mut queued = 0;
             for ext in sparse_map {
-                queued += queue_file_range(&harc, ext, pool, status_channel, opts)?;
+                queued += queue_file_range(&harc, ext, pool, status_channel)?;
             }
             Ok(queued)
         } else {
@@ -159,15 +158,15 @@ fn queue_file_blocks(
     }
 }
 
-pub fn copy_single_file(source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
-    let nworkers = num_workers(opts);
+fn copy_single_file(source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
+    let nworkers = num_workers(&opts);
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
-    let pb = ProgressBar::new(opts, len)?;
+    let pb = ProgressBar::new(&opts, len)?;
 
     let (stat_tx, stat_rx) = cbc::unbounded();
-    let sender = Sender::new(stat_tx, opts);
+    let sender = Sender::new(stat_tx, &opts);
     queue_file_blocks(source, dest, &pool, &sender, opts)?;
     drop(sender);
 
@@ -187,16 +186,16 @@ struct CopyOp {
     target: PathBuf,
 }
 
-pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
-    let pb = ProgressBar::new(opts, 0)?;
+fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
+    let pb = ProgressBar::new(&opts, 0)?;
     let mut total = 0;
 
-    let nworkers = num_workers(opts) as usize;
+    let nworkers = num_workers(&opts) as usize;
     let (stat_tx, stat_rx) = cbc::unbounded::<StatusUpdate>();
 
     let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
-    let qopts = opts.clone(); // FIXME: Would be better to use scoped thread?
-    let sender = Sender::new(stat_tx, opts);
+    let sender = Sender::new(stat_tx, &opts);
+    let q_opts = opts.clone();
     let _dispatcher = thread::spawn(move || {
         let pool = Builder::new()
             .num_threads(nworkers)
@@ -207,7 +206,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
             .queue_len(128)
             .build();
         for op in file_rx {
-            queue_file_blocks(&op.from, &op.target, &pool, &sender, &qopts).unwrap();
+            queue_file_blocks(&op.from, &op.target, &pool, &sender, q_opts.clone()).unwrap();
             // FIXME
         }
         info!("Queuing complete");
@@ -228,7 +227,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
         };
         debug!("Target base is {:?}", target_base);
 
-        let gitignore = parse_ignore(&source, opts)?;
+        let gitignore = parse_ignore(&source, &opts.clone())?;
 
         for entry in WalkDir::new(&source)
             .into_iter()
