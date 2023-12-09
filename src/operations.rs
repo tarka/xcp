@@ -22,7 +22,7 @@ use std::sync::Arc;
 use libfs::{
     allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync,
 };
-use log::debug;
+use log::{debug, error};
 
 use crate::errors::Result;
 use crate::options::Opts;
@@ -50,12 +50,6 @@ impl CopyHandle {
             metadata,
             opts: opts.clone(),
         };
-
-        // FIXME: This should happen at the end of the file copy, but with
-        // the parblock handler this may be tricky. This works in practice.
-        if !opts.no_perms {
-            copy_permissions(&handle.infd, &handle.outfd)?;
-        }
 
         Ok(handle)
     }
@@ -97,13 +91,23 @@ impl CopyHandle {
 
         Ok(total)
     }
+
+    fn finalise_copy(&self) -> Result<()> {
+        if !self.opts.no_perms {
+            copy_permissions(&self.infd, &self.outfd)?;
+        }
+        if self.opts.fsync {
+            debug!("Syncing file {:?}", self.outfd);
+            sync(&self.outfd)?;
+        }
+        Ok(())
+    }
 }
 
 impl Drop for CopyHandle {
     fn drop(&mut self) {
-        if self.opts.fsync {
-            debug!("Syncing file {:?}", self.outfd);
-            sync(&self.outfd).unwrap();
+        if let Err(e) = self.finalise_copy() {
+            error!("Error during finalising copy operation {:?} -> {:?}: {}", self.infd, self.outfd, e);
         }
     }
 }
