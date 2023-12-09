@@ -95,11 +95,15 @@ impl CopyHandle {
             self.copy_bytes(self.metadata.len(), updates)?
         };
 
+        Ok(total)
+    }
+}
+
+impl Drop for CopyHandle {
+    fn drop(&mut self) {
         if self.opts.fsync {
             debug!("Syncing file {:?}", self.outfd);
-            sync(&self.outfd)?;
+            sync(&self.outfd).unwrap();
         }
-
-        Ok(total)
     }
 }
