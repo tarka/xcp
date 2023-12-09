@@ -45,53 +45,53 @@ pub struct Opts {
 
     /// Number of parallel workers for recursive copies. Default is 1;
     /// if the value is negative or 0 it uses the number of logical CPUs.
-    #[arg(short, long = "workers", default_value = "4")]
+    #[arg(short, long, default_value = "4")]
     pub workers: i64,
 
     /// Block size for operations. Accepts standard size modifiers
     /// like "M" and "GB". Actual usage internally depends on the
     /// driver.
-    #[arg(long = "block-size",  default_value = "1MB", value_parser=unbytify)]
+    #[arg(long,  default_value = "1MB", value_parser=unbytify)]
     pub block_size: u64,
 
     /// Do not overwrite an existing file
-    #[arg(short, long = "no-clobber")]
-    pub noclobber: bool,
+    #[arg(short, long)]
+    pub no_clobber: bool,
 
     /// Use .gitignore if present. NOTE: This is fairly basic at the
     /// moment, and only honours a .gitignore in the directory root
     /// for directory copies; global or sub-directory ignores are
     /// skipped.
-    #[arg(long = "gitignore")]
+    #[arg(long)]
     pub gitignore: bool,
 
     /// Glob (expand) filename patterns natively (note; the shell may still do its own expansion first)
-    #[arg(short, long = "glob")]
+    #[arg(short, long)]
     pub glob: bool,
 
     /// Disable progress bar.
-    #[arg(long = "no-progress")]
-    pub noprogress: bool,
+    #[arg(long)]
+    pub no_progress: bool,
 
     /// Do not copy the file permissions.
-    #[arg(long = "no-perms")]
+    #[arg(long)]
     pub no_perms: bool,
 
     /// Specify the driver. Currently there are 2; the default
     /// "parfile", which parallelises copies across workers at the
     /// file level, and an experimental "parblock" driver, which
     /// parellelises at the block level. See also '--block-size'.
-    #[arg(long = "driver")]
+    #[arg(long)]
     pub driver: Option<Drivers>,
 
     /// Analogous to cp's no-target-directory. Expected behavior is that when
     /// copying a directory to another directory, instead of creating a sub-folder
     /// in target, overwrite target.
-    #[arg(short = 'T', long = "no-target-directory")]
+    #[arg(short = 'T', long)]
     pub no_target_directory: bool,
 
     /// Sync each file to disk after fully written.
-    #[arg(long = "fsync")]
+    #[arg(long)]
     pub fsync: bool,
 
     pub paths: Vec<String>,

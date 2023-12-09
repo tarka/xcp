@@ -92,7 +92,7 @@ struct Sender {
 impl Sender {
     fn new(chan: cbc::Sender<StatusUpdate>, opts: &Opts) -> Sender {
         Sender {
-            noop: opts.noprogress,
+            noop: opts.no_progress,
             chan,
         }
     }
@@ -260,7 +260,7 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
                 target_base.clone()
             };
 
-            if opts.noclobber && target.exists() {
+            if opts.no_clobber && target.exists() {
                 return Err(XcpError::DestinationExists(
                     "Destination file exists and --no-clobber is set.",
                     target,

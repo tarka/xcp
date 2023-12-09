@@ -106,6 +106,7 @@ impl CopyHandle {
 
 impl Drop for CopyHandle {
     fn drop(&mut self) {
+        // FIXME: SHould we chcek for panicking() here?
         if let Err(e) = self.finalise_copy() {
             error!("Error during finalising copy operation {:?} -> {:?}: {}", self.infd, self.outfd, e);
         }

@@ -138,7 +138,7 @@ fn copy_source(
             target_base.clone()
         };
 
-        if opts.noclobber && target.exists() {
+        if opts.no_clobber && target.exists() {
             work_tx.send(Operation::End)?;
             updates.update(Err(XcpError::DestinationExists(
                 "Destination file exists and --no-clobber is set.",
@@ -198,7 +198,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<(
     let (work_tx, work_rx) = cbc::unbounded();
     let (stat_tx, stat_rx) = cbc::unbounded();
 
-    let (pb, batch_size) = if opts.noprogress {
+    let (pb, batch_size) = if opts.no_progress {
         (ProgressBar::Nop, usize::max_value() as u64)
     } else {
         (ProgressBar::new(&opts, 0)?, BATCH_DEFAULT)
@@ -251,7 +251,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<(
 }
 
 fn copy_single_file(source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
-    let mut copy_stat = if opts.noprogress {
+    let mut copy_stat = if opts.no_progress {
         BatchUpdater {
             sender: Box::new(NopUpdater {}),
             stat: StatusUpdate::Copied(0),
