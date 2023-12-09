@@ -39,18 +39,34 @@ use crate::utils::{empty, FileType, ToFileType};
 
 // ********************************************************************** //
 
-pub struct Driver;
-
-impl CopyDriver for Driver {
-    fn supported_platform(&self) -> bool {
-        cfg_if! {
-            if #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd", target_os = "netbsd", target_os="dragonfly"))] {
-                true
-            } else {
-                false
-            }
+const fn supported_platform() -> bool {
+    cfg_if! {
+        if #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd", target_os = "netbsd", target_os="dragonfly"))] {
+            true
+        } else {
+            false
         }
     }
+}
+
+
+pub struct Driver;
+
+impl Driver {
+    pub fn new(_opts: &Opts) -> Result<Self> {
+        if !supported_platform() {
+            let msg = "The parblock driver is not currently supported on this OS.";
+            error!("{}", msg);
+            return Err(XcpError::UnsupportedOS(msg).into());
+        }
+
+        Ok(Self {})
+    }
+}
+
+
+
+impl CopyDriver for Driver {
 
     fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
         copy_all(sources, dest, opts)

@@ -37,11 +37,13 @@ use crate::utils::{empty, FileType, ToFileType};
 
 pub struct Driver;
 
-impl CopyDriver for Driver {
-    fn supported_platform(&self) -> bool {
-        true // No known platform issues
+impl Driver {
+    pub fn new(_opts: &Opts) -> Result<Self> {
+        Ok(Self {})
     }
+}
 
+impl CopyDriver for Driver {
     fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
         copy_all(sources, dest, opts)
     }

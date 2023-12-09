@@ -23,13 +23,10 @@ use std::result;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use log::error;
-
 use crate::errors::{Result, XcpError};
 use crate::options::Opts;
 
 pub trait CopyDriver {
-    fn supported_platform(&self) -> bool;
     fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()>;
     fn copy_single(&self, source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()>;
 }
@@ -56,17 +53,12 @@ impl FromStr for Drivers {
 
 pub fn pick_driver(opts: &Opts) -> Result<Box<dyn CopyDriver>> {
     let dopt = opts.driver.unwrap_or(Drivers::ParFile);
-    let driver: Box<dyn CopyDriver> = match dopt {
-        Drivers::ParFile => Box::new(parfile::Driver {}),
-        #[cfg(feature = "parblock")]
-        Drivers::ParBlock => Box::new(parblock::Driver {}),
-    };
 
-    if !driver.supported_platform() {
-        let msg = "The parblock driver is not currently supported on Mac.";
-        error!("{}", msg);
-        return Err(XcpError::UnsupportedOS(msg).into());
-    }
+    let driver: Box<dyn CopyDriver> = match dopt {
+        Drivers::ParFile => Box::new(parfile::Driver::new(opts)?),
+        #[cfg(feature = "parblock")]
+        Drivers::ParBlock => Box::new(parblock::Driver::new(opts)?),
+    };
 
     Ok(driver)
 }
