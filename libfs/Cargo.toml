@@ -9,7 +9,7 @@ homepage = "https://github.com/tarka/xcp/libfs"
 repository = "https://github.com/tarka/xcp/libfs"
 readme = "README.md"
 
-keywords = ["coreutils", "cp", "files", "filesystem"]
+keywords = ["coreutils", "files", "filesystem", "sparse"]
 categories =["filesystem"]
 license = "GPL-3.0-only"
 
