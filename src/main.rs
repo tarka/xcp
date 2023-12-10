@@ -22,6 +22,7 @@ mod progress;
 mod utils;
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use libfs::is_same_file;
 use log::info;
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
@@ -30,7 +31,7 @@ use crate::drivers::pick_driver;
 use crate::errors::{Result, XcpError};
 
 fn main() -> Result<()> {
-    let opts = options::parse_args()?;
+    let opts = Arc::new(options::parse_args()?);
 
     let log_level = match opts.verbose {
         0 => LevelFilter::Warn,
@@ -69,7 +70,7 @@ fn main() -> Result<()> {
 
     } else if sources.len() == 1 && dest.is_file() {
         // Special case; rename/overwrite existing file.
-        if opts.noclobber {
+        if opts.no_clobber {
             return Err(XcpError::DestinationExists(
                 "Destination file exists and --no-clobber is set.",
                 dest,
@@ -88,7 +89,7 @@ fn main() -> Result<()> {
         }
 
         info!("Copying file {:?} to {:?}", sources[0], dest);
-        driver.copy_single(&sources[0], &dest, &opts)?;
+        driver.copy_single(&sources[0], &dest, opts.clone())?;
 
     } else {
         // Sanity-check all sources up-front
@@ -117,7 +118,7 @@ fn main() -> Result<()> {
             }
         }
 
-        driver.copy_all(sources, &dest, &opts)?;
+        driver.copy_all(sources, &dest, opts.clone())?;
     }
 
     Ok(())

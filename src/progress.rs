@@ -108,7 +108,7 @@ pub enum ProgressBar {
 
 impl ProgressBar {
     pub fn new(opts: &Opts, size: u64) -> Result<ProgressBar> {
-        match opts.noprogress {
+        match opts.no_progress {
             true => Ok(ProgressBar::Nop),
             false => iprogress_bar(size),
         }

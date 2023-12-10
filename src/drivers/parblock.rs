@@ -31,7 +31,7 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{init_copy, CopyHandle};
+use crate::operations::CopyHandle;
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
 use crate::progress::{ProgressBar, StatusUpdate};
@@ -39,24 +39,40 @@ use crate::utils::{empty, FileType, ToFileType};
 
 // ********************************************************************** //
 
-pub struct Driver;
-
-impl CopyDriver for Driver {
-    fn supported_platform(&self) -> bool {
-        cfg_if! {
-            if #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd", target_os = "netbsd", target_os="dragonfly"))] {
-                true
-            } else {
-                false
-            }
+const fn supported_platform() -> bool {
+    cfg_if! {
+        if #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd", target_os = "netbsd", target_os="dragonfly"))] {
+            true
+        } else {
+            false
         }
     }
+}
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
+
+pub struct Driver;
+
+impl Driver {
+    pub fn new(_opts: &Opts) -> Result<Self> {
+        if !supported_platform() {
+            let msg = "The parblock driver is not currently supported on this OS.";
+            error!("{}", msg);
+            return Err(XcpError::UnsupportedOS(msg).into());
+        }
+
+        Ok(Self {})
+    }
+}
+
+
+
+impl CopyDriver for Driver {
+
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
         copy_all(sources, dest, opts)
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
+    fn copy_single(&self, source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
         copy_single_file(source, dest, opts)
     }
 }
@@ -76,7 +92,7 @@ struct Sender {
 impl Sender {
     fn new(chan: cbc::Sender<StatusUpdate>, opts: &Opts) -> Sender {
         Sender {
-            noop: opts.noprogress,
+            noop: opts.no_progress,
             chan,
         }
     }
@@ -100,10 +116,9 @@ fn queue_file_range(
     range: Range<u64>,
     pool: &ThreadPool,
     status_channel: &Sender,
-    opts: &Opts,
 ) -> Result<u64> {
     let len = range.end - range.start;
-    let bsize = opts.block_size;
+    let bsize = handle.opts.block_size;
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
     for blkn in 0..blocks {
@@ -113,6 +128,7 @@ fn queue_file_range(
         let off = range.start + (blkn * bsize);
 
         pool.execute(move || {
+            // FIXME: Move into CopyHandle once settled.
             let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64).unwrap();
 
             stat_tx.send(StatusUpdate::Copied(r as u64), bytes, bsize).unwrap();
@@ -127,9 +143,9 @@ fn queue_file_blocks(
     dest: &Path,
     pool: &ThreadPool,
     status_channel: &Sender,
-    opts: &Opts,
+    opts: Arc<Opts>,
 ) -> Result<u64> {
-    let handle = init_copy(source, dest, opts)?;
+    let handle = CopyHandle::new(source, dest, opts)?;
     let len = handle.metadata.len();
 
     // Put the open files in an Arc, which we drop once work has
@@ -139,7 +155,7 @@ fn queue_file_blocks(
     let harc = Arc::new(handle);
 
     let queue_whole_file = || {
-        queue_file_range(&harc, 0..len, pool, status_channel, opts)
+        queue_file_range(&harc, 0..len, pool, status_channel)
     };
 
     if probably_sparse(&harc.infd)? {
@@ -147,7 +163,7 @@ fn queue_file_blocks(
             let sparse_map = merge_extents(extents)?;
             let mut queued = 0;
             for ext in sparse_map {
-                queued += queue_file_range(&harc, ext, pool, status_channel, opts)?;
+                queued += queue_file_range(&harc, ext, pool, status_channel)?;
             }
             Ok(queued)
         } else {
@@ -158,15 +174,15 @@ fn queue_file_blocks(
     }
 }
 
-pub fn copy_single_file(source: &Path, dest: &Path, opts: &Opts) -> Result<()> {
-    let nworkers = num_workers(opts);
+fn copy_single_file(source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
+    let nworkers = num_workers(&opts);
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
-    let pb = ProgressBar::new(opts, len)?;
+    let pb = ProgressBar::new(&opts, len)?;
 
     let (stat_tx, stat_rx) = cbc::unbounded();
-    let sender = Sender::new(stat_tx, opts);
+    let sender = Sender::new(stat_tx, &opts);
     queue_file_blocks(source, dest, &pool, &sender, opts)?;
     drop(sender);
 
@@ -186,16 +202,16 @@ struct CopyOp {
     target: PathBuf,
 }
 
-pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
-    let pb = ProgressBar::new(opts, 0)?;
+fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
+    let pb = ProgressBar::new(&opts, 0)?;
     let mut total = 0;
 
-    let nworkers = num_workers(opts) as usize;
+    let nworkers = num_workers(&opts) as usize;
     let (stat_tx, stat_rx) = cbc::unbounded::<StatusUpdate>();
 
     let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
-    let qopts = opts.clone(); // FIXME: Would be better to use scoped thread?
-    let sender = Sender::new(stat_tx, opts);
+    let sender = Sender::new(stat_tx, &opts);
+    let q_opts = opts.clone();
     let _dispatcher = thread::spawn(move || {
         let pool = Builder::new()
             .num_threads(nworkers)
@@ -206,7 +222,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
             .queue_len(128)
             .build();
         for op in file_rx {
-            queue_file_blocks(&op.from, &op.target, &pool, &sender, &qopts).unwrap();
+            queue_file_blocks(&op.from, &op.target, &pool, &sender, q_opts.clone()).unwrap();
             // FIXME
         }
         info!("Queuing complete");
@@ -227,7 +243,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
         };
         debug!("Target base is {:?}", target_base);
 
-        let gitignore = parse_ignore(&source, opts)?;
+        let gitignore = parse_ignore(&source, &opts.clone())?;
 
         for entry in WalkDir::new(&source)
             .into_iter()
@@ -244,7 +260,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Opts) -> Result<()> {
                 target_base.clone()
             };
 
-            if opts.noclobber && target.exists() {
+            if opts.no_clobber && target.exists() {
                 return Err(XcpError::DestinationExists(
                     "Destination file exists and --no-clobber is set.",
                     target,

@@ -17,10 +17,12 @@
 use std::cmp;
 use std::fs::{File, Metadata};
 use std::path::Path;
+use std::sync::Arc;
 
 use libfs::{
-    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse,
+    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync,
 };
+use log::{debug, error};
 
 use crate::errors::Result;
 use crate::options::Opts;
@@ -31,65 +33,82 @@ pub struct CopyHandle {
     pub infd: File,
     pub outfd: File,
     pub metadata: Metadata,
+    pub opts: Arc<Opts>,
 }
 
-pub fn init_copy(from: &Path, to: &Path, opts: &Opts) -> Result<CopyHandle> {
-    let infd = File::open(from)?;
-    let metadata = infd.metadata()?;
+impl CopyHandle {
+    pub fn new(from: &Path, to: &Path, opts: Arc<Opts>) -> Result<CopyHandle> {
+        let infd = File::open(from)?;
+        let metadata = infd.metadata()?;
 
-    let outfd = File::create(to)?;
-    allocate_file(&outfd, metadata.len())?;
+        let outfd = File::create(to)?;
+        allocate_file(&outfd, metadata.len())?;
 
-    let handle = CopyHandle {
-        infd,
-        outfd,
-        metadata,
-    };
+        let handle = CopyHandle {
+            infd,
+            outfd,
+            metadata,
+            opts: opts.clone(),
+        };
 
-    // FIXME: This should happen at the end of the file copy, but with
-    // the parblock handler this may be tricky. This works in practice.
-    if !opts.no_perms {
-        copy_permissions(&handle.infd, &handle.outfd)?;
+        Ok(handle)
     }
 
-    Ok(handle)
-}
+    /// Copy len bytes from wherever the descriptor cursors are set.
+    fn copy_bytes(&self, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
+        let mut written = 0u64;
+        while written < len {
+            let bytes_to_copy = cmp::min(len - written, updates.batch_size);
+            let result = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
+            written += result;
+            updates.update(Ok(result))?;
+        }
 
-/// Copy len bytes from wherever the descriptor cursors are set.
-pub fn copy_bytes(handle: &CopyHandle, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
-    let mut written = 0u64;
-    while written < len {
-        let bytes_to_copy = cmp::min(len - written, updates.batch_size);
-        let result = copy_file_bytes(&handle.infd, &handle.outfd, bytes_to_copy)? as u64;
-        written += result;
-        updates.update(Ok(result))?;
+        Ok(written)
     }
 
-    Ok(written)
-}
+    /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
+    fn copy_sparse(&self, updates: &mut BatchUpdater) -> Result<u64> {
+        let len = self.metadata.len();
+        let mut pos = 0;
 
-/// Wrapper around copy_bytes that looks for sparse blocks and skips them.
-pub fn copy_sparse(handle: &CopyHandle, updates: &mut BatchUpdater) -> Result<u64> {
-    let len = handle.metadata.len();
-    let mut pos = 0;
+        while pos < len {
+            let (next_data, next_hole) = next_sparse_segments(&self.infd, &self.outfd, pos)?;
 
-    while pos < len {
-        let (next_data, next_hole) = next_sparse_segments(&handle.infd, &handle.outfd, pos)?;
+            let _written = self.copy_bytes(next_hole - next_data, updates)?;
+            pos = next_hole;
+        }
 
-        let _written = copy_bytes(handle, next_hole - next_data, updates)?;
-        pos = next_hole;
+        Ok(len)
     }
 
-    Ok(len)
+    pub fn copy_file(&self, updates: &mut BatchUpdater) -> Result<u64> {
+        let total = if probably_sparse(&self.infd)? {
+            self.copy_sparse(updates)?
+        } else {
+            self.copy_bytes(self.metadata.len(), updates)?
+        };
+
+        Ok(total)
+    }
+
+    fn finalise_copy(&self) -> Result<()> {
+        if !self.opts.no_perms {
+            copy_permissions(&self.infd, &self.outfd)?;
+        }
+        if self.opts.fsync {
+            debug!("Syncing file {:?}", self.outfd);
+            sync(&self.outfd)?;
+        }
+        Ok(())
+    }
 }
 
-pub fn copy_file(from: &Path, to: &Path, opts: &Opts, updates: &mut BatchUpdater) -> Result<u64> {
-    let handle = init_copy(from, to, opts)?;
-    let total = if probably_sparse(&handle.infd)? {
-        copy_sparse(&handle, updates)?
-    } else {
-        copy_bytes(&handle, handle.metadata.len(), updates)?
-    };
-
-    Ok(total)
+impl Drop for CopyHandle {
+    fn drop(&mut self) {
+        // FIXME: SHould we chcek for panicking() here?
+        if let Err(e) = self.finalise_copy() {
+            error!("Error during finalising copy operation {:?} -> {:?}: {}", self.infd, self.outfd, e);
+        }
+    }
 }
