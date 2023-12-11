@@ -20,7 +20,7 @@ use std::ops::Range;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::PermissionsExt;
 
-use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST};
+use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST, FICLONE};
 use rustix::fs::CWD;
 use rustix::{fs::{copy_file_range, seek, mknodat, FileType, Mode, RawMode, SeekFrom}, io::Errno};
 
@@ -236,6 +236,21 @@ pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
 
     mknodat(CWD, dest, ftype, mode, dev)?;
     Ok(())
+}
+
+/// Reflink a file. This will reuse the underlying data on disk for
+/// the target file, utilising copy-on-write for any future
+/// updates. Only certain filesystems support this; if not supported
+/// the function returns `false`.
+pub fn reflink(infd: &File, outfd: &File) -> Result<bool> {
+    if unsafe { libc::ioctl(outfd.as_raw_fd(), FICLONE as u64, infd.as_raw_fd()) } != 0 {
+        let oserr = io::Error::last_os_error();
+        match oserr.raw_os_error() {
+            Some(libc::EOPNOTSUPP) | Some(libc::EINVAL) => return Ok(false),
+            _ => return  Err(oserr.into()),
+        }
+    }
+    Ok(true)
 }
 
 #[cfg(test)]
