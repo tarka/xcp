@@ -166,7 +166,7 @@ fn copy_source(
                 create_dir_all(&target)?;
             }
 
-            FileType::Unknown => {
+            FileType::Other => {
                 error!("Unknown filetype found; this should never happen!");
                 work_tx.send(Operation::End)?;
                 updates.update(Err(XcpError::UnknownFiletype(target).into()))?;

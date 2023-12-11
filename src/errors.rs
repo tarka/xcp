@@ -38,6 +38,9 @@ pub enum XcpError {
     #[error("Destination Exists: {0}, {1}")]
     DestinationExists(&'static str, PathBuf),
 
+    #[error("Unknown file type: {0}")]
+    DestinationExists(PathBuf),
+
     #[error("Early shutdown: {0}")]
     EarlyShutdown(&'static str),
 

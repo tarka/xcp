@@ -21,7 +21,7 @@ pub enum FileType {
     File,
     Dir,
     Symlink,
-    Unknown,
+    Other,
 }
 
 pub trait ToFileType {
@@ -36,7 +36,7 @@ fn to_enum(ft: fs::FileType) -> FileType {
     } else if ft.is_symlink() {
         FileType::Symlink
     } else {
-        FileType::Unknown
+        FileType::Other
     }
 }
 

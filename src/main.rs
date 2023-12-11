@@ -69,7 +69,7 @@ fn main() -> Result<()> {
         return Err(XcpError::InvalidSource("No source files found.").into());
 
     } else if sources.len() == 1 && dest.is_file() {
-        // Special case; rename/overwrite existing file.
+        // Special case; attemping to rename/overwrite existing file.
         if opts.no_clobber {
             return Err(XcpError::DestinationExists(
                 "Destination file exists and --no-clobber is set.",

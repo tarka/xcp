@@ -289,13 +289,9 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
                     create_dir_all(&target)?;
                 }
 
-                FileType::Unknown => {
+                FileType::Other => {
                     error!("Unknown filetype found; this should never happen!");
-                    return Err(XcpError::DestinationExists(
-                        "Destination file exists and --no-clobber is set.",
-                        target,
-                    )
-                    .into());
+                    return Err(XcpError::UnknownFiletype(target).into());
                 }
             };
         }
