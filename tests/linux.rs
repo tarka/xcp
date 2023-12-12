@@ -14,13 +14,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use cfg_if::cfg_if;
+mod util;
 
-cfg_if! {if #[cfg(all(target_os = "linux", feature = "use_linux"))] {
+#[cfg(all(target_os = "linux", feature = "use_linux"))]
+mod test {
     use std::process::Command;
     use test_case::test_case;
 
-    mod util;
     use crate::util::*;
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
@@ -214,4 +214,4 @@ cfg_if! {if #[cfg(all(target_os = "linux", feature = "use_linux"))] {
         assert_eq!(from_data, to_data);
     }
 
-}}
+}
