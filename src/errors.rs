@@ -21,7 +21,7 @@ pub use anyhow::{Error, Result};
 #[derive(Debug, thiserror::Error)]
 pub enum XcpError {
     #[error("Unknown file-type: {0}")]
-    UnknownFiletype(PathBuf),
+    UnknownFileType(PathBuf),
 
     #[error("Unknown driver: {0}")]
     UnknownDriver(String),
@@ -37,9 +37,6 @@ pub enum XcpError {
 
     #[error("Destination Exists: {0}, {1}")]
     DestinationExists(&'static str, PathBuf),
-
-    #[error("Unknown file type: {0}")]
-    DestinationExists(PathBuf),
 
     #[error("Early shutdown: {0}")]
     EarlyShutdown(&'static str),

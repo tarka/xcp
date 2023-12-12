@@ -291,7 +291,7 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
 
                 FileType::Other => {
                     error!("Unknown filetype found; this should never happen!");
-                    return Err(XcpError::UnknownFiletype(target).into());
+                    return Err(XcpError::UnknownFileType(target).into());
                 }
             };
         }
