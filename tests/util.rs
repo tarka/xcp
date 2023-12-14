@@ -32,7 +32,7 @@ use walkdir::WalkDir;
 pub type TResult = result::Result<(), Error>;
 
 #[allow(unused)]
-fn fs_supports(unsupported: Vec<&str>) -> bool {
+fn fs_not(unsupported: Vec<&str>) -> bool {
     // See `.github/workflows/rust.yml`
     match var("XCP_TEST_FS") {
         Ok(fs) => {
@@ -44,17 +44,22 @@ fn fs_supports(unsupported: Vec<&str>) -> bool {
 
 #[allow(unused)]
 pub fn fs_supports_symlinks() -> bool {
-    fs_supports(vec!["fat", "vfat"])
+    fs_not(vec!["fat", "vfat"])
 }
 
 #[allow(unused)]
 pub fn fs_supports_xattr() -> bool {
-    fs_supports(vec!["fat", "vfat"])
+    fs_not(vec!["fat", "vfat"])
+}
+
+#[allow(unused)]
+pub fn fs_supports_sockets() -> bool {
+    fs_not(vec!["fat", "vfat"])
 }
 
 #[allow(unused)]
 pub fn fs_supports_extents() -> bool {
-    fs_supports(vec!["ext2", "ntfs", "fat", "vfat", "zfs"])
+    fs_not(vec!["ext2", "ntfs", "fat", "vfat", "zfs"])
 }
 
 #[allow(unused)]
@@ -62,6 +67,7 @@ pub fn fs_supports_sparse() -> bool {
     // FIXME: Same set for now.
     fs_supports_extents()
 }
+
 
 pub fn get_command() -> Result<Command, Error> {
     let exe = env!("CARGO_BIN_EXE_xcp");

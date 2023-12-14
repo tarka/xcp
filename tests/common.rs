@@ -868,6 +868,10 @@ fn glob_pattern_error(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn test_socket_file(drv: &str) {
+    if !fs_supports_sockets() {
+        return;
+    }
+
     let dir = tempdir().unwrap();
     let from = dir.path().join("from.sock");
     let to = dir.path().join("to.sock");
@@ -891,6 +895,9 @@ fn test_socket_file(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn test_sockets_dir(drv: &str) {
+    if !fs_supports_sockets() {
+        return;
+    }
 
     let dir = tempdir().unwrap();
     let src_dir = dir.path().join("fromdir");
