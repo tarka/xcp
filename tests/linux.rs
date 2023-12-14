@@ -18,36 +18,61 @@ mod util;
 
 #[cfg(all(target_os = "linux", feature = "use_linux"))]
 mod test {
-    use std::process::Command;
+    use std::{process::Command, os::unix::net::UnixListener, fs::create_dir_all};
     use test_case::test_case;
 
     use crate::util::*;
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[ignore] // Expensive so skip for local dev
-    fn copy_generated_tree_sparse(drv: &str) {
+    fn test_socket_file(drv: &str) {
         let dir = tempdir().unwrap();
+        let from = dir.path().join("from.sock");
+        let to = dir.path().join("to.sock");
 
-        let src = dir.path().join("generated");
-        let dest = dir.path().join("target");
+        let _sock = UnixListener::bind(&from).unwrap();
+        let ftype = from.metadata().unwrap().file_type();
+        assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
 
-        // Spam some output to keep CI from timing-out (hopefully).
-        println!("Generating file tree...");
-        gen_filetree(&src, 0, true).unwrap();
-
-        println!("Running copy...");
         let out = run(&[
-            "--driver",
-            drv,
-            "-r",
-            src.to_str().unwrap(),
-            dest.to_str().unwrap(),
+            "--driver", drv,
+            from.to_str().unwrap(),
+            to.to_str().unwrap(),
         ]).unwrap();
         assert!(out.status.success());
 
-        println!("Compare trees...");
-        compare_trees(&src, &dest).unwrap();
+        assert!(to.exists());
+        let ftype = to.metadata().unwrap().file_type();
+        assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
+    }
+
+    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+    #[test_case("parfile"; "Test with parallel file driver")]
+    fn test_sockets_dir(drv: &str) {
+
+        let dir = tempdir().unwrap();
+        let src_dir = dir.path().join("fromdir");
+        create_dir_all(&src_dir).unwrap();
+
+        let from = src_dir.join("from.sock");
+        let _sock = UnixListener::bind(&from).unwrap();
+        let ftype = from.metadata().unwrap().file_type();
+        assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
+
+        let to_dir = dir.path().join("todir");
+        let to = to_dir.join("from.sock");
+
+        let out = run(&[
+            "--driver", drv,
+            "-r",
+            src_dir.to_str().unwrap(),
+            to_dir.to_str().unwrap(),
+        ]).unwrap();
+        assert!(out.status.success());
+
+        assert!(to.exists());
+        let ftype = to.metadata().unwrap().file_type();
+        assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
     }
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
@@ -214,4 +239,30 @@ mod test {
         assert_eq!(from_data, to_data);
     }
 
+
+    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+    #[test_case("parfile"; "Test with parallel file driver")]
+    #[ignore] // Expensive so skip for local dev
+    fn copy_generated_tree_sparse(drv: &str) {
+        let dir = tempdir().unwrap();
+
+        let src = dir.path().join("generated");
+        let dest = dir.path().join("target");
+
+        // Spam some output to keep CI from timing-out (hopefully).
+        println!("Generating file tree...");
+        gen_filetree(&src, 0, true).unwrap();
+
+        println!("Running copy...");
+        let out = run(&[
+            "--driver", drv,
+            "-r",
+            src.to_str().unwrap(),
+            dest.to_str().unwrap(),
+        ]).unwrap();
+        assert!(out.status.success());
+
+        println!("Compare trees...");
+        compare_trees(&src, &dest).unwrap();
+    }
 }

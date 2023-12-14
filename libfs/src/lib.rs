@@ -17,7 +17,11 @@
 mod common;
 mod errors;
 
+use std::fs;
+
 use cfg_if::cfg_if;
+use rustix::fs::FileTypeExt;
+
 cfg_if! {
     if #[cfg(all(target_os = "linux", feature = "use_linux"))] {
         mod linux;
@@ -38,6 +42,7 @@ pub use backend::{
 pub use common::{
     allocate_file,
     copy_file,
+    copy_node,
     copy_permissions,
     is_same_file,
     merge_extents,
@@ -60,3 +65,36 @@ pub const XATTR_SUPPORTED: bool = {
         }
     }
 };
+
+
+/// Enum mapping for various *nix file types. Mapped from
+/// [std::fs::FileType] and [rustix::fs::FileTypeExt]. 
+pub enum FileType {
+    File,
+    Dir,
+    Symlink,
+    Socket,
+    Fifo,
+    Char,
+    Other
+}
+
+impl From<fs::FileType> for FileType {
+    fn from(ft: fs::FileType) -> Self {
+        if ft.is_dir() {
+            FileType::Dir
+        } else if ft.is_file() {
+            FileType::File
+        } else if ft.is_symlink() {
+            FileType::Symlink
+        } else if ft.is_socket() {
+            FileType::Socket
+        } else if ft.is_fifo() {
+            FileType::Fifo
+        } else if ft.is_char_device() {
+            FileType::Char
+        } else {
+            FileType::Other
+        }
+    }
+}

@@ -16,6 +16,7 @@
 
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
+use libfs::{FileType, copy_node};
 use std::fs::{create_dir_all, read_link};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -31,7 +32,7 @@ use crate::progress::{
     BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
     BATCH_DEFAULT,
 };
-use crate::utils::{empty, FileType, ToFileType};
+use crate::utils::empty;
 
 // ********************************************************************** //
 
@@ -59,6 +60,7 @@ impl CopyDriver for Driver {
 enum Operation {
     Copy(PathBuf, PathBuf),
     Link(PathBuf, PathBuf),
+    Special(PathBuf, PathBuf),
     End,
 }
 
@@ -91,6 +93,11 @@ fn copy_worker(
             Operation::Link(from, to) => {
                 info!("Worker: Symlink {:?} -> {:?}", from, to);
                 let _r = symlink(&from, &to);
+            }
+
+            Operation::Special(from, to) => {
+                info!("Worker: Special file {:?} -> {:?}", from, to);
+                copy_node(&from, &to)?;
             }
 
             Operation::End => {
@@ -148,7 +155,7 @@ fn copy_source(
             return Err(XcpError::EarlyShutdown("Path exists and --no-clobber set.").into());
         }
 
-        match meta.file_type().to_enum() {
+        match FileType::from(meta.file_type()) {
             FileType::File => {
                 debug!("Send copy operation {:?} to {:?}", from, target);
                 updates.update(Ok(meta.len()))?;
@@ -166,10 +173,14 @@ fn copy_source(
                 create_dir_all(&target)?;
             }
 
+            FileType::Socket | FileType::Char | FileType::Fifo => {
+                debug!("Unknown file type: {:?} to {:?}", from, target);
+                work_tx.send(Operation::Special(from, target))?;
+            }
+
             FileType::Other => {
                 error!("Unknown filetype found; this should never happen!");
-                work_tx.send(Operation::End)?;
-                updates.update(Err(XcpError::UnknownFileType(target).into()))?;
+                return Err(XcpError::UnknownFileType(target).into());
             }
         };
     }

@@ -14,37 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fs;
 use std::path::{Path, PathBuf};
-
-pub enum FileType {
-    File,
-    Dir,
-    Symlink,
-    Other,
-}
-
-pub trait ToFileType {
-    fn to_enum(self) -> FileType;
-}
-
-fn to_enum(ft: fs::FileType) -> FileType {
-    if ft.is_dir() {
-        FileType::Dir
-    } else if ft.is_file() {
-        FileType::File
-    } else if ft.is_symlink() {
-        FileType::Symlink
-    } else {
-        FileType::Other
-    }
-}
-
-impl ToFileType for fs::FileType {
-    fn to_enum(self) -> FileType {
-        to_enum(self)
-    }
-}
 
 pub fn empty(path: &Path) -> bool {
     *path == PathBuf::new()

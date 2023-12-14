@@ -16,14 +16,14 @@
 
 
 use log::{debug, warn};
-use rustix::fs::fsync;
-use rustix::io::pwrite;
-use rustix::{fs::ftruncate, io::pread};
+use rustix::fs::{fsync, mknodat, ftruncate, CWD, FileType, Mode, RawMode};
+use rustix::io::{pread, pwrite};
 use std::cmp;
 use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::ops::Range;
 use std::os::unix::fs::MetadataExt;
+use std::os::unix::prelude::PermissionsExt;
 use std::path::Path;
 use xattr::FileExt;
 
@@ -183,6 +183,17 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<u64> {
     Ok(total)
 }
 
+pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
+    let meta = src.metadata()?;
+    let rmode = RawMode::from(meta.permissions().mode());
+    let mode = Mode::from_raw_mode(rmode);
+    let ftype = FileType::from_raw_mode(rmode);
+    let dev = meta.dev();
+
+    mknodat(CWD, dest, ftype, mode, dev)?;
+    Ok(())
+}
+
 /// Sync an open file to disk. Uses `fsync(2)`.
 pub fn sync(fd: &File) -> Result<()> {
     Ok(fsync(fd)?)
@@ -191,7 +202,8 @@ pub fn sync(fd: &File) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::read;
+    use std::{fs::read, os::unix::net::UnixListener};
+    use rustix::fs::FileTypeExt;
     use tempfile::tempdir;
 
     #[test]
@@ -302,6 +314,21 @@ mod tests {
         assert_eq!(len, to.metadata()?.len() as usize);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_copy_socket() {
+        let dir = tempdir().unwrap();
+        let from = dir.path().join("from.sock");
+        let to = dir.path().join("to.sock");
+
+        let _sock = UnixListener::bind(&from).unwrap();
+        assert!(from.metadata().unwrap().file_type().is_socket());
+
+        copy_node(&from, &to).unwrap();
+
+        assert!(to.exists());
+        assert!(to.metadata().unwrap().file_type().is_socket());
     }
 
 }
