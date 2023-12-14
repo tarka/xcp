@@ -189,11 +189,8 @@ pub fn sync(fd: &File) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::copy_node;
-
     use super::*;
-    use std::{fs::read, os::unix::net::UnixListener};
-    use rustix::fs::FileTypeExt;
+    use std::fs::read;
     use tempfile::tempdir;
 
     #[test]
@@ -305,20 +302,4 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    fn test_copy_socket() {
-        let dir = tempdir().unwrap();
-        let from = dir.path().join("from.sock");
-        let to = dir.path().join("to.sock");
-
-        let _sock = UnixListener::bind(&from).unwrap();
-        assert!(from.metadata().unwrap().file_type().is_socket());
-
-        copy_node(&from, &to).unwrap();
-
-        assert!(to.exists());
-        assert!(to.metadata().unwrap().file_type().is_socket());
-    }
-
 }

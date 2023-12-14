@@ -245,8 +245,10 @@ mod tests {
     use std::fs::{read, OpenOptions};
     use std::io::{self, Seek, Write};
     use std::iter;
+    use std::os::unix::net::UnixListener;
     use std::path::PathBuf;
     use std::process::Command;
+    use rustix::fs::FileTypeExt;
     use tempfile::{tempdir_in, TempDir};
 
     fn tempdir() -> Result<TempDir> {
@@ -742,5 +744,20 @@ mod tests {
         assert!(probably_sparse(&File::open(&to)?)?);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_copy_socket() {
+        let dir = tempdir().unwrap();
+        let from = dir.path().join("from.sock");
+        let to = dir.path().join("to.sock");
+
+        let _sock = UnixListener::bind(&from).unwrap();
+        assert!(from.metadata().unwrap().file_type().is_socket());
+
+        copy_node(&from, &to).unwrap();
+
+        assert!(to.exists());
+        assert!(to.metadata().unwrap().file_type().is_socket());
     }
 }
