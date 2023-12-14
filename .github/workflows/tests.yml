@@ -18,49 +18,49 @@ jobs:
         run: scripts/make-filesystems.sh ext2 ext4 xfs btrfs ntfs fat zfs
 
       - name: Run tests on ext2
-        run: cargo test
+        run: cargo test --workspace
         working-directory: /fs/ext2/src
         env:
           XCP_TEST_FS: ext2
         if: always()
 
       - name: Run tests on ext4
-        run: cargo test
+        run: cargo test --workspace
         working-directory: /fs/ext4/src
         env:
           XCP_TEST_FS: ext4
         if: always()
 
       - name: Run tests on XFS
-        run: cargo test
+        run: cargo test --workspace
         working-directory: /fs/xfs/src
         env:
           XCP_TEST_FS: xfs
         if: always()
 
       - name: Run tests on btrfs
-        run: cargo test
+        run: cargo test --workspace
         working-directory: /fs/btrfs/src
         env:
           XCP_TEST_FS: btrfs
         if: always()
 
       - name: Run tests on ntfs
-        run: cargo test
+        run: cargo test --workspace
         working-directory: /fs/ntfs/src
         env:
           XCP_TEST_FS: ntfs
         if: always()
 
       - name: Run tests on fat
-        run: cargo test
+        run: cargo test --workspace
         working-directory: /fs/fat/src
         env:
           XCP_TEST_FS: fat
         if: always()
 
       - name: Run tests on ZFS
-        run: cargo test
+        run: cargo test --workspace
         working-directory: /fs/zfs/src
         env:
           XCP_TEST_FS: zfs
@@ -75,7 +75,7 @@ jobs:
         run: ~/.cargo/bin/rustup update
 
       - name: Run expensive tests
-        run: ~/.cargo/bin/cargo test -- --ignored
+        run: ~/.cargo/bin/cargo test --workspace -- --ignored
 
   macos:
     runs-on: macos-latest
@@ -89,7 +89,7 @@ jobs:
         run: ~/.cargo/bin/rustup update
 
       - name: Run tests
-        run: ~/.cargo/bin/cargo test --no-default-features
+        run: ~/.cargo/bin/cargo test --workspace --no-default-features
 
       - name: Run expensive tests
-        run: ~/.cargo/bin/cargo test --no-default-features -- --ignored
+        run: ~/.cargo/bin/cargo test --workspace --no-default-features -- --ignored
