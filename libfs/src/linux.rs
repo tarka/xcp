@@ -224,6 +224,7 @@ pub fn copy_sparse(infd: &File, outfd: &File) -> Result<u64> {
     Ok(len)
 }
 
+/// Create a clone of a special file (unix socket, char-device, etc.)
 pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
     // NOTE: The `mknod` version in `fallback.rs` also works.
     use std::os::unix::fs::MetadataExt;
