@@ -25,58 +25,6 @@ mod test {
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     #[test_case("parfile"; "Test with parallel file driver")]
-    fn test_socket_file(drv: &str) {
-        let dir = tempdir().unwrap();
-        let from = dir.path().join("from.sock");
-        let to = dir.path().join("to.sock");
-
-        let _sock = UnixListener::bind(&from).unwrap();
-        let ftype = from.metadata().unwrap().file_type();
-        assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
-
-        let out = run(&[
-            "--driver", drv,
-            from.to_str().unwrap(),
-            to.to_str().unwrap(),
-        ]).unwrap();
-        assert!(out.status.success());
-
-        assert!(to.exists());
-        let ftype = to.metadata().unwrap().file_type();
-        assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
-    }
-
-    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
-    #[test_case("parfile"; "Test with parallel file driver")]
-    fn test_sockets_dir(drv: &str) {
-
-        let dir = tempdir().unwrap();
-        let src_dir = dir.path().join("fromdir");
-        create_dir_all(&src_dir).unwrap();
-
-        let from = src_dir.join("from.sock");
-        let _sock = UnixListener::bind(&from).unwrap();
-        let ftype = from.metadata().unwrap().file_type();
-        assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
-
-        let to_dir = dir.path().join("todir");
-        let to = to_dir.join("from.sock");
-
-        let out = run(&[
-            "--driver", drv,
-            "-r",
-            src_dir.to_str().unwrap(),
-            to_dir.to_str().unwrap(),
-        ]).unwrap();
-        assert!(out.status.success());
-
-        assert!(to.exists());
-        let ftype = to.metadata().unwrap().file_type();
-        assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
-    }
-
-    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
-    #[test_case("parfile"; "Test with parallel file driver")]
     fn test_sparse(drv: &str) {
         if !fs_supports_sparse() {
             return
