@@ -328,7 +328,6 @@ mod tests {
         copy_node(&from, &to).unwrap();
 
         assert!(to.exists());
-        let ftype = to.metadata().unwrap().file_type();
         assert!(to.metadata().unwrap().file_type().is_socket());
     }
 

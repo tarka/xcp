@@ -35,8 +35,7 @@ mod test {
         assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
 
         let out = run(&[
-            "--driver",
-            drv,
+            "--driver", drv,
             from.to_str().unwrap(),
             to.to_str().unwrap(),
         ]).unwrap();
@@ -52,22 +51,22 @@ mod test {
     fn test_sockets_dir(drv: &str) {
 
         let dir = tempdir().unwrap();
-        let source_path = dir.path().join("fromdir");
-        create_dir_all(&source_path).unwrap();
+        let src_dir = dir.path().join("fromdir");
+        create_dir_all(&src_dir).unwrap();
 
-        let from = source_path.join("from.sock");
+        let from = src_dir.join("from.sock");
         let _sock = UnixListener::bind(&from).unwrap();
         let ftype = from.metadata().unwrap().file_type();
         assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
 
-        let dest_path = dir.path().join("todir");
-        let to = dest_path.join("from.sock");
+        let to_dir = dir.path().join("todir");
+        let to = to_dir.join("from.sock");
 
         let out = run(&[
-            "--driver",
-            drv,
-            source_path.to_str().unwrap(),
-            dest_path.to_str().unwrap(),
+            "--driver", drv,
+            "-r",
+            src_dir.to_str().unwrap(),
+            to_dir.to_str().unwrap(),
         ]).unwrap();
         assert!(out.status.success());
 
@@ -256,8 +255,7 @@ mod test {
 
         println!("Running copy...");
         let out = run(&[
-            "--driver",
-            drv,
+            "--driver", drv,
             "-r",
             src.to_str().unwrap(),
             dest.to_str().unwrap(),

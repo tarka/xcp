@@ -15,8 +15,8 @@
  */
 
 use crossbeam_channel as cbc;
-use log::{debug, info};
-use libfs::FileType;
+use log::{debug, error, info};
+use libfs::{FileType, copy_node};
 use std::fs::{create_dir_all, read_link};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -97,8 +97,7 @@ fn copy_worker(
 
             Operation::Special(from, to) => {
                 info!("Worker: Special file {:?} -> {:?}", from, to);
-                let _r = std::fs::copy(from, to);
-                info!("COPYIED: {:?}", _r);
+                copy_node(&from, &to)?;
             }
 
             Operation::End => {
@@ -174,9 +173,14 @@ fn copy_source(
                 create_dir_all(&target)?;
             }
 
-            FileType::Socket | FileType::Char | FileType::Fifo | FileType::Other => {
+            FileType::Socket | FileType::Char | FileType::Fifo => {
                 debug!("Unknown file type: {:?} to {:?}", from, target);
                 work_tx.send(Operation::Special(from, target))?;
+            }
+
+            FileType::Other => {
+                error!("Unknown filetype found; this should never happen!");
+                return Err(XcpError::UnknownFileType(target).into());
             }
         };
     }
