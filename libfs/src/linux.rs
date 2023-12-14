@@ -748,6 +748,12 @@ mod tests {
 
     #[test]
     fn test_copy_socket() {
+        if let Ok(fs) = var("XCP_TEST_FS") {
+            if fs == "fat" {
+                return;
+            }
+        }
+
         let dir = tempdir().unwrap();
         let from = dir.path().join("from.sock");
         let to = dir.path().join("to.sock");
