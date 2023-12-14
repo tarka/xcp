@@ -54,7 +54,8 @@ pub fn fs_supports_xattr() -> bool {
 
 #[allow(unused)]
 pub fn fs_supports_sockets() -> bool {
-    fs_not(&["fat", "vfat"])
+    // HFS+ does, but gives permission errors in CI.
+    fs_not(&["fat", "vfat", "hfs"])
 }
 
 #[allow(unused)]

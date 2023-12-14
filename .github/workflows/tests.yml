@@ -79,6 +79,8 @@ jobs:
 
   macos:
     runs-on: macos-latest
+    env:
+      XCP_TEST_FS: hfs
     steps:
       - uses: actions/checkout@v1
 
