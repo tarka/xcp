@@ -25,7 +25,7 @@ use std::thread;
 
 use cfg_if::cfg_if;
 use crossbeam_channel as cbc;
-use libfs::FileType;
+use libfs::{FileType, copy_node};
 use log::{debug, error, info};
 use blocking_threadpool::{Builder, ThreadPool};
 use walkdir::WalkDir;
@@ -288,7 +288,12 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
                     create_dir_all(&target)?;
                 }
 
-                FileType::Socket | FileType::Char | FileType::Fifo | FileType::Other => {
+                FileType::Socket | FileType::Char | FileType::Fifo => {
+                    debug!("Copy special file {:?} to {:?}", from, target);
+                    copy_node(&from, &target)?;
+                }
+
+                FileType::Other => {
                     error!("Unknown filetype found; this should never happen!");
                     return Err(XcpError::UnknownFileType(target).into());
                 }
