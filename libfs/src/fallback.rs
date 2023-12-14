@@ -14,8 +14,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::ffi::CString;
 use std::fs::File;
+use std::io;
 use std::ops::Range;
+use std::os::unix::fs::MetadataExt;
+use std::os::unix::prelude::PermissionsExt;
+use std::path::Path;
+
+use libc::{dev_t, mode_t};
 
 use crate::common::{copy_bytes_uspace, copy_range_uspace};
 use crate::errors::{Result, Error};
@@ -50,3 +57,18 @@ pub fn copy_sparse(infd: &File, outfd: &File) -> Result<u64> {
         .map(|i| i as u64)
 }
 
+pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
+    let meta = src.metadata()?;
+    let mode = meta.permissions().mode();
+    let dev = meta.dev();
+    let pstr = dest.to_str()
+        .ok_or(Error::InvalidPath(dest.to_path_buf()))?;
+    let cdest = CString::new(pstr)
+        .map_err(|_| Error::InvalidPath(dest.to_path_buf()))?;
+
+    if unsafe { libc::mknod(cdest.into_raw(), mode as mode_t, dev as dev_t) } != 0 {
+        let errno = io::Error::last_os_error();
+        return Err(errno.into())
+    }
+    Ok(())
+}

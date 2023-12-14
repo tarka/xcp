@@ -15,39 +15,19 @@
  */
 
 
-use libc::{dev_t, mode_t};
 use log::{debug, warn};
-use rustix::fs::{fsync, ftruncate, RawMode};
+use rustix::fs::{fsync, ftruncate};
 use rustix::io::{pread, pwrite};
 use std::cmp;
-use std::ffi::CString;
 use std::fs::File;
-use std::io::{self, ErrorKind, Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::ops::Range;
 use std::os::unix::fs::MetadataExt;
-use std::os::unix::prelude::PermissionsExt;
 use std::path::Path;
 use xattr::FileExt;
 
 use crate::errors::{Result, Error};
 use crate::{XATTR_SUPPORTED, copy_sparse, probably_sparse, copy_file_bytes};
-
-
-pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
-    let meta = src.metadata()?;
-    let mode = meta.permissions().mode();
-    let dev = meta.dev();
-    let pstr = dest.to_str()
-        .ok_or(Error::InvalidPath(dest.to_path_buf()))?;
-    let cdest = CString::new(pstr)
-        .map_err(|_| Error::InvalidPath(dest.to_path_buf()))?;
-
-    if unsafe { libc::mknod(cdest.into_raw(), mode as mode_t, dev as dev_t) } != 0 {
-        let errno = io::Error::last_os_error();
-        return Err(errno.into())
-    }
-    Ok(())
-}
 
 fn copy_xattr(infd: &File, outfd: &File) -> Result<()> {
     // FIXME: Flag for xattr.
@@ -209,6 +189,8 @@ pub fn sync(fd: &File) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use crate::copy_node;
+
     use super::*;
     use std::{fs::read, os::unix::net::UnixListener};
     use rustix::fs::FileTypeExt;

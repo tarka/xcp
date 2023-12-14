@@ -34,6 +34,7 @@ cfg_if! {
 pub use backend::{
     copy_file_bytes,
     copy_file_offset,
+    copy_node,
     copy_sparse,
     probably_sparse,
     next_sparse_segments,
@@ -43,7 +44,6 @@ pub use common::{
     allocate_file,
     copy_file,
     copy_permissions,
-    copy_node,
     is_same_file,
     merge_extents,
     sync,

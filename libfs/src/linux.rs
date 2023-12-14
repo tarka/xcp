@@ -225,6 +225,7 @@ pub fn copy_sparse(infd: &File, outfd: &File) -> Result<u64> {
 }
 
 pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
+    // NOTE: The `mknod` version in `fallback.rs` also works.
     use std::os::unix::fs::MetadataExt;
     let meta = src.metadata()?;
     let rmode = RawMode::from(meta.permissions().mode());
