@@ -35,7 +35,7 @@ use crate::{XATTR_SUPPORTED, copy_sparse, probably_sparse, copy_file_bytes};
 
 pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
     let meta = src.metadata()?;
-    let mode = RawMode::from(meta.permissions().mode());
+    let mode = meta.permissions().mode();
     let dev = meta.dev();
     let pstr = dest.to_str()
         .ok_or(Error::InvalidPath(dest.to_path_buf()))?;
