@@ -18,7 +18,7 @@ mod util;
 
 #[cfg(all(target_os = "linux", feature = "use_linux"))]
 mod test {
-    use std::{process::Command, os::unix::net::UnixListener, fs::create_dir_all};
+    use std::{process::Command};
     use test_case::test_case;
 
     use crate::util::*;
