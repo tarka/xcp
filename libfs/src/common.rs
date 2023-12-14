@@ -15,6 +15,7 @@
  */
 
 
+use libc::{dev_t, mode_t};
 use log::{debug, warn};
 use rustix::fs::{fsync, ftruncate, RawMode};
 use rustix::io::{pread, pwrite};
@@ -41,7 +42,7 @@ pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
     let cdest = CString::new(pstr)
         .map_err(|_| Error::InvalidPath(dest.to_path_buf()))?;
 
-    if unsafe { libc::mknod(cdest.into_raw(), mode, dev) } != 0 {
+    if unsafe { libc::mknod(cdest.into_raw(), mode as mode_t, dev as dev_t) } != 0 {
         let errno = io::Error::last_os_error();
         return Err(errno.into())
     }
