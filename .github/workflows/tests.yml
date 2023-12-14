@@ -79,8 +79,6 @@ jobs:
 
   macos:
     runs-on: macos-latest
-    env:
-      XCP_TEST_FS: hfs
     steps:
       - uses: actions/checkout@v1
 
@@ -92,6 +90,10 @@ jobs:
 
       - name: Run tests
         run: ~/.cargo/bin/cargo test --workspace --no-default-features
+        env:
+          XCP_TEST_FS: hfs
 
       - name: Run expensive tests
         run: ~/.cargo/bin/cargo test --workspace --no-default-features -- --ignored
+        env:
+          XCP_TEST_FS: hfs
