@@ -42,8 +42,8 @@ pub use backend::{
 pub use common::{
     allocate_file,
     copy_file,
-    copy_node,
     copy_permissions,
+    copy_node,
     is_same_file,
     merge_extents,
     sync,

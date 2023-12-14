@@ -14,14 +14,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fs::File;
+use std::{fs::File, path::Path};
 use std::io;
 use std::ops::Range;
-use std::os::linux::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
+use std::os::unix::prelude::PermissionsExt;
 
 use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST};
-use rustix::{fs::{copy_file_range, seek, SeekFrom}, io::Errno};
+use rustix::fs::CWD;
+use rustix::{fs::{copy_file_range, seek, mknodat, FileType, Mode, RawMode, SeekFrom}, io::Errno};
 
 use crate::errors::Result;
 use crate::common::{copy_bytes_uspace, copy_range_uspace};
@@ -75,6 +76,7 @@ pub fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Resu
 /// coreutils `cp`.
 // FIXME: Should work on *BSD?
 pub fn probably_sparse(fd: &File) -> Result<bool> {
+    use std::os::linux::fs::MetadataExt;
     const ST_NBLOCKSIZE: u64 = 512;
     let stat = fd.metadata()?;
     Ok(stat.st_blocks() < stat.st_size() / ST_NBLOCKSIZE)
@@ -222,6 +224,17 @@ pub fn copy_sparse(infd: &File, outfd: &File) -> Result<u64> {
     Ok(len)
 }
 
+pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    let meta = src.metadata()?;
+    let rmode = RawMode::from(meta.permissions().mode());
+    let mode = Mode::from_raw_mode(rmode);
+    let ftype = FileType::from_raw_mode(rmode);
+    let dev = meta.dev();
+
+    mknodat(CWD, dest, ftype, mode, dev)?;
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {

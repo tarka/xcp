@@ -14,10 +14,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::path::PathBuf;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Invalid source: {0}")]
     InvalidSource(&'static str),
+
+    #[error("Invalid path: {0}")]
+    InvalidPath(PathBuf),
 
     #[error(transparent)]
     IOError(#[from] std::io::Error),

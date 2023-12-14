@@ -49,3 +49,4 @@ pub fn copy_sparse(infd: &File, outfd: &File) -> Result<u64> {
     copy_file_bytes(&infd, &outfd, len)
         .map(|i| i as u64)
 }
+
