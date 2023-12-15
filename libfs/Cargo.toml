@@ -16,6 +16,12 @@ license = "GPL-3.0-only"
 [features]
 default = ["use_linux"]
 use_linux = []
+# For CI; disable feature testing on filesystems that don't support
+# it. See .github/workflows/tests.yml
+test_no_reflink = []
+test_no_sparse = []
+test_no_extents = []
+test_no_sockets = []
 
 [dependencies]
 cfg-if = "1.0.0"
