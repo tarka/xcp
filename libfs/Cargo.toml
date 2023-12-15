@@ -25,10 +25,13 @@ test_no_sockets = []
 
 [dependencies]
 cfg-if = "1.0.0"
-libc = "0.2.150"
+libc = "0.2.151"
 linux-raw-sys = { version = "0.6.2", features = ["ioctl"] }
 log = "0.4.20"
-rustix = { version = "0.38.26", features = ["fs"] }
+rustix = { version = "0.38.28", features = ["fs"] }
 tempfile = "3.8.1"
 thiserror = "1.0.50"
-xattr = "1.0.1"
+xattr = "1.1.3"
+
+[lints.clippy]
+upper_case_acronyms = "allow"
