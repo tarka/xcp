@@ -19,7 +19,7 @@ use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::{Alphanumeric, Pareto, Triangular};
 use rand_xorshift::XorShiftRng;
 use std::cmp;
-use std::env::{current_dir, var};
+use std::env::current_dir;
 use std::fs::{create_dir_all, File};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -30,45 +30,6 @@ use uuid::Uuid;
 use walkdir::WalkDir;
 
 pub type TResult = result::Result<(), Error>;
-
-#[allow(unused)]
-fn fs_not(unsupported: &[&str]) -> bool {
-    // See `.github/workflows/rust.yml`
-    match var("XCP_TEST_FS") {
-        Ok(fs) => {
-            !unsupported.contains(&fs.as_str())
-        },
-        Err(_) => true // Not CI, assume 'normal' linux environment.
-    }
-}
-
-#[allow(unused)]
-pub fn fs_supports_symlinks() -> bool {
-    fs_not(&["fat", "vfat"])
-}
-
-#[allow(unused)]
-pub fn fs_supports_xattr() -> bool {
-    fs_not(&["fat", "vfat"])
-}
-
-#[allow(unused)]
-pub fn fs_supports_sockets() -> bool {
-    // HFS+ does, but gives permission errors in CI.
-    fs_not(&["fat", "vfat", "hfs"])
-}
-
-#[allow(unused)]
-pub fn fs_supports_extents() -> bool {
-    fs_not(&["ext2", "ntfs", "fat", "vfat", "zfs"])
-}
-
-#[allow(unused)]
-pub fn fs_supports_sparse() -> bool {
-    // FIXME: Same set for now.
-    fs_supports_extents()
-}
-
 
 pub fn get_command() -> Result<Command, Error> {
     let exe = env!("CARGO_BIN_EXE_xcp");

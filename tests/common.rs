@@ -17,6 +17,7 @@
 use std::fs::{create_dir_all, metadata, set_permissions, write, File};
 use std::os::unix::fs::symlink;
 use std::os::unix::net::UnixListener;
+use cfg_if::cfg_if;
 use test_case::test_case;
 
 
@@ -247,6 +248,13 @@ fn file_copy(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn file_copy_perms(drv: &str) {
+    cfg_if! {
+        if #[cfg(feature = "test_no_xattr")] {
+            let fs_supports_xattr = false;
+        } else {
+            let fs_supports_xattr = true;
+        }
+    }
     let dir = tempdir().unwrap();
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
@@ -254,7 +262,7 @@ fn file_copy_perms(drv: &str) {
 
     create_file(&source_path, text).unwrap();
 
-    if fs_supports_xattr() {
+    if fs_supports_xattr {
         xattr::set(&source_path, "user.test", b"my test").unwrap();
     }
 
@@ -278,7 +286,7 @@ fn file_copy_perms(drv: &str) {
         metadata(&dest_path).unwrap().permissions().readonly()
     );
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-    if fs_supports_xattr() {
+    if fs_supports_xattr {
         assert_eq!(
             xattr::get(&dest_path, "user.test").unwrap().unwrap(),
             b"my test"
@@ -479,7 +487,7 @@ fn copy_dirs_files(drv: &str) {
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-#[ignore] // Expensive so skip for local dev
+#[ignore= "Stress test"]
 fn copy_generated_tree(drv: &str) {
     let dir = tempdir().unwrap();
 
@@ -676,11 +684,8 @@ fn dir_overwrite_with_noclobber(drv: &str) {
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_symlinks", ignore)]
 fn dir_copy_containing_symlinks(drv: &str) {
-    if !fs_supports_symlinks() {
-        return
-    }
-
     let dir = tempdir_rel().unwrap();
 
     let source_path = dir.join("mydir");
@@ -865,12 +870,10 @@ fn glob_pattern_error(drv: &str) {
     assert!(stderr.contains("Pattern syntax error"));
 }
 
-#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[cfg_attr(all(feature = "parblock", not(feature = "test_no_sockets")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_sockets", ignore)]
 fn test_socket_file(drv: &str) {
-    if !fs_supports_sockets() {
-        return;
-    }
 
     let dir = tempdir().unwrap();
     let from = dir.path().join("from.sock");
@@ -892,13 +895,10 @@ fn test_socket_file(drv: &str) {
     assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
 }
 
-#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[cfg_attr(all(feature = "parblock", not(feature = "test_no_sockets")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_sockets", ignore)]
 fn test_sockets_dir(drv: &str) {
-    if !fs_supports_sockets() {
-        return;
-    }
-
     let dir = tempdir().unwrap();
     let src_dir = dir.path().join("fromdir");
     create_dir_all(&src_dir).unwrap();

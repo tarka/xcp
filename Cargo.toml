@@ -18,6 +18,14 @@ license = "GPL-3.0-only"
 default = ["parblock", "use_linux"]
 parblock = []
 use_linux = ["libfs/use_linux"]
+# For CI; disable feature testing on filesystems that don't support
+# it. See .github/workflows/tests.yml
+test_no_reflink = ["libfs/test_no_reflink"]
+test_no_sparse = ["libfs/test_no_sparse"]
+test_no_extents = ["libfs/test_no_extents"]
+test_no_sockets = ["libfs/test_no_sockets"]
+test_no_xattr = []
+test_no_symlinks = []
 
 [dependencies]
 anyhow = "1.0.75"
