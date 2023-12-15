@@ -146,6 +146,21 @@ impl FiemapReq {
     }
 }
 
+fn fiemap(fd: &File, req: &FiemapReq) -> Result<bool> {
+    // FIXME: Rustix has an IOCTL mini-framework but it's a little
+    // tricky and is unsafe anyway. This is simpler for now.
+    let req_ptr: *const FiemapReq = req;
+    if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP as u64, req_ptr) } != 0 {
+        let oserr = io::Error::last_os_error();
+        if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
+            return Ok(false)
+        }
+        return Err(oserr.into());
+    }
+
+    Ok(true)
+}
+
 /// Attempt to retrieve a map of the underlying allocated extents for
 /// a file. Will return [None] if the filesystem doesn't support
 /// extents. On Linux this is the raw list from
@@ -153,18 +168,11 @@ impl FiemapReq {
 /// [merge_extents](super::merge_extents) for a tool to merge contiguous extents.
 pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
     let mut req = FiemapReq::new();
-    let req_ptr: *const FiemapReq = &req;
     let mut extents = Vec::with_capacity(FIEMAP_PAGE_SIZE);
 
     loop {
-        // FIXME: Rustix has an IOCTL mini-framework but it's a little
-        // tricky and is unsafe anyway. This is simpler for now.
-        if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP as u64, req_ptr) } != 0 {
-            let oserr = io::Error::last_os_error();
-            if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
-                return Ok(None)
-            }
-            return Err(oserr.into());
+        if !fiemap(fd, &req)? {
+            return Ok(None)
         }
         if req.fm_mapped_extents == 0 {
             break;
