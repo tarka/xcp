@@ -292,11 +292,6 @@ mod tests {
     #[test]
     #[cfg_attr(feature = "test_no_reflink", ignore = "No FS support")]
     fn test_reflink() -> Result<()> {
-        // if !fs_supports_reflink() {
-        //     warn!("Skipping test as reflink not support");
-        //     return Ok(())
-        // }
-
         let dir = tempdir()?;
         let from = dir.path().join("file.bin");
         let to = dir.path().join("copy.bin");
@@ -319,8 +314,8 @@ mod tests {
             assert!(from_map.fm_extents[0].fe_flags & FIEMAP_EXTENT_SHARED == 0);
         }
 
-        let r = reflink(&from_fd, &to_fd)?;
-        assert!(r);
+        let worked = reflink(&from_fd, &to_fd)?;
+        assert!(worked);
 
         {
             let from_map = FiemapReq::new();

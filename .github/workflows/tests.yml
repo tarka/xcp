@@ -55,7 +55,7 @@ jobs:
 
       - name: Run expensive tests
         # Assume we're running on ext4
-        run: ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_run_expensive -- --ignored
+        run: ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_run_expensive
 
   macos:
     runs-on: macos-latest
@@ -72,4 +72,4 @@ jobs:
         run: ~/.cargo/bin/cargo test --workspace --no-default-features --features=test_no_reflink,test_no_sockets
 
       - name: Run expensive tests
-        run: ~/.cargo/bin/cargo test --workspace --no-default-features --features=test_no_reflink,test_no_sockets,test_run_expensive -- --ignored
+        run: ~/.cargo/bin/cargo test --workspace --no-default-features --features=test_no_reflink,test_no_sockets,test_run_expensive
