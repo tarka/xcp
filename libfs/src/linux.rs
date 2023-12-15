@@ -290,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_reflink", ignore)]
+    #[cfg_attr(feature = "test_no_reflink", ignore = "No FS support")]
     fn test_reflink() -> Result<()> {
         // if !fs_supports_reflink() {
         //     warn!("Skipping test as reflink not support");
@@ -341,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_detection_small_data() -> Result<()> {
         assert!(!probably_sparse(&File::open("Cargo.toml")?)?);
 
@@ -366,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_detection_half() -> Result<()> {
         assert!(!probably_sparse(&File::open("Cargo.toml")?)?);
 
@@ -387,7 +387,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_copy_bytes_sparse() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
@@ -416,7 +416,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_copy_middle() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
@@ -464,7 +464,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_copy_range_middle() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
@@ -505,7 +505,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_lseek_data() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
@@ -546,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_rust_seek() -> Result<()> {
         let dir = PathBuf::from("../target");
         let file = dir.join("sparse.bin");
@@ -580,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_lseek_no_data() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
@@ -599,7 +599,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_allocate_file_is_sparse() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
@@ -617,7 +617,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_extents", ignore)]
+    #[cfg_attr(feature = "test_no_extents", ignore = "No FS support")]
     fn test_empty_extent() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
@@ -638,7 +638,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_extents", ignore)]
+    #[cfg_attr(feature = "test_no_extents", ignore = "No FS support")]
     fn test_extent_fetch() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
@@ -684,7 +684,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_extents", ignore)]
+    #[cfg_attr(feature = "test_no_extents", ignore = "No FS support")]
     fn test_extent_fetch_many() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
@@ -715,7 +715,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_extents", ignore)]
+    #[cfg_attr(feature = "test_no_extents", ignore = "No FS support")]
     fn test_extent_not_sparse() -> Result<()> {
         let dir = tempdir()?;
         let file = dir.path().join("file.bin");
@@ -739,7 +739,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_extents", ignore)]
+    #[cfg_attr(feature = "test_no_extents", ignore = "No FS support")]
     fn test_extent_unsupported_fs() -> Result<()> {
         let file = "/proc/cpuinfo";
         let fd = File::open(file)?;
@@ -750,7 +750,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_copy_file_sparse() -> Result<()> {
         let dir = tempdir()?;
         let from = dir.path().join("sparse.bin");
@@ -774,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_sockets", ignore)]
+    #[cfg_attr(feature = "test_no_sockets", ignore = "No FS support")]
     fn test_copy_socket() {
         let dir = tempdir().unwrap();
         let from = dir.path().join("from.sock");

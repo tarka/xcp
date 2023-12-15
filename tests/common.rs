@@ -684,7 +684,7 @@ fn dir_overwrite_with_noclobber(drv: &str) {
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-#[cfg_attr(feature = "test_no_symlinks", ignore)]
+#[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
 fn dir_copy_containing_symlinks(drv: &str) {
     let dir = tempdir_rel().unwrap();
 
@@ -872,7 +872,7 @@ fn glob_pattern_error(drv: &str) {
 
 #[cfg_attr(all(feature = "parblock", not(feature = "test_no_sockets")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-#[cfg_attr(feature = "test_no_sockets", ignore)]
+#[cfg_attr(feature = "test_no_sockets", ignore = "No FS support")]
 fn test_socket_file(drv: &str) {
 
     let dir = tempdir().unwrap();
@@ -897,7 +897,7 @@ fn test_socket_file(drv: &str) {
 
 #[cfg_attr(all(feature = "parblock", not(feature = "test_no_sockets")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-#[cfg_attr(feature = "test_no_sockets", ignore)]
+#[cfg_attr(feature = "test_no_sockets", ignore = "No FS support")]
 fn test_sockets_dir(drv: &str) {
     let dir = tempdir().unwrap();
     let src_dir = dir.path().join("fromdir");

@@ -25,7 +25,7 @@ mod test {
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse(drv: &str) {
         use std::fs::read;
 
@@ -56,7 +56,7 @@ mod test {
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_leading_gap(drv: &str) {
         use std::fs::read;
 
@@ -86,7 +86,7 @@ mod test {
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_trailng_gap(drv: &str) {
         use std::fs::read;
 
@@ -116,7 +116,7 @@ mod test {
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_single_overwrite(drv: &str) {
         use std::fs::read;
 
@@ -146,7 +146,7 @@ mod test {
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[cfg_attr(feature = "test_no_sparse", ignore)]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_empty_sparse(drv: &str) {
         use std::fs::read;
 

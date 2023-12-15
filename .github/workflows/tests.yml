@@ -34,11 +34,11 @@ jobs:
         working-directory: /fs/btrfs/src
 
       - name: Run tests on ntfs
-        run: cargo test --workspace --features=test_no_extents,test_no_sparse
+        run: cargo test --workspace --features=test_no_extents,test_no_sparse,test_no_reflink
         working-directory: /fs/ntfs/src
 
       - name: Run tests on fat
-        run: cargo test --workspace --features=test_no_extents,test_no_sparse,test_no_sockets,test_no_symlinks,test_no_xattr
+        run: cargo test --workspace --features=test_no_extents,test_no_sparse,test_no_sockets,test_no_symlinks,test_no_xattr,test_no_reflink
         working-directory: /fs/fat/src
 
       - name: Run tests on ZFS
@@ -54,7 +54,8 @@ jobs:
         run: ~/.cargo/bin/rustup update
 
       - name: Run expensive tests
-        run: ~/.cargo/bin/cargo test --workspace -- --ignored
+        # Assume we're running on ext4
+        run: ~/.cargo/bin/cargo test --workspace --features=test_no_reflink -- --ignored
 
   macos:
     runs-on: macos-latest
