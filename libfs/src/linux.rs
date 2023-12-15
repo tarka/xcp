@@ -254,8 +254,13 @@ pub fn reflink(infd: &File, outfd: &File) -> Result<bool> {
     if unsafe { libc::ioctl(outfd.as_raw_fd(), FICLONE as u64, infd.as_raw_fd()) } != 0 {
         let oserr = io::Error::last_os_error();
         match oserr.raw_os_error() {
-            Some(libc::EOPNOTSUPP) | Some(libc::EINVAL) => return Ok(false),
-            _ => return  Err(oserr.into()),
+            Some(libc::EOPNOTSUPP)
+                | Some(libc::EINVAL)
+                | Some(libc::EXDEV)
+                | Some(libc::ETXTBSY) =>
+                return Ok(false),
+            _ =>
+                return  Err(oserr.into()),
         }
     }
     Ok(true)
@@ -272,6 +277,8 @@ mod tests {
     use std::os::unix::net::UnixListener;
     use std::path::PathBuf;
     use std::process::Command;
+    use linux_raw_sys::ioctl::FIEMAP_EXTENT_SHARED;
+    use log::warn;
     use rustix::fs::FileTypeExt;
     use tempfile::{tempdir_in, TempDir};
 
@@ -281,9 +288,18 @@ mod tests {
         Ok(tempdir_in(current_dir()?.join("../target"))?)
     }
 
-    fn fs_supports_extents() -> bool {
+    fn fs_is(supported: &[&str]) -> bool {
         // See `.github/workflows/rust.yml`
-        let unsupported = ["ext2", "ntfs", "fat", "vfat", "zfs"];
+        match var("XCP_TEST_FS") {
+            Ok(fs) => {
+                supported.contains(&fs.as_str())
+            },
+            Err(_) => true // Not CI, assume 'normal' linux environment.
+        }
+    }
+
+    fn fs_not(unsupported: &[&str]) -> bool {
+        // See `.github/workflows/rust.yml`
         match var("XCP_TEST_FS") {
             Ok(fs) => {
                 !unsupported.contains(&fs.as_str())
@@ -292,9 +308,66 @@ mod tests {
         }
     }
 
+    fn fs_supports_extents() -> bool {
+        fs_not(&["ext2", "ntfs", "fat", "vfat", "zfs"])
+    }
+
     fn fs_supports_sparse() -> bool {
-        // FIXME: Same set for now.
-        fs_supports_extents()
+        fs_not(&["ext2", "ntfs", "fat", "vfat", "zfs"])
+    }
+
+    fn fs_supports_reflink() -> bool {
+        fs_is(&["btrfs", "xfs", "bcachefs"])
+    }
+
+    #[test]
+    fn test_reflink() -> Result<()> {
+        if !fs_supports_reflink() {
+            warn!("Skipping test as reflink not support");
+            return Ok(())
+        }
+
+        let dir = tempdir()?;
+        let from = dir.path().join("file.bin");
+        let to = dir.path().join("copy.bin");
+        let size = 128 * 1024;
+
+        {
+            let mut fd: File = File::create(&from)?;
+            let data = "X".repeat(size);
+            write!(fd, "{}", data)?;
+        }
+
+        let from_fd = File::open(from)?;
+        let to_fd = File::create(to)?;
+
+        {
+            let from_map = FiemapReq::new();
+            assert!(fiemap(&from_fd, &from_map)?);
+            assert!(from_map.fm_mapped_extents > 0);
+            // Un-refed file, no shared extents
+            assert!(from_map.fm_extents[0].fe_flags & FIEMAP_EXTENT_SHARED == 0);
+        }
+
+        let r = reflink(&from_fd, &to_fd)?;
+        assert!(r);
+
+        {
+            let from_map = FiemapReq::new();
+            assert!(fiemap(&from_fd, &from_map)?);
+            assert!(from_map.fm_mapped_extents > 0);
+
+            let to_map = FiemapReq::new();
+            assert!(fiemap(&to_fd, &to_map)?);
+            assert!(to_map.fm_mapped_extents > 0);
+
+            // Now both have shared extents
+            assert_eq!(from_map.fm_mapped_extents, to_map.fm_mapped_extents);
+            assert!(from_map.fm_extents[0].fe_flags & FIEMAP_EXTENT_SHARED != 0);
+            assert!(to_map.fm_extents[0].fe_flags & FIEMAP_EXTENT_SHARED != 0);
+        }
+
+        Ok(())
     }
 
     #[test]

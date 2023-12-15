@@ -39,6 +39,7 @@ pub use backend::{
     probably_sparse,
     next_sparse_segments,
     map_extents,
+    reflink,
 };
 pub use common::{
     allocate_file,

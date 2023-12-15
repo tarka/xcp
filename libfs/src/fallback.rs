@@ -72,3 +72,7 @@ pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
     }
     Ok(())
 }
+
+pub fn reflink(infd: &File, outfd: &File) -> Result<bool> {
+    Ok(false)
+}
