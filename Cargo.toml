@@ -26,6 +26,7 @@ test_no_extents = ["libfs/test_no_extents"]
 test_no_sockets = ["libfs/test_no_sockets"]
 test_no_xattr = []
 test_no_symlinks = []
+test_run_expensive = []
 
 [dependencies]
 anyhow = "1.0.75"

@@ -180,7 +180,7 @@ mod test {
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     #[test_case("parfile"; "Test with parallel file driver")]
-    #[ignore= "Stress test"]
+    #[cfg_attr(not(feature = "test_run_expensive"), ignore = "Stress test")]
     fn copy_generated_tree_sparse(drv: &str) {
         let dir = tempdir().unwrap();
 
