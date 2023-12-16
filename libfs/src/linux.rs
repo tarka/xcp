@@ -16,14 +16,14 @@
 
 use std::{fs::File, path::Path};
 use std::io;
-use std::ops::Range;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::PermissionsExt;
 
-use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST, FICLONE};
+use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST, FICLONE, FIEMAP_EXTENT_SHARED};
 use rustix::fs::CWD;
 use rustix::{fs::{copy_file_range, seek, mknodat, FileType, Mode, RawMode, SeekFrom}, io::Errno};
 
+use crate::Extent;
 use crate::errors::Result;
 use crate::common::{copy_bytes_uspace, copy_range_uspace};
 
@@ -166,7 +166,7 @@ fn fiemap(fd: &File, req: &FiemapReq) -> Result<bool> {
 /// extents. On Linux this is the raw list from
 /// [fiemap](https://docs.kernel.org/filesystems/fiemap.html). See
 /// [merge_extents](super::merge_extents) for a tool to merge contiguous extents.
-pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
+pub fn map_extents(fd: &File) -> Result<Option<Vec<Extent>>> {
     let mut req = FiemapReq::new();
     let mut extents = Vec::with_capacity(FIEMAP_PAGE_SIZE);
 
@@ -180,9 +180,12 @@ pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
 
         for i in 0..req.fm_mapped_extents as usize {
             let e = req.fm_extents[i];
-            let start = e.fe_logical;
-            let end = start + e.fe_length;
-            extents.push(start..end);
+            let ext = Extent {
+                start: e.fe_logical,
+                end: e.fe_logical + e.fe_length,
+                shared: e.fe_flags & FIEMAP_EXTENT_SHARED != 0,
+            };
+            extents.push(ext);
         }
 
         let last = req.fm_extents[(req.fm_mapped_extents - 1) as usize];
@@ -674,6 +677,7 @@ mod tests {
         assert_eq!(extents.len(), 1);
         assert_eq!(extents[0].start, offset as u64);
         assert_eq!(extents[0].end, offset as u64 + 4 * 1024); // FIXME: Assume 4k blocks
+        assert!(!extents[0].shared);
 
         Ok(())
     }
@@ -728,7 +732,8 @@ mod tests {
         let extents = extents_p.unwrap();
 
         assert_eq!(1, extents.len());
-        assert_eq!(0..size as u64, extents[0]);
+        assert_eq!(0 as u64, extents[0].start);
+        assert_eq!(size as u64, extents[0].end);
 
         Ok(())
     }

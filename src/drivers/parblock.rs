@@ -162,7 +162,7 @@ fn queue_file_blocks(
             let sparse_map = merge_extents(extents)?;
             let mut queued = 0;
             for ext in sparse_map {
-                queued += queue_file_range(&harc, ext, pool, status_channel)?;
+                queued += queue_file_range(&harc, ext.into(), pool, status_channel)?;
             }
             Ok(queued)
         } else {

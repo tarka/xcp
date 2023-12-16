@@ -21,13 +21,12 @@ use rustix::io::{pread, pwrite};
 use std::cmp;
 use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
-use std::ops::Range;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use xattr::FileExt;
 
 use crate::errors::{Result, Error};
-use crate::{XATTR_SUPPORTED, copy_sparse, probably_sparse, copy_file_bytes};
+use crate::{Extent, XATTR_SUPPORTED, copy_sparse, probably_sparse, copy_file_bytes};
 
 fn copy_xattr(infd: &File, outfd: &File) -> Result<()> {
     // FIXME: Flag for xattr.
@@ -126,17 +125,21 @@ pub fn allocate_file(fd: &File, len: u64) -> Result<()> {
 }
 
 /// Merge any contiguous extents in a list. See [merge_extents].
-pub fn merge_extents(extents: Vec<Range<u64>>) -> Result<Vec<Range<u64>>> {
-    let mut merged: Vec<Range<u64>> = vec![];
+pub fn merge_extents(extents: Vec<Extent>) -> Result<Vec<Extent>> {
+    let mut merged: Vec<Extent> = vec![];
 
-    let mut prev: Option<Range<u64>> = None;
+    let mut prev: Option<Extent> = None;
     for e in extents {
         match prev {
             Some(p) => {
                 if e.start == p.end + 1 {
                     // Current & prev are contiguous, merge & see what
                     // comes next.
-                    prev = Some(p.start..e.end);
+                    prev = Some(Extent {
+                        start: p.start,
+                        end: e.end,
+                        shared: p.shared & e.shared,
+                    });
                 } else {
                     merged.push(p);
                     prev = Some(e);
@@ -191,7 +194,18 @@ pub fn sync(fd: &File) -> Result<()> {
 mod tests {
     use super::*;
     use std::fs::read;
+    use std::ops::Range;
     use tempfile::tempdir;
+
+    impl Into<Extent> for Range<u64> {
+        fn into(self) -> Extent {
+            Extent {
+                start: self.start,
+                end: self.end,
+                shared: false,
+            }
+        }
+    }
 
     #[test]
     fn test_copy_bytes_uspace_large() {
@@ -262,20 +276,47 @@ mod tests {
     #[test]
     fn test_extent_merge() -> Result<()> {
         assert_eq!(merge_extents(vec!())?, vec!());
-        assert_eq!(merge_extents(vec!(0..1))?, vec!(0..1));
-        assert_eq!(merge_extents(vec!(0..1, 10..20))?, vec!(0..1, 10..20));
-        assert_eq!(merge_extents(vec!(0..10, 11..20))?, vec!(0..20));
+        assert_eq!(merge_extents(
+            vec!((0..1).into()))?,
+            vec!((0..1).into()));
+
+        assert_eq!(merge_extents(
+            vec!((0..1).into(),
+                (10..20).into()))?,
+            vec!((0..1).into(),
+                (10..20).into()));
+        assert_eq!(merge_extents(
+            vec!((0..10).into(),
+                (11..20).into()))?,
+            vec!((0..20).into()));
         assert_eq!(
-            merge_extents(vec!(0..5, 11..20, 21..30, 40..50))?,
-            vec!(0..5, 11..30, 40..50)
+            merge_extents(
+                vec!((0..5).into(),
+                    (11..20).into(),
+                    (21..30).into(),
+                    (40..50).into()))?,
+            vec!((0..5).into(),
+                (11..30).into(),
+                (40..50).into())
         );
         assert_eq!(
-            merge_extents(vec!(0..5, 11..20, 21..30, 40..50, 51..60))?,
-            vec!(0..5, 11..30, 40..60)
+            merge_extents(vec!((0..5).into(),
+                (11..20).into(),
+                (21..30).into(),
+                (40..50).into(),
+                (51..60).into()))?,
+            vec!((0..5).into(),
+                (11..30).into(),
+                (40..60).into())
         );
         assert_eq!(
-            merge_extents(vec!(0..10, 11..20, 21..30, 31..50, 51..60))?,
-            vec!(0..60)
+            merge_extents(
+                vec!((0..10).into(),
+                    (11..20).into(),
+                    (21..30).into(),
+                    (31..50).into(),
+                    (51..60).into()))?,
+            vec!((0..60).into())
         );
         Ok(())
     }
