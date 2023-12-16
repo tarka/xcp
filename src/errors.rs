@@ -20,26 +20,29 @@ pub use anyhow::{Error, Result};
 
 #[derive(Debug, thiserror::Error)]
 pub enum XcpError {
-    #[error("Unknown file-type: {0}")]
-    UnknownFileType(PathBuf),
-
-    #[error("Unknown driver: {0}")]
-    UnknownDriver(String),
-
-    #[error("Invalid arguments: {0}")]
-    InvalidArguments(&'static str),
-
-    #[error("Invalid source: {0}")]
-    InvalidSource(&'static str),
-
-    #[error("Invalid destination: {0}")]
-    InvalidDestination(&'static str),
-
     #[error("Destination Exists: {0}, {1}")]
     DestinationExists(&'static str, PathBuf),
 
     #[error("Early shutdown: {0}")]
     EarlyShutdown(&'static str),
+
+    #[error("Invalid arguments: {0}")]
+    InvalidArguments(String),
+
+    #[error("Invalid destination: {0}")]
+    InvalidDestination(&'static str),
+
+    #[error("Invalid source: {0}")]
+    InvalidSource(&'static str),
+
+    #[error("Failed to reflink file and 'always' was specified: {0}")]
+    ReflinkFailed(String),
+
+    #[error("Unknown driver: {0}")]
+    UnknownDriver(String),
+
+    #[error("Unknown file-type: {0}")]
+    UnknownFileType(PathBuf),
 
     #[error("Unsupported OS")]
     UnsupportedOS(&'static str),

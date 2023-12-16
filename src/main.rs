@@ -52,7 +52,7 @@ fn main() -> Result<()> {
     let (dest, source_patterns) = opts
         .paths
         .split_last()
-        .ok_or(XcpError::InvalidArguments("Insufficient arguments"))
+        .ok_or(XcpError::InvalidArguments("Insufficient arguments".to_string()))
         .map(|(d, s)| (PathBuf::from(d), s))?;
 
     // Do this check before expansion otherwise it could result in

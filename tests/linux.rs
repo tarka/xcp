@@ -18,10 +18,47 @@ mod util;
 
 #[cfg(all(target_os = "linux", feature = "use_linux"))]
 mod test {
-    use std::process::Command;
+    use std::{process::Command, fs::File};
+    use libfs::map_extents;
     use test_case::test_case;
 
     use crate::util::*;
+
+    #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+    #[test_case("parfile"; "Test with parallel file driver")]
+    #[cfg_attr(feature = "test_no_reflink", ignore = "No FS support")]
+    fn file_copy_reflink_always(drv: &str) {
+        let dir = tempdir().unwrap();
+        let source_path = dir.path().join("source.txt");
+        let dest_path = dir.path().join("dest.txt");
+        let text = "This is a test file.";
+
+        create_file(&source_path, text).unwrap();
+
+        let out = run(&[
+            "--driver", drv,
+            "--reflink=always",
+            source_path.to_str().unwrap(),
+            dest_path.to_str().unwrap(),
+        ])
+            .unwrap();
+
+        // Should always work on CoW FS
+        assert!(out.status.success());
+        assert!(file_contains(&dest_path, text).unwrap());
+        assert!(files_match(&source_path, &dest_path));
+
+        let infd = File::open(&source_path).unwrap();
+        let outfd = File::open(&dest_path).unwrap();
+
+        let inext = map_extents(&infd).unwrap().unwrap();
+        let outext = map_extents(&outfd).unwrap().unwrap();
+        for (i, o) in inext.iter().zip(outext.iter()) {
+            assert_eq!(i.start, o.start);
+            assert_eq!(i.end, o.end);
+            assert_eq!(i.shared, o.shared);
+        }
+    }
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
     #[test_case("parfile"; "Test with parallel file driver")]

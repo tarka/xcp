@@ -42,7 +42,7 @@ impl FromStr for Drivers {
     type Err = XcpError;
 
     fn from_str(s: &str) -> result::Result<Self, Self::Err> {
-        match s {
+        match s.to_lowercase().as_str() {
             "parfile" => Ok(Drivers::ParFile),
             #[cfg(feature = "parblock")]
             "parblock" => Ok(Drivers::ParBlock),

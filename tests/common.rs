@@ -247,6 +247,54 @@ fn file_copy(drv: &str) {
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+fn file_copy_reflink_auto(drv: &str) {
+    let dir = tempdir().unwrap();
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+    let text = "This is a test file.";
+
+    create_file(&source_path, text).unwrap();
+
+    let out = run(&[
+        "--driver", drv,
+        "--reflink=auto",
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    // Should always work, even on non-CoW FS
+    assert!(out.status.success());
+    assert!(file_contains(&dest_path, text).unwrap());
+    assert!(files_match(&source_path, &dest_path));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn file_copy_reflink_never(drv: &str) {
+    let dir = tempdir().unwrap();
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+    let text = "This is a test file.";
+
+    create_file(&source_path, text).unwrap();
+
+    let out = run(&[
+        "--driver", drv,
+        "--reflink=never",
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    // Should always work
+    assert!(out.status.success());
+    assert!(file_contains(&dest_path, text).unwrap());
+    assert!(files_match(&source_path, &dest_path));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
 fn file_copy_perms(drv: &str) {
     cfg_if! {
         if #[cfg(feature = "test_no_xattr")] {

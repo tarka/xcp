@@ -27,6 +27,7 @@ use walkdir::DirEntry;
 
 use crate::drivers::Drivers;
 use crate::errors::Result;
+use crate::operations::Reflink;
 
 #[derive(Clone, Debug, Parser)]
 #[command(
@@ -93,6 +94,13 @@ pub struct Opts {
     /// Sync each file to disk after fully written.
     #[arg(long)]
     pub fsync: bool,
+
+    /// Whether and how to use reflinks. 'auto' (the default) will
+    /// attempt to reflink and fallback to a copy if it is not
+    /// possible, 'always' will return an error if it cannot reflink,
+    /// and 'never' will always perform a full data copy.
+    #[arg(long, default_value = "auto")]
+    pub reflink: Reflink,
 
     pub paths: Vec<String>,
 }
