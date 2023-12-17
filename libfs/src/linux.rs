@@ -546,8 +546,8 @@ mod tests {
     #[test]
     #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_rust_seek() -> Result<()> {
-        let dir = PathBuf::from("../target");
-        let file = dir.join("sparse.bin");
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
 
         let data = "c00lc0d3";
 

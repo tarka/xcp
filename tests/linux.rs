@@ -29,7 +29,7 @@ mod test {
     #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(feature = "test_no_reflink", ignore = "No FS support")]
     fn file_copy_reflink_always(drv: &str) {
-        let dir = tempdir().unwrap();
+        let dir = tempdir_rel().unwrap();
         let source_path = dir.path().join("source.bin");
         let dest_path = dir.path().join("dest.bin");
         let size = 128 * 1024;
@@ -102,8 +102,8 @@ mod test {
         use std::fs::read;
 
         let dir = tempdir_rel().unwrap();
-        let from = dir.join("sparse.bin");
-        let to = dir.join("target.bin");
+        let from = dir.path().join("sparse.bin");
+        let to = dir.path().join("target.bin");
 
         let slen = create_sparse(&from, 0, 0).unwrap();
         assert_eq!(slen, from.metadata().unwrap().len());
@@ -132,7 +132,7 @@ mod test {
     fn test_sparse_leading_gap(drv: &str) {
         use std::fs::read;
 
-        let dir = tempdir().unwrap();
+        let dir = tempdir_rel().unwrap();
         let from = dir.path().join("sparse.bin");
         let to = dir.path().join("target.bin");
 
@@ -162,7 +162,7 @@ mod test {
     fn test_sparse_trailng_gap(drv: &str) {
         use std::fs::read;
 
-        let dir = tempdir().unwrap();
+        let dir = tempdir_rel().unwrap();
         let from = dir.path().join("sparse.bin");
         let to = dir.path().join("target.bin");
 
@@ -192,7 +192,7 @@ mod test {
     fn test_sparse_single_overwrite(drv: &str) {
         use std::fs::read;
 
-        let dir = tempdir().unwrap();
+        let dir = tempdir_rel().unwrap();
         let from = dir.path().join("sparse.bin");
         let to = dir.path().join("target.bin");
 
@@ -222,7 +222,7 @@ mod test {
     fn test_empty_sparse(drv: &str) {
         use std::fs::read;
 
-        let dir = tempdir().unwrap();
+        let dir = tempdir_rel().unwrap();
         let from = dir.path().join("sparse.bin");
         let to = dir.path().join("target.bin");
 
@@ -254,14 +254,12 @@ mod test {
     #[test_case("parfile"; "Test with parallel file driver")]
     #[cfg_attr(not(feature = "test_run_expensive"), ignore = "Stress test")]
     fn copy_generated_tree_sparse(drv: &str) {
-        let dir = tempdir().unwrap();
-
-        let src = dir.path().join("generated");
-        let dest = dir.path().join("target");
-
         // Spam some output to keep CI from timing-out (hopefully).
         println!("Generating file tree...");
-        gen_filetree(&src, 0, true).unwrap();
+        let src = gen_global_filetree(false).unwrap();
+
+        let dir = tempdir_rel().unwrap();
+        let dest = dir.path().join("target");
 
         println!("Running copy...");
         let out = run(&[

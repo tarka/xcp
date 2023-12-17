@@ -15,7 +15,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use anyhow::Error;
+use anyhow::{self, Error};
+use fslock::LockFile;
 use rand::{Rng, RngCore, SeedableRng, thread_rng};
 use rand_distr::{Alphanumeric, Pareto, Triangular, Standard};
 use rand_xorshift::XorShiftRng;
@@ -44,17 +45,12 @@ pub fn run(args: &[&str]) -> Result<Output, Error> {
     Ok(out)
 }
 
-pub fn tempdir() -> Result<TempDir, Error> {
-    // Force into local dir as /tmp might be tmpfs, which doesn't
-    // support all VFS options (notably fiemap).
+pub fn tempdir_rel() -> Result<TempDir, Error> {
+    // let uuid = Uuid::new_v4();
+    // let dir = PathBuf::from("target/").join(uuid.to_string());
+    // create_dir_all(&dir)?;
+    // Ok(dir)
     Ok(tempdir_in(current_dir()?.join("target"))?)
-}
-
-pub fn tempdir_rel() -> Result<PathBuf, Error> {
-    let uuid = Uuid::new_v4();
-    let dir = PathBuf::from("target/").join(uuid.to_string());
-    create_dir_all(&dir)?;
-    Ok(dir)
 }
 
 pub fn create_file(path: &Path, text: &str) -> Result<(), Error> {
@@ -127,7 +123,7 @@ pub fn files_match(a: &Path, b: &Path) -> bool {
 #[test]
 fn test_hasher() -> TResult {
     {
-        let dir = tempdir()?;
+        let dir = tempdir_rel()?;
         let a = dir.path().join("source.txt");
         let b = dir.path().join("dest.txt");
         let text = "sd;lkjfasl;kjfa;sldkfjaslkjfa;jsdlfkjsdlfkajl";
@@ -136,7 +132,7 @@ fn test_hasher() -> TResult {
         assert!(files_match(&a, &b));
     }
     {
-        let dir = tempdir()?;
+        let dir = tempdir_rel()?;
         let a = dir.path().join("source.txt");
         let b = dir.path().join("dest.txt");
         create_file(&a, "lskajdf;laksjdfl;askjdf;alksdj")?;
@@ -246,6 +242,20 @@ pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64, with_sparse: 
     }
 
     Ok(())
+}
+
+pub fn gen_global_filetree(with_sparse: bool) -> anyhow::Result<PathBuf> {
+    let path = PathBuf::from("target/generated_filetree");
+    let lockfile = path.with_extension("lock");
+
+    let mut lf = LockFile::open(&lockfile)?;
+    lf.lock()?;
+    if !path.exists() {
+        gen_filetree(&path, 0, with_sparse)?;
+    }
+    lf.unlock();
+
+    Ok(path)
 }
 
 pub fn gen_filetree(base: &Path, seed: u64, with_sparse: bool) -> TResult {
