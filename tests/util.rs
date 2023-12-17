@@ -1,3 +1,4 @@
+#![allow(unused)]
 /*
  * Copyright © 2018, Steve Smith <tarkasteve@gmail.com>
  *
