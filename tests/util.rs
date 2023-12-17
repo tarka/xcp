@@ -15,8 +15,8 @@
  */
 
 use anyhow::Error;
-use rand::{Rng, RngCore, SeedableRng};
-use rand_distr::{Alphanumeric, Pareto, Triangular};
+use rand::{Rng, RngCore, SeedableRng, thread_rng};
+use rand_distr::{Alphanumeric, Pareto, Triangular, Standard};
 use rand_xorshift::XorShiftRng;
 use std::cmp;
 use std::env::current_dir;
@@ -171,6 +171,13 @@ pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
     Ok(false)
+}
+
+pub fn rand_data(len: usize) -> Vec<u8> {
+    thread_rng()
+        .sample_iter(Standard)
+        .take(len)
+        .collect()
 }
 
 const MAXDEPTH: u64 = 2;

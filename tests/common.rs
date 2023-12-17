@@ -548,8 +548,7 @@ fn copy_generated_tree(drv: &str) {
 
     println!("Running copy...");
     let out = run(&[
-        "--driver",
-        drv,
+        "--driver", drv,
         "-r",
         src.to_str().unwrap(),
         dest.to_str().unwrap(),
@@ -576,8 +575,7 @@ fn copy_dirs_overwrites(drv: &str) {
     let dest_file = dest_base.join("mydir/file.txt");
 
     let mut out = run(&[
-        "--driver",
-        drv,
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),

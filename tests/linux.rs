@@ -18,8 +18,9 @@ mod util;
 
 #[cfg(all(target_os = "linux", feature = "use_linux"))]
 mod test {
-    use std::{process::Command, fs::File};
-    use libfs::map_extents;
+    use std::{process::Command, fs::{File, OpenOptions}, io::SeekFrom};
+    use std::io::{Seek, Write};
+    use libfs::{map_extents, sync};
     use test_case::test_case;
 
     use crate::util::*;
@@ -29,11 +30,22 @@ mod test {
     #[cfg_attr(feature = "test_no_reflink", ignore = "No FS support")]
     fn file_copy_reflink_always(drv: &str) {
         let dir = tempdir().unwrap();
-        let source_path = dir.path().join("source.txt");
-        let dest_path = dir.path().join("dest.txt");
-        let text = "This is a test file.";
+        let source_path = dir.path().join("source.bin");
+        let dest_path = dir.path().join("dest.bin");
+        let size = 128 * 1024;
 
-        create_file(&source_path, text).unwrap();
+        {
+            let mut infd = File::create(&source_path).unwrap();
+            let data = rand_data(size);
+            infd.write(&data).unwrap();
+        }
+
+        {
+            let infd = File::open(&source_path).unwrap();
+            let inext = map_extents(&infd).unwrap().unwrap();
+            // Single file, extent not shared.
+            assert_eq!(false, inext[0].shared);
+        }
 
         let out = run(&[
             "--driver", drv,
@@ -45,19 +57,42 @@ mod test {
 
         // Should always work on CoW FS
         assert!(out.status.success());
-        assert!(file_contains(&dest_path, text).unwrap());
         assert!(files_match(&source_path, &dest_path));
 
-        let infd = File::open(&source_path).unwrap();
-        let outfd = File::open(&dest_path).unwrap();
-
-        let inext = map_extents(&infd).unwrap().unwrap();
-        let outext = map_extents(&outfd).unwrap().unwrap();
-        for (i, o) in inext.iter().zip(outext.iter()) {
-            assert_eq!(i.start, o.start);
-            assert_eq!(i.end, o.end);
-            assert_eq!(i.shared, o.shared);
+        {
+            let infd = File::open(&source_path).unwrap();
+            let outfd = File::open(&dest_path).unwrap();
+            // Extents should be shared.
+            let inext = map_extents(&infd).unwrap().unwrap();
+            let outext = map_extents(&outfd).unwrap().unwrap();
+            assert_eq!(true, inext[0].shared);
+            assert_eq!(true, outext[0].shared);
         }
+
+        {
+            let mut outfd = OpenOptions::new()
+                .create(false)
+                .write(true)
+                .read(true)
+                .open(&dest_path).unwrap();
+            outfd.seek(SeekFrom::Start(0)).unwrap();
+            let data = rand_data(size);
+            outfd.write(&data).unwrap();
+            // brtfs at least seems to need this to force CoW and
+            // de-share the extents.
+            sync(&outfd).unwrap();
+        }
+
+        {
+            let infd = File::open(&source_path).unwrap();
+            let outfd = File::open(&dest_path).unwrap();
+            // First extent should now be un-shared.
+            let inext = map_extents(&infd).unwrap().unwrap();
+            let outext = map_extents(&outfd).unwrap().unwrap();
+            assert_eq!(false, inext[0].shared);
+            assert_eq!(false, outext[0].shared);
+        }
+
     }
 
     #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
@@ -232,6 +267,7 @@ mod test {
         let out = run(&[
             "--driver", drv,
             "-r",
+            "--no-progress",
             src.to_str().unwrap(),
             dest.to_str().unwrap(),
         ]).unwrap();
