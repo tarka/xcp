@@ -174,7 +174,7 @@ fn copy_source(
             }
 
             FileType::Socket | FileType::Char | FileType::Fifo => {
-                debug!("Unknown file type: {:?} to {:?}", from, target);
+                debug!("Special file found: {:?} to {:?}", from, target);
                 work_tx.send(Operation::Special(from, target))?;
             }
 
