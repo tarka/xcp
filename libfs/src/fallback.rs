@@ -23,6 +23,7 @@ use std::os::unix::prelude::PermissionsExt;
 use std::path::Path;
 
 use libc::{dev_t, mode_t};
+use log::warn;
 
 use crate::common::{copy_bytes_uspace, copy_range_uspace};
 use crate::errors::{Result, Error};
@@ -58,17 +59,7 @@ pub fn copy_sparse(infd: &File, outfd: &File) -> Result<u64> {
 }
 
 pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
-    let meta = src.metadata()?;
-    let mode = meta.permissions().mode();
-    let dev = meta.dev();
-    let pstr = dest.to_str()
-        .ok_or(Error::InvalidPath(dest.to_path_buf()))?;
-    let cdest = CString::new(pstr)
-        .map_err(|_| Error::InvalidPath(dest.to_path_buf()))?;
-
-    if unsafe { libc::mknod(cdest.into_raw(), mode as mode_t, dev as dev_t) } != 0 {
-        let errno = io::Error::last_os_error();
-        return Err(errno.into())
-    }
+    // FreeBSD `cp` just warns about this, so do the same here.
+    warn!("Socket copy not supported by this OS: {}", src.to_string_lossy());
     Ok(())
 }
