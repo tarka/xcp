@@ -68,8 +68,5 @@ jobs:
       - name: Update Rust (installer may lag behind)
         run: ~/.cargo/bin/rustup update
 
-      - name: Run tests
-        run: ~/.cargo/bin/cargo test --workspace --no-default-features --features=test_no_reflink,test_no_sockets
-
-      - name: Run expensive tests
+      - name: Run all tests
         run: ~/.cargo/bin/cargo test --workspace --no-default-features --features=test_no_reflink,test_no_sockets,test_run_expensive
