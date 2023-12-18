@@ -24,6 +24,7 @@ use std::path::Path;
 use libc::{dev_t, mode_t};
 use log::warn;
 
+use crate::Extent;
 use crate::common::{copy_bytes_uspace, copy_range_uspace};
 use crate::errors::{Result, Error};
 
