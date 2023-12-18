@@ -55,11 +55,11 @@ pub struct Driver;
 
 impl Driver {
     pub fn new(_opts: &Opts) -> Result<Self> {
-        if !supported_platform() {
-            let msg = "The parblock driver is not currently supported on this OS.";
-            error!("{}", msg);
-            return Err(XcpError::UnsupportedOS(msg).into());
-        }
+        // if !supported_platform() {
+        //     let msg = "The parblock driver is not currently supported on this OS.";
+        //     error!("{}", msg);
+        //     return Err(XcpError::UnsupportedOS(msg).into());
+        // }
 
         Ok(Self {})
     }
