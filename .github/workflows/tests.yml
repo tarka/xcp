@@ -80,7 +80,7 @@ jobs:
        with:
          usesh: true
          prepare: |
-           pkg install -y curl
+           pkg install -y curl bash
          run: |
-           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash /dev/stdin -y
            ~/.cargo/bin/cargo test --workspace --no-default-features --features=test_no_reflink,test_no_sockets,test_run_expensive
