@@ -147,6 +147,11 @@ fn queue_file_blocks(
     let handle = CopyHandle::new(source, dest, opts)?;
     let len = handle.metadata.len();
 
+    if handle.try_reflink()? {
+        info!("Reflinked, skipping rest of copy");
+        return Ok(len);
+    }
+
     // Put the open files in an Arc, which we drop once work has
     // been queued. This will keep them open until all work has
     // been consumed, then close them. (This may be overkill;
@@ -162,7 +167,7 @@ fn queue_file_blocks(
             let sparse_map = merge_extents(extents)?;
             let mut queued = 0;
             for ext in sparse_map {
-                queued += queue_file_range(&harc, ext, pool, status_channel)?;
+                queued += queue_file_range(&harc, ext.into(), pool, status_channel)?;
             }
             Ok(queued)
         } else {
@@ -201,6 +206,7 @@ struct CopyOp {
     target: PathBuf,
 }
 
+
 fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
     let pb = ProgressBar::new(&opts, 0)?;
     let mut total = 0;
@@ -222,7 +228,6 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
             .build();
         for op in file_rx {
             queue_file_blocks(&op.from, &op.target, &pool, &sender, q_opts.clone()).unwrap();
-            // FIXME
         }
         info!("Queuing complete");
 

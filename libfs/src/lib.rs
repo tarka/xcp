@@ -17,7 +17,7 @@
 mod common;
 mod errors;
 
-use std::fs;
+use std::{fs, ops::Range};
 
 use cfg_if::cfg_if;
 use rustix::fs::FileTypeExt;
@@ -39,6 +39,7 @@ pub use backend::{
     probably_sparse,
     next_sparse_segments,
     map_extents,
+    reflink,
 };
 pub use common::{
     allocate_file,
@@ -65,7 +66,6 @@ pub const XATTR_SUPPORTED: bool = {
         }
     }
 };
-
 
 /// Enum mapping for various *nix file types. Mapped from
 /// [std::fs::FileType] and [rustix::fs::FileTypeExt]. 
@@ -96,5 +96,24 @@ impl From<fs::FileType> for FileType {
         } else {
             FileType::Other
         }
+    }
+}
+
+/// Struct representing a file extent metadata.
+#[derive(Debug, PartialEq)]
+pub struct Extent {
+    /// Extent logical start
+    pub start: u64,
+    /// Extent logical end
+    pub end: u64,
+    /// Whether extent is shared between multiple file. This generally
+    /// only applies to reflinked files on filesystems that support
+    /// CoW.
+    pub shared: bool,
+}
+
+impl Into<Range<u64>> for Extent {
+    fn into(self) -> Range<u64> {
+        self.start..self.end
     }
 }

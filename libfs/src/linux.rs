@@ -16,14 +16,14 @@
 
 use std::{fs::File, path::Path};
 use std::io;
-use std::ops::Range;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::PermissionsExt;
 
-use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST};
+use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST, FICLONE, FIEMAP_EXTENT_SHARED};
 use rustix::fs::CWD;
 use rustix::{fs::{copy_file_range, seek, mknodat, FileType, Mode, RawMode, SeekFrom}, io::Errno};
 
+use crate::Extent;
 use crate::errors::Result;
 use crate::common::{copy_bytes_uspace, copy_range_uspace};
 
@@ -146,25 +146,33 @@ impl FiemapReq {
     }
 }
 
+fn fiemap(fd: &File, req: &FiemapReq) -> Result<bool> {
+    // FIXME: Rustix has an IOCTL mini-framework but it's a little
+    // tricky and is unsafe anyway. This is simpler for now.
+    let req_ptr: *const FiemapReq = req;
+    if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP as u64, req_ptr) } != 0 {
+        let oserr = io::Error::last_os_error();
+        if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
+            return Ok(false)
+        }
+        return Err(oserr.into());
+    }
+
+    Ok(true)
+}
+
 /// Attempt to retrieve a map of the underlying allocated extents for
 /// a file. Will return [None] if the filesystem doesn't support
 /// extents. On Linux this is the raw list from
 /// [fiemap](https://docs.kernel.org/filesystems/fiemap.html). See
 /// [merge_extents](super::merge_extents) for a tool to merge contiguous extents.
-pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
+pub fn map_extents(fd: &File) -> Result<Option<Vec<Extent>>> {
     let mut req = FiemapReq::new();
-    let req_ptr: *const FiemapReq = &req;
     let mut extents = Vec::with_capacity(FIEMAP_PAGE_SIZE);
 
     loop {
-        // FIXME: Rustix has an IOCTL mini-framework but it's a little
-        // tricky and is unsafe anyway. This is simpler for now.
-        if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP as u64, req_ptr) } != 0 {
-            let oserr = io::Error::last_os_error();
-            if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
-                return Ok(None)
-            }
-            return Err(oserr.into());
+        if !fiemap(fd, &req)? {
+            return Ok(None)
         }
         if req.fm_mapped_extents == 0 {
             break;
@@ -172,9 +180,12 @@ pub fn map_extents(fd: &File) -> Result<Option<Vec<Range<u64>>>> {
 
         for i in 0..req.fm_mapped_extents as usize {
             let e = req.fm_extents[i];
-            let start = e.fe_logical;
-            let end = start + e.fe_length;
-            extents.push(start..end);
+            let ext = Extent {
+                start: e.fe_logical,
+                end: e.fe_logical + e.fe_length,
+                shared: e.fe_flags & FIEMAP_EXTENT_SHARED != 0,
+            };
+            extents.push(ext);
         }
 
         let last = req.fm_extents[(req.fm_mapped_extents - 1) as usize];
@@ -237,7 +248,28 @@ pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Reflink a file. This will reuse the underlying data on disk for
+/// the target file, utilising copy-on-write for any future
+/// updates. Only certain filesystems support this; if not supported
+/// the function returns `false`.
+pub fn reflink(infd: &File, outfd: &File) -> Result<bool> {
+    if unsafe { libc::ioctl(outfd.as_raw_fd(), FICLONE as u64, infd.as_raw_fd()) } != 0 {
+        let oserr = io::Error::last_os_error();
+        match oserr.raw_os_error() {
+            Some(libc::EOPNOTSUPP)
+                | Some(libc::EINVAL)
+                | Some(libc::EXDEV)
+                | Some(libc::ETXTBSY) =>
+                return Ok(false),
+            _ =>
+                return  Err(oserr.into()),
+        }
+    }
+    Ok(true)
+}
+
 #[cfg(test)]
+#[allow(unused)]
 mod tests {
     use super::*;
     use crate::allocate_file;
@@ -248,6 +280,8 @@ mod tests {
     use std::os::unix::net::UnixListener;
     use std::path::PathBuf;
     use std::process::Command;
+    use linux_raw_sys::ioctl::FIEMAP_EXTENT_SHARED;
+    use log::warn;
     use rustix::fs::FileTypeExt;
     use tempfile::{tempdir_in, TempDir};
 
@@ -257,28 +291,55 @@ mod tests {
         Ok(tempdir_in(current_dir()?.join("../target"))?)
     }
 
-    fn fs_supports_extents() -> bool {
-        // See `.github/workflows/rust.yml`
-        let unsupported = ["ext2", "ntfs", "fat", "vfat", "zfs"];
-        match var("XCP_TEST_FS") {
-            Ok(fs) => {
-                !unsupported.contains(&fs.as_str())
-            },
-            Err(_) => true // Not CI, assume 'normal' linux environment.
-        }
-    }
+    #[test]
+    #[cfg_attr(feature = "test_no_reflink", ignore = "No FS support")]
+    fn test_reflink() -> Result<()> {
+        let dir = tempdir()?;
+        let from = dir.path().join("file.bin");
+        let to = dir.path().join("copy.bin");
+        let size = 128 * 1024;
 
-    fn fs_supports_sparse() -> bool {
-        // FIXME: Same set for now.
-        fs_supports_extents()
+        {
+            let mut fd: File = File::create(&from)?;
+            let data = "X".repeat(size);
+            write!(fd, "{}", data)?;
+        }
+
+        let from_fd = File::open(from)?;
+        let to_fd = File::create(to)?;
+
+        {
+            let from_map = FiemapReq::new();
+            assert!(fiemap(&from_fd, &from_map)?);
+            assert!(from_map.fm_mapped_extents > 0);
+            // Un-refed file, no shared extents
+            assert!(from_map.fm_extents[0].fe_flags & FIEMAP_EXTENT_SHARED == 0);
+        }
+
+        let worked = reflink(&from_fd, &to_fd)?;
+        assert!(worked);
+
+        {
+            let from_map = FiemapReq::new();
+            assert!(fiemap(&from_fd, &from_map)?);
+            assert!(from_map.fm_mapped_extents > 0);
+
+            let to_map = FiemapReq::new();
+            assert!(fiemap(&to_fd, &to_map)?);
+            assert!(to_map.fm_mapped_extents > 0);
+
+            // Now both have shared extents
+            assert_eq!(from_map.fm_mapped_extents, to_map.fm_mapped_extents);
+            assert!(from_map.fm_extents[0].fe_flags & FIEMAP_EXTENT_SHARED != 0);
+            assert!(to_map.fm_extents[0].fe_flags & FIEMAP_EXTENT_SHARED != 0);
+        }
+
+        Ok(())
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_detection_small_data() -> Result<()> {
-        if !fs_supports_sparse() {
-            return Ok(())
-        }
-
         assert!(!probably_sparse(&File::open("Cargo.toml")?)?);
 
         let dir = tempdir()?;
@@ -302,11 +363,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_detection_half() -> Result<()> {
-        if !fs_supports_sparse() {
-            return Ok(())
-        }
-
         assert!(!probably_sparse(&File::open("Cargo.toml")?)?);
 
         let dir = tempdir()?;
@@ -326,11 +384,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_copy_bytes_sparse() -> Result<()> {
-        if !fs_supports_sparse() {
-            return Ok(())
-        }
-
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -358,11 +413,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_copy_middle() -> Result<()> {
-        if !fs_supports_sparse() {
-            return Ok(())
-        }
-
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -409,11 +461,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_copy_range_middle() -> Result<()> {
-        if !fs_supports_sparse() {
-            return Ok(())
-        }
-
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -453,11 +502,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_lseek_data() -> Result<()> {
-        if !fs_supports_sparse() {
-            return Ok(())
-        }
-
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -497,13 +543,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_sparse_rust_seek() -> Result<()> {
-        if !fs_supports_sparse() {
-            return Ok(())
-        }
-
-        let dir = PathBuf::from("../target");
-        let file = dir.join("sparse.bin");
+        let dir = tempdir()?;
+        let file = dir.path().join("sparse.bin");
 
         let data = "c00lc0d3";
 
@@ -534,11 +577,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_lseek_no_data() -> Result<()> {
-        if !fs_supports_sparse() {
-            return Ok(())
-        }
-
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
 
@@ -556,11 +596,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_allocate_file_is_sparse() -> Result<()> {
-        if !fs_supports_sparse() {
-            return Ok(())
-        }
-
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let len = 32 * 1024 * 1024;
@@ -577,10 +614,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_extents", ignore = "No FS support")]
     fn test_empty_extent() -> Result<()> {
-        if !fs_supports_extents() {
-            return Ok(())
-        }
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
 
@@ -600,10 +635,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_extents", ignore = "No FS support")]
     fn test_extent_fetch() -> Result<()> {
-        if !fs_supports_extents() {
-            return Ok(())
-        }
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
         let from = dir.path().join("from.txt");
@@ -643,15 +676,14 @@ mod tests {
         assert_eq!(extents.len(), 1);
         assert_eq!(extents[0].start, offset as u64);
         assert_eq!(extents[0].end, offset as u64 + 4 * 1024); // FIXME: Assume 4k blocks
+        assert!(!extents[0].shared);
 
         Ok(())
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_extents", ignore = "No FS support")]
     fn test_extent_fetch_many() -> Result<()> {
-        if !fs_supports_extents() {
-            return Ok(())
-        }
         let dir = tempdir()?;
         let file = dir.path().join("sparse.bin");
 
@@ -681,10 +713,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_extents", ignore = "No FS support")]
     fn test_extent_not_sparse() -> Result<()> {
-        if !fs_supports_extents() {
-            return Ok(())
-        }
         let dir = tempdir()?;
         let file = dir.path().join("file.bin");
         let size = 128 * 1024;
@@ -701,16 +731,15 @@ mod tests {
         let extents = extents_p.unwrap();
 
         assert_eq!(1, extents.len());
-        assert_eq!(0..size as u64, extents[0]);
+        assert_eq!(0 as u64, extents[0].start);
+        assert_eq!(size as u64, extents[0].end);
 
         Ok(())
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_extents", ignore = "No FS support")]
     fn test_extent_unsupported_fs() -> Result<()> {
-        if !fs_supports_extents() {
-            return Ok(())
-        }
         let file = "/proc/cpuinfo";
         let fd = File::open(file)?;
         let extents_p = map_extents(&fd)?;
@@ -720,11 +749,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sparse", ignore = "No FS support")]
     fn test_copy_file_sparse() -> Result<()> {
-        if !fs_supports_sparse() {
-            return Ok(())
-        }
-
         let dir = tempdir()?;
         let from = dir.path().join("sparse.bin");
         let len = 32 * 1024 * 1024;
@@ -747,13 +773,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_sockets", ignore = "No FS support")]
     fn test_copy_socket() {
-        if let Ok(fs) = var("XCP_TEST_FS") {
-            if fs == "fat" {
-                return;
-            }
-        }
-
         let dir = tempdir().unwrap();
         let from = dir.path().join("from.sock");
         let to = dir.path().join("to.sock");

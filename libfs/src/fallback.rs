@@ -63,3 +63,7 @@ pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
     warn!("Socket copy not supported by this OS: {}", src.to_string_lossy());
     Ok(())
 }
+
+pub fn reflink(infd: &File, outfd: &File) -> Result<bool> {
+    Ok(false)
+}

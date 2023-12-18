@@ -17,16 +17,39 @@
 use std::cmp;
 use std::fs::{File, Metadata};
 use std::path::Path;
+use std::result;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use libfs::{
-    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync,
+    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync, reflink,
 };
 use log::{debug, error};
 
-use crate::errors::Result;
+use crate::errors::{Result, XcpError};
 use crate::options::Opts;
 use crate::progress::{BatchUpdater, Updater};
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Reflink {
+    Always,
+    Auto,
+    Never,
+}
+
+impl FromStr for Reflink {
+    type Err = XcpError;
+
+    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "always" => Ok(Reflink::Always),
+            "auto" => Ok(Reflink::Auto),
+            "never" => Ok(Reflink::Never),
+            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'reflink': {}", s))),
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub struct CopyHandle {
@@ -82,7 +105,32 @@ impl CopyHandle {
         Ok(len)
     }
 
+    pub fn try_reflink(&self) -> Result<bool> {
+        match self.opts.reflink {
+            Reflink::Always | Reflink::Auto => {
+                debug!("Attempting reflink from {:?}->{:?}", self.infd, self.outfd);
+                let worked = reflink(&self.infd, &self.outfd)?;
+                if worked {
+                    debug!("Reflink {:?} succeeded", self.outfd);
+                    return Ok(true)
+                } else if self.opts.reflink == Reflink::Always {
+                    return Err(XcpError::ReflinkFailed(format!("{:?}->{:?}", self.infd, self.outfd)).into());
+                } else {
+                    debug!("Failed to reflink, falling back to copy");
+                    Ok(false)
+                }
+            }
+
+            Reflink::Never => {
+                Ok(false)
+            }
+        }
+    }
+
     pub fn copy_file(&self, updates: &mut BatchUpdater) -> Result<u64> {
+        if self.try_reflink()? {
+            return Ok(self.metadata.len());
+        }
         let total = if probably_sparse(&self.infd)? {
             self.copy_sparse(updates)?
         } else {

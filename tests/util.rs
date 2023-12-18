@@ -1,3 +1,4 @@
+#![allow(unused)]
 /*
  * Copyright © 2018, Steve Smith <tarkasteve@gmail.com>
  *
@@ -14,12 +15,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use anyhow::Error;
-use rand::{Rng, RngCore, SeedableRng};
-use rand_distr::{Alphanumeric, Pareto, Triangular};
+use anyhow::{self, Error};
+use fslock::LockFile;
+use rand::{Rng, RngCore, SeedableRng, thread_rng};
+use rand_distr::{Alphanumeric, Pareto, Triangular, Standard};
 use rand_xorshift::XorShiftRng;
 use std::cmp;
-use std::env::{current_dir, var};
+use std::env::current_dir;
 use std::fs::{create_dir_all, File};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -30,45 +32,6 @@ use uuid::Uuid;
 use walkdir::WalkDir;
 
 pub type TResult = result::Result<(), Error>;
-
-#[allow(unused)]
-fn fs_not(unsupported: &[&str]) -> bool {
-    // See `.github/workflows/rust.yml`
-    match var("XCP_TEST_FS") {
-        Ok(fs) => {
-            !unsupported.contains(&fs.as_str())
-        },
-        Err(_) => true // Not CI, assume 'normal' linux environment.
-    }
-}
-
-#[allow(unused)]
-pub fn fs_supports_symlinks() -> bool {
-    fs_not(&["fat", "vfat"])
-}
-
-#[allow(unused)]
-pub fn fs_supports_xattr() -> bool {
-    fs_not(&["fat", "vfat"])
-}
-
-#[allow(unused)]
-pub fn fs_supports_sockets() -> bool {
-    // HFS+ does, but gives permission errors in CI.
-    fs_not(&["fat", "vfat", "hfs"])
-}
-
-#[allow(unused)]
-pub fn fs_supports_extents() -> bool {
-    fs_not(&["ext2", "ntfs", "fat", "vfat", "zfs"])
-}
-
-#[allow(unused)]
-pub fn fs_supports_sparse() -> bool {
-    // FIXME: Same set for now.
-    fs_supports_extents()
-}
-
 
 pub fn get_command() -> Result<Command, Error> {
     let exe = env!("CARGO_BIN_EXE_xcp");
@@ -82,17 +45,12 @@ pub fn run(args: &[&str]) -> Result<Output, Error> {
     Ok(out)
 }
 
-pub fn tempdir() -> Result<TempDir, Error> {
-    // Force into local dir as /tmp might be tmpfs, which doesn't
-    // support all VFS options (notably fiemap).
+pub fn tempdir_rel() -> Result<TempDir, Error> {
+    // let uuid = Uuid::new_v4();
+    // let dir = PathBuf::from("target/").join(uuid.to_string());
+    // create_dir_all(&dir)?;
+    // Ok(dir)
     Ok(tempdir_in(current_dir()?.join("target"))?)
-}
-
-pub fn tempdir_rel() -> Result<PathBuf, Error> {
-    let uuid = Uuid::new_v4();
-    let dir = PathBuf::from("target/").join(uuid.to_string());
-    create_dir_all(&dir)?;
-    Ok(dir)
 }
 
 pub fn create_file(path: &Path, text: &str) -> Result<(), Error> {
@@ -165,7 +123,7 @@ pub fn files_match(a: &Path, b: &Path) -> bool {
 #[test]
 fn test_hasher() -> TResult {
     {
-        let dir = tempdir()?;
+        let dir = tempdir_rel()?;
         let a = dir.path().join("source.txt");
         let b = dir.path().join("dest.txt");
         let text = "sd;lkjfasl;kjfa;sldkfjaslkjfa;jsdlfkjsdlfkajl";
@@ -174,7 +132,7 @@ fn test_hasher() -> TResult {
         assert!(files_match(&a, &b));
     }
     {
-        let dir = tempdir()?;
+        let dir = tempdir_rel()?;
         let a = dir.path().join("source.txt");
         let b = dir.path().join("dest.txt");
         create_file(&a, "lskajdf;laksjdfl;askjdf;alksdj")?;
@@ -210,6 +168,13 @@ pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
     Ok(false)
+}
+
+pub fn rand_data(len: usize) -> Vec<u8> {
+    thread_rng()
+        .sample_iter(Standard)
+        .take(len)
+        .collect()
 }
 
 const MAXDEPTH: u64 = 2;
@@ -277,6 +242,20 @@ pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64, with_sparse: 
     }
 
     Ok(())
+}
+
+pub fn gen_global_filetree(with_sparse: bool) -> anyhow::Result<PathBuf> {
+    let path = PathBuf::from("target/generated_filetree");
+    let lockfile = path.with_extension("lock");
+
+    let mut lf = LockFile::open(&lockfile)?;
+    lf.lock()?;
+    if !path.exists() {
+        gen_filetree(&path, 0, with_sparse)?;
+    }
+    lf.unlock();
+
+    Ok(path)
 }
 
 pub fn gen_filetree(base: &Path, seed: u64, with_sparse: bool) -> TResult {

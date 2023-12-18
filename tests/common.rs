@@ -17,6 +17,7 @@
 use std::fs::{create_dir_all, metadata, set_permissions, write, File};
 use std::os::unix::fs::symlink;
 use std::os::unix::net::UnixListener;
+use cfg_if::cfg_if;
 use test_case::test_case;
 
 
@@ -78,7 +79,7 @@ fn source_missing_globbed(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn dest_file_exists(drv: &str) {
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
 
@@ -104,7 +105,7 @@ fn dest_file_exists(drv: &str) {
 #[test_case("parfile"; "Test with parallel file driver")]
 fn source_same_as_dest(drv: &str) {
     let dir = tempdir_rel().unwrap();
-    let dest = dir.join("dest");
+    let dest = dir.path().join("dest");
     create_dir_all(&dest).unwrap();
 
     let out = run(&[
@@ -124,7 +125,7 @@ fn source_same_as_dest(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn dest_file_in_dir_exists(drv: &str) {
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
 
@@ -150,7 +151,7 @@ fn dest_file_in_dir_exists(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn dest_file_exists_overwrites(drv: &str) {
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
 
@@ -175,7 +176,7 @@ fn dest_file_exists_overwrites(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn same_file_no_overwrite(drv: &str) {
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
 
     {
@@ -196,7 +197,7 @@ fn same_file_no_overwrite(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn dest_file_exists_noclobber(drv: &str) {
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
 
@@ -224,7 +225,7 @@ fn dest_file_exists_noclobber(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn file_copy(drv: &str) {
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
     let text = "This is a test file.";
@@ -246,15 +247,70 @@ fn file_copy(drv: &str) {
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-fn file_copy_perms(drv: &str) {
-    let dir = tempdir().unwrap();
+fn file_copy_reflink_auto(drv: &str) {
+    let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
     let text = "This is a test file.";
 
     create_file(&source_path, text).unwrap();
 
-    if fs_supports_xattr() {
+    let out = run(&[
+        "--driver", drv,
+        "--reflink=auto",
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    // Should always work, even on non-CoW FS
+    assert!(out.status.success());
+    assert!(file_contains(&dest_path, text).unwrap());
+    assert!(files_match(&source_path, &dest_path));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn file_copy_reflink_never(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+    let text = "This is a test file.";
+
+    create_file(&source_path, text).unwrap();
+
+    let out = run(&[
+        "--driver", drv,
+        "--reflink=never",
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    // Should always work
+    assert!(out.status.success());
+    assert!(file_contains(&dest_path, text).unwrap());
+    assert!(files_match(&source_path, &dest_path));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn file_copy_perms(drv: &str) {
+    cfg_if! {
+        if #[cfg(feature = "test_no_xattr")] {
+            let fs_supports_xattr = false;
+        } else {
+            let fs_supports_xattr = true;
+        }
+    }
+    let dir = tempdir_rel().unwrap();
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+    let text = "This is a test file.";
+
+    create_file(&source_path, text).unwrap();
+
+    if fs_supports_xattr {
         xattr::set(&source_path, "user.test", b"my test").unwrap();
     }
 
@@ -278,7 +334,7 @@ fn file_copy_perms(drv: &str) {
         metadata(&dest_path).unwrap().permissions().readonly()
     );
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-    if fs_supports_xattr() {
+    if fs_supports_xattr {
         assert_eq!(
             xattr::get(&dest_path, "user.test").unwrap().unwrap(),
             b"my test"
@@ -289,7 +345,7 @@ fn file_copy_perms(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn file_copy_no_perms(drv: &str) {
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
     let dest_path = dir.path().join("dest.txt");
     let text = "This is a test file.";
@@ -318,8 +374,8 @@ fn file_copy_no_perms(drv: &str) {
 #[test_case("parfile"; "Test with parallel file driver")]
 fn file_copy_rel(drv: &str) {
     let dir = tempdir_rel().unwrap();
-    let source_path = dir.join("source.txt");
-    let dest_path = dir.join("dest.txt");
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
     let text = "This is a test file.";
 
     create_file(&source_path, text).unwrap();
@@ -341,10 +397,10 @@ fn file_copy_rel(drv: &str) {
 #[test_case("parfile"; "Test with parallel file driver")]
 fn file_copy_multiple(drv: &str) {
     let dir = tempdir_rel().unwrap();
-    let dest = dir.join("dest");
+    let dest = dir.path().join("dest");
     create_dir_all(&dest).unwrap();
 
-    let (f1, f2) = (dir.join("file1.txt"), dir.join("file2.txt"));
+    let (f1, f2) = (dir.path().join("file1.txt"), dir.path().join("file2.txt"));
     create_file(&f1, "test").unwrap();
     create_file(&f2, "test").unwrap();
 
@@ -366,7 +422,7 @@ fn file_copy_multiple(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn copy_empty_dir(drv: &str) {
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
 
     let source_path = dir.path().join("mydir");
     create_dir_all(&source_path).unwrap();
@@ -392,7 +448,7 @@ fn copy_empty_dir(drv: &str) {
 #[test_case("parfile"; "Test with parallel file driver")]
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 fn copy_all_dirs(drv: &str) {
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
 
     let source_path = dir.path().join("mydir");
     create_dir_all(&source_path).unwrap();
@@ -421,11 +477,11 @@ fn copy_all_dirs(drv: &str) {
 fn copy_all_dirs_rel(drv: &str) {
     let dir = tempdir_rel().unwrap();
 
-    let source_path = dir.join("mydir");
+    let source_path = dir.path().join("mydir");
     create_dir_all(&source_path).unwrap();
     create_dir_all(source_path.join("one/two/three/")).unwrap();
 
-    let dest_base = dir.join("dest");
+    let dest_base = dir.path().join("dest");
     create_dir_all(&dest_base).unwrap();
 
     let out = run(&[
@@ -446,7 +502,7 @@ fn copy_all_dirs_rel(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 fn copy_dirs_files(drv: &str) {
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
 
     let source_path = dir.path().join("mydir");
     create_dir_all(&source_path).unwrap();
@@ -479,21 +535,18 @@ fn copy_dirs_files(drv: &str) {
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
-#[ignore] // Expensive so skip for local dev
+#[cfg_attr(not(feature = "test_run_expensive"), ignore = "Stress test")]
 fn copy_generated_tree(drv: &str) {
-    let dir = tempdir().unwrap();
-
-    let src = dir.path().join("generated");
-    let dest = dir.path().join("target");
-
     // Spam some output to keep CI from timing-out (hopefully).
     println!("Generating file tree...");
-    gen_filetree(&src, 0, false).unwrap();
+    let src = gen_global_filetree(false).unwrap();
+
+    let dir = tempdir_rel().unwrap();
+    let dest = dir.path().join("target");
 
     println!("Running copy...");
     let out = run(&[
-        "--driver",
-        drv,
+        "--driver", drv,
         "-r",
         src.to_str().unwrap(),
         dest.to_str().unwrap(),
@@ -510,18 +563,17 @@ fn copy_generated_tree(drv: &str) {
 fn copy_dirs_overwrites(drv: &str) {
     let dir = tempdir_rel().unwrap();
 
-    let source_path = dir.join("mydir");
+    let source_path = dir.path().join("mydir");
     let source_file = source_path.join("file.txt");
     create_dir_all(&source_path).unwrap();
     create_file(&source_file, "orig").unwrap();
 
-    let dest_base = dir.join("dest");
+    let dest_base = dir.path().join("dest");
     create_dir_all(&dest_base).unwrap();
     let dest_file = dest_base.join("mydir/file.txt");
 
     let mut out = run(&[
-        "--driver",
-        drv,
+        "--driver", drv,
         "-r",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -558,12 +610,12 @@ fn copy_dirs_overwrites_no_target_dir() {
     {
         let dir = tempdir_rel().unwrap();
 
-        let source_path = dir.join("mydir");
+        let source_path = dir.path().join("mydir");
         let source_file = source_path.join("file.txt");
         create_dir_all(&source_path).unwrap();
         create_file(&source_file, "orig").unwrap();
 
-        let dest_base = dir.join("dest");
+        let dest_base = dir.path().join("dest");
         create_dir_all(&dest_base).unwrap();
         let dest_file = dest_base.join("mydir/file.txt");
 
@@ -582,12 +634,12 @@ fn copy_dirs_overwrites_no_target_dir() {
     {
         let dir = tempdir_rel().unwrap();
 
-        let source_path = dir.join("mydir");
+        let source_path = dir.path().join("mydir");
         let source_file = source_path.join("file.txt");
         create_dir_all(&source_path).unwrap();
         create_file(&source_file, "new content").unwrap();
 
-        let dest_base = dir.join("dest");
+        let dest_base = dir.path().join("dest");
         create_dir_all(&dest_base).unwrap();
         let dest_file = dest_base.join("file.txt");
 
@@ -609,12 +661,12 @@ fn copy_dirs_overwrites_no_target_dir() {
 fn dir_copy_to_nonexistent_is_rename(drv: &str) {
     let dir = tempdir_rel().unwrap();
 
-    let source_path = dir.join("mydir");
+    let source_path = dir.path().join("mydir");
     let source_file = source_path.join("file.txt");
     create_dir_all(&source_path).unwrap();
     create_file(&source_file, "orig").unwrap();
 
-    let dest_base = dir.join("dest");
+    let dest_base = dir.path().join("dest");
     let dest_file = dest_base.join("file.txt");
 
     let out = run(&[
@@ -636,12 +688,12 @@ fn dir_copy_to_nonexistent_is_rename(drv: &str) {
 fn dir_overwrite_with_noclobber(drv: &str) {
     let dir = tempdir_rel().unwrap();
 
-    let source_path = dir.join("mydir");
+    let source_path = dir.path().join("mydir");
     let source_file = source_path.join("file.txt");
     create_dir_all(&source_path).unwrap();
     create_file(&source_file, "orig").unwrap();
 
-    let dest_base = dir.join("dest");
+    let dest_base = dir.path().join("dest");
     create_dir_all(&dest_base).unwrap();
     let dest_file = dest_base.join("mydir/file.txt");
 
@@ -676,14 +728,11 @@ fn dir_overwrite_with_noclobber(drv: &str) {
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
 fn dir_copy_containing_symlinks(drv: &str) {
-    if !fs_supports_symlinks() {
-        return
-    }
-
     let dir = tempdir_rel().unwrap();
 
-    let source_path = dir.join("mydir");
+    let source_path = dir.path().join("mydir");
     let source_file = source_path.join("file.txt");
     let source_rlink = source_path.join("link.txt");
     create_dir_all(&source_path).unwrap();
@@ -691,7 +740,7 @@ fn dir_copy_containing_symlinks(drv: &str) {
     symlink("file.txt", source_rlink).unwrap();
     symlink("/etc/hosts", source_path.join("hosts")).unwrap();
 
-    let dest_base = dir.join("dest");
+    let dest_base = dir.path().join("dest");
     let dest_file = dest_base.join("file.txt");
     let dest_rlink = source_path.join("link.txt");
 
@@ -724,12 +773,12 @@ fn dir_copy_containing_symlinks(drv: &str) {
 fn dir_copy_with_hidden_dir(drv: &str) {
     let dir = tempdir_rel().unwrap();
 
-    let source_path = dir.join("mydir/.hidden");
+    let source_path = dir.path().join("mydir/.hidden");
     let source_file = source_path.join("file.txt");
     create_dir_all(&source_path).unwrap();
     create_file(&source_file, "orig").unwrap();
 
-    let dest_base = dir.join("dest/.hidden");
+    let dest_base = dir.path().join("dest/.hidden");
     let dest_file = dest_base.join("file.txt");
 
     let out = run(&[
@@ -752,7 +801,7 @@ fn dir_copy_with_hidden_dir(drv: &str) {
 fn dir_with_gitignore(drv: &str) {
     let dir = tempdir_rel().unwrap();
 
-    let source_path = dir.join("mydir");
+    let source_path = dir.path().join("mydir");
     create_dir_all(&source_path).unwrap();
 
     let source_file = source_path.join("file.txt");
@@ -761,17 +810,17 @@ fn dir_with_gitignore(drv: &str) {
     let ignore_file = source_path.join(".gitignore");
     create_file(&ignore_file, "/.ignored\n").unwrap();
 
-    let ignored_path = dir.join("mydir/.ignored");
+    let ignored_path = dir.path().join("mydir/.ignored");
     let ignored_file = ignored_path.join("file.txt");
     create_dir_all(&ignored_path).unwrap();
     create_file(&ignored_file, "ignored content").unwrap();
 
-    let hidden_path = dir.join("mydir/.hidden");
+    let hidden_path = dir.path().join("mydir/.hidden");
     let hidden_file = hidden_path.join("file.txt");
     create_dir_all(&hidden_path).unwrap();
     create_file(&hidden_file, "hidden content").unwrap();
 
-    let dest_base = dir.join("dest");
+    let dest_base = dir.path().join("dest");
 
     let out = run(&[
         "--driver",
@@ -797,10 +846,10 @@ fn dir_with_gitignore(drv: &str) {
 #[test_case("parfile"; "Test with parallel file driver")]
 fn copy_with_glob(drv: &str) {
     let dir = tempdir_rel().unwrap();
-    let dest = dir.join("dest");
+    let dest = dir.path().join("dest");
     create_dir_all(&dest).unwrap();
 
-    let (f1, f2) = (dir.join("file1.txt"), dir.join("file2.txt"));
+    let (f1, f2) = (dir.path().join("file1.txt"), dir.path().join("file2.txt"));
     create_file(&f1, "test").unwrap();
     create_file(&f2, "test").unwrap();
 
@@ -808,7 +857,7 @@ fn copy_with_glob(drv: &str) {
         "--driver",
         drv,
         "--glob",
-        dir.join("file*.txt").to_str().unwrap(),
+        dir.path().join("file*.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
     ])
     .unwrap();
@@ -822,16 +871,16 @@ fn copy_with_glob(drv: &str) {
 #[test_case("parfile"; "Test with parallel file driver")]
 fn copy_pattern_no_glob(drv: &str) {
     let dir = tempdir_rel().unwrap();
-    let dest = dir.join("dest");
+    let dest = dir.path().join("dest");
     create_dir_all(&dest).unwrap();
 
-    let f1 = dir.join("a [b] c.txt");
+    let f1 = dir.path().join("a [b] c.txt");
     create_file(&f1, "test").unwrap();
 
     let out = run(&[
         "--driver",
         drv,
-        dir.join("a [b] c.txt").to_str().unwrap(),
+        dir.path().join("a [b] c.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
     ])
     .unwrap();
@@ -844,10 +893,10 @@ fn copy_pattern_no_glob(drv: &str) {
 #[test_case("parfile"; "Test with parallel file driver")]
 fn glob_pattern_error(drv: &str) {
     let dir = tempdir_rel().unwrap();
-    let dest = dir.join("dest");
+    let dest = dir.path().join("dest");
     create_dir_all(&dest).unwrap();
 
-    let (f1, f2) = (dir.join("file1.txt"), dir.join("file2.txt"));
+    let (f1, f2) = (dir.path().join("file1.txt"), dir.path().join("file2.txt"));
     create_file(&f1, "test").unwrap();
     create_file(&f2, "test").unwrap();
 
@@ -855,7 +904,7 @@ fn glob_pattern_error(drv: &str) {
         "--driver",
         drv,
         "--glob",
-        dir.join("file***.txt").to_str().unwrap(),
+        dir.path().join("file***.txt").to_str().unwrap(),
         dest.to_str().unwrap(),
     ])
     .unwrap();
@@ -865,14 +914,12 @@ fn glob_pattern_error(drv: &str) {
     assert!(stderr.contains("Pattern syntax error"));
 }
 
-#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[cfg_attr(all(feature = "parblock", not(feature = "test_no_sockets")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_sockets", ignore = "No FS support")]
 fn test_socket_file(drv: &str) {
-    if !fs_supports_sockets() {
-        return;
-    }
 
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
     let from = dir.path().join("from.sock");
     let to = dir.path().join("to.sock");
 
@@ -892,14 +939,11 @@ fn test_socket_file(drv: &str) {
     assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
 }
 
-#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[cfg_attr(all(feature = "parblock", not(feature = "test_no_sockets")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_sockets", ignore = "No FS support")]
 fn test_sockets_dir(drv: &str) {
-    if !fs_supports_sockets() {
-        return;
-    }
-
-    let dir = tempdir().unwrap();
+    let dir = tempdir_rel().unwrap();
     let src_dir = dir.path().join("fromdir");
     create_dir_all(&src_dir).unwrap();
 
