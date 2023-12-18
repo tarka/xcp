@@ -17,7 +17,6 @@
 use std::ffi::CString;
 use std::fs::File;
 use std::io;
-use std::ops::Range;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::prelude::PermissionsExt;
 use std::path::Path;
@@ -42,7 +41,7 @@ pub fn probably_sparse(_fd: &File) -> Result<bool> {
     Ok(false)
 }
 
-pub fn map_extents(_fd: &File) -> Result<Option<Vec<Range<u64>>>> {
+pub fn map_extents(_fd: &File) -> Result<Option<Vec<Extent>>> {
     // FIXME: Implement for *BSD with lseek?
     Ok(None)
 }
