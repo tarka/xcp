@@ -72,7 +72,6 @@ jobs:
         run: ~/.cargo/bin/cargo test --workspace --no-default-features --features=test_no_reflink,test_no_sockets,test_run_expensive
 
   freebsd:
-     name: FreeBSD
      runs-on: ubuntu-latest
      steps:
      - uses: actions/checkout@v3
@@ -80,8 +79,8 @@ jobs:
      - uses: vmactions/freebsd-vm@v1
        with:
          usesh: true
-         # prepare: |
-         #   pkg install -y jackit boost-libs cmake git
+         prepare: |
+           pkg install -y curl
          run: |
            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
            ~/.cargo/bin/cargo test --workspace --no-default-features --features=test_no_reflink,test_no_sockets,test_run_expensive
