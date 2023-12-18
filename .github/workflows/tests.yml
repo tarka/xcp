@@ -69,7 +69,7 @@ jobs:
         run: ~/.cargo/bin/rustup update
 
       - name: Run all tests
-        run: ~/.cargo/bin/cargo test --workspace --no-default-features --features=test_no_reflink,test_no_sockets,test_run_expensive
+        run: ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive
 
   freebsd:
      runs-on: ubuntu-latest
@@ -80,8 +80,8 @@ jobs:
        with:
          usesh: true
          prepare: |
-           pkg install -y curl bash
+           pkg install -y curl
          run: |
-           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash /dev/stdin -y
+           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh /dev/stdin -y
            ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive
            rm -rf target/generated_filetree/
