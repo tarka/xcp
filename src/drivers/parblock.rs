@@ -42,7 +42,15 @@ use crate::utils::empty;
 
 const fn supported_platform() -> bool {
     cfg_if! {
-        if #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd", target_os = "netbsd", target_os="dragonfly"))] {
+        if #[cfg(
+            any(target_os = "linux",
+                target_os = "android",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os="dragonfly",
+                target_os = "macos",
+            ))]
+        {
             true
         } else {
             false
@@ -55,11 +63,11 @@ pub struct Driver;
 
 impl Driver {
     pub fn new(_opts: &Opts) -> Result<Self> {
-        // if !supported_platform() {
-        //     let msg = "The parblock driver is not currently supported on this OS.";
-        //     error!("{}", msg);
-        //     return Err(XcpError::UnsupportedOS(msg).into());
-        // }
+        if !supported_platform() {
+            let msg = "The parblock driver is not currently supported on this OS.";
+            error!("{}", msg);
+            return Err(XcpError::UnsupportedOS(msg).into());
+        }
 
         Ok(Self {})
     }
