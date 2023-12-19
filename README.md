@@ -67,8 +67,7 @@ pkgin install xcp
     tree-walking and per-file copying. This is the default.
   * 'parblock': An experimental driver that parallelises copying at the block
     level. This has the potential for performance improvements in some
-    architectures, but increases complexity. Currently MacOS is not
-    supported. Testing is welcome.
+    architectures, but increases complexity. Testing is welcome.
 * Non-Linux Unix-like OSs (OS X, *BSD) are supported via fall-back operation
   (although sparse-files are not yet supported in this case).
 * Optionally understands `.gitignore` files to limit the copied directories.
