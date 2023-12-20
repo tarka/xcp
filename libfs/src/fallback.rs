@@ -14,14 +14,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::ffi::CString;
 use std::fs::File;
-use std::io;
-use std::os::unix::fs::MetadataExt;
-use std::os::unix::prelude::PermissionsExt;
 use std::path::Path;
 
-use libc::{dev_t, mode_t};
 use log::warn;
 
 use crate::Extent;
@@ -58,12 +53,12 @@ pub fn copy_sparse(infd: &File, outfd: &File) -> Result<u64> {
         .map(|i| i as u64)
 }
 
-pub fn copy_node(src: &Path, dest: &Path) -> Result<()> {
+pub fn copy_node(src: &Path, _dest: &Path) -> Result<()> {
     // FreeBSD `cp` just warns about this, so do the same here.
     warn!("Socket copy not supported by this OS: {}", src.to_string_lossy());
     Ok(())
 }
 
-pub fn reflink(infd: &File, outfd: &File) -> Result<bool> {
+pub fn reflink(_infd: &File, _outfd: &File) -> Result<bool> {
     Ok(false)
 }
