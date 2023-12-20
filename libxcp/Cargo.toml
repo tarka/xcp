@@ -1,0 +1,48 @@
+[package]
+name = "libxcp"
+description = "This library provides the core functionality. See the main xcp crate for more a working executable version."
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70.0"
+
+authors = ["Steve Smith <tarkasteve@gmail.com>"]
+homepage = "https://github.com/tarka/xcp"
+repository = "https://github.com/tarka/xcp"
+readme = "README.md"
+
+keywords = ["coreutils", "cp", "files", "filesystem"]
+categories =[]
+license = "GPL-3.0-only"
+
+[features]
+default = ["parblock", "use_linux"]
+parblock = []
+use_linux = ["libfs/use_linux"]
+# For CI; disable feature testing on filesystems that don't support
+# it. See .github/workflows/tests.yml
+test_no_reflink = ["libfs/test_no_reflink"]
+test_no_sparse = ["libfs/test_no_sparse"]
+test_no_extents = ["libfs/test_no_extents"]
+test_no_sockets = ["libfs/test_no_sockets"]
+test_no_xattr = []
+test_no_symlinks = []
+test_run_expensive = []
+
+[dependencies]
+anyhow = "1.0.75"
+blocking-threadpool = "1.0.1"
+cfg-if = "1.0.0"
+clap = { version = "4.4.11", features = ["derive"] }
+crossbeam-channel = "0.5.9"
+glob = "0.3.1"
+ignore = "0.4.21"
+indicatif = "0.17.7"
+libfs = { version = "0.5.0", path = "../libfs" }
+log = "0.4.20"
+num_cpus = "1.16.0"
+thiserror = "1.0.50"
+unbytify = "0.2.0"
+walkdir = "2.4.0"
+
+[lints.clippy]
+upper_case_acronyms = "allow"

@@ -14,21 +14,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-mod drivers;
-mod errors;
-mod operations;
-mod options;
-mod progress;
-mod utils;
-
 use std::path::PathBuf;
 use std::sync::Arc;
 use libfs::is_same_file;
 use log::info;
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
-use crate::drivers::pick_driver;
-use crate::errors::{Result, XcpError};
+use libxcp::drivers::pick_driver;
+use libxcp::errors::{Result, XcpError};
+use libxcp::options;
 
 fn main() -> Result<()> {
     let opts = Arc::new(options::parse_args()?);

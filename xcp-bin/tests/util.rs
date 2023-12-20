@@ -50,7 +50,7 @@ pub fn tempdir_rel() -> Result<TempDir, Error> {
     // let dir = PathBuf::from("target/").join(uuid.to_string());
     // create_dir_all(&dir)?;
     // Ok(dir)
-    Ok(tempdir_in(current_dir()?.join("target"))?)
+    Ok(tempdir_in(current_dir()?.join("../target"))?)
 }
 
 pub fn create_file(path: &Path, text: &str) -> Result<(), Error> {
@@ -245,7 +245,7 @@ pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64, with_sparse: 
 }
 
 pub fn gen_global_filetree(with_sparse: bool) -> anyhow::Result<PathBuf> {
-    let path = PathBuf::from("target/generated_filetree");
+    let path = PathBuf::from("../target/generated_filetree");
     let lockfile = path.with_extension("lock");
 
     let mut lf = LockFile::open(&lockfile)?;
@@ -283,7 +283,7 @@ pub fn compare_trees(src: &Path, dest: &Path) -> TResult {
             // FIXME: Ideally we'd check sparse holes here, but
             // there's no guarantee they'll match exactly due to
             // low-level filesystem details (SEEK_HOLE behaviour,
-            // tail-packing, compression, etc.)
+            // tail-packing, compression, bcachefs buckets, etc.)
         }
     }
     Ok(())
