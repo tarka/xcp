@@ -28,7 +28,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::result;
 use tempfile::{tempdir_in, TempDir};
-use uuid::Uuid;
 use walkdir::WalkDir;
 
 pub type TResult = result::Result<(), Error>;
@@ -46,10 +45,6 @@ pub fn run(args: &[&str]) -> Result<Output, Error> {
 }
 
 pub fn tempdir_rel() -> Result<TempDir, Error> {
-    // let uuid = Uuid::new_v4();
-    // let dir = PathBuf::from("target/").join(uuid.to_string());
-    // create_dir_all(&dir)?;
-    // Ok(dir)
     Ok(tempdir_in(current_dir()?.join("../target"))?)
 }
 
