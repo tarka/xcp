@@ -42,7 +42,7 @@ crossbeam-channel = "0.5.9"
 glob = "0.3.1"
 ignore = "0.4.21"
 indicatif = "0.17.7"
-libfs = { version = "0.4.2", path = "libfs" }
+libfs = { version = "0.5.0", path = "libfs" }
 log = "0.4.20"
 num_cpus = "1.16.0"
 simplelog = "0.12.1"
