@@ -3,7 +3,7 @@ name: Tests
 on: [push]
 
 jobs:
-  ubuntu:
+  multi-fs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -15,7 +15,7 @@ jobs:
         # f2fs and exfat modules are in linux-modules-extra-azure
         # and cannot be installed reliably:
         # https://github.com/actions/runner-images/issues/7587
-        run: tests/scripts/make-filesystems.sh ext2 ext4 xfs btrfs ntfs fat zfs
+        run: xcp-bin/tests/scripts/make-filesystems.sh ext2 ext4 xfs btrfs ntfs fat zfs
 
       - name: Run tests on ext2
         run: cargo test --workspace --features=test_no_extents,test_no_reflink

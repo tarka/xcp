@@ -1,14 +1,13 @@
 [package]
 name = "libxcp"
 description = "This library provides the core functionality. See the main xcp crate for more a working executable version."
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 rust-version = "1.70.0"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
 homepage = "https://github.com/tarka/xcp"
 repository = "https://github.com/tarka/xcp"
-readme = "README.md"
 
 keywords = ["coreutils", "cp", "files", "filesystem"]
 categories =[]

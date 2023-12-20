@@ -31,7 +31,7 @@ test_run_expensive = []
 [dependencies]
 cfg-if = "1.0.0"
 libfs = { version = "0.5.0", path = "../libfs" }
-libxcp = { version = "0.1.0", path = "../libxcp" }
+libxcp = { version = "0.0.1", path = "../libxcp" }
 log = "0.4.20"
 simplelog = "0.12.1"
 
@@ -51,7 +51,7 @@ anyhow = "1.0.75"
 clap = { version = "4.4.11", features = ["derive"] }
 clap_complete = "4.4.4"
 clap_mangen = "0.2.15"
-libxcp = { version = "0.1.0", path = "../libxcp" }
+libxcp = { version = "0.0.1", path = "../libxcp" }
 
 [lints.clippy]
 upper_case_acronyms = "allow"
