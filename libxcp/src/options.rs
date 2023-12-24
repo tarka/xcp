@@ -32,11 +32,12 @@ use crate::operations::Reflink;
 #[derive(Clone, Debug, Parser)]
 #[command(
     name = "xcp",
-    about = "Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY."
+    about = "A (partial) clone of the Unix `cp` command with progress and pluggable drivers.",
 )]
 pub struct Opts {
-    /// Explain what is being done. Can be specified multiple times to
-    /// increase logging.
+    /// Verbosity.
+    ///
+    /// Can be specified multiple times to increase logging.
     #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
 
@@ -44,14 +45,17 @@ pub struct Opts {
     #[arg(short, long)]
     pub recursive: bool,
 
-    /// Number of parallel workers for recursive copies. Default is 1;
-    /// if the value is negative or 0 it uses the number of logical CPUs.
+    /// Number of parallel workers.
+    ///
+    /// Default is 1; if the value is negative or 0 it uses the number
+    /// of logical CPUs.
     #[arg(short, long, default_value = "4")]
     pub workers: i64,
 
-    /// Block size for operations. Accepts standard size modifiers
-    /// like "M" and "GB". Actual usage internally depends on the
-    /// driver.
+    /// Block size for operations.
+    ///
+    /// Accepts standard size modifiers like "M" and "GB". Actual
+    /// usage internally depends on the driver.
     #[arg(long,  default_value = "1MB", value_parser=unbytify)]
     pub block_size: u64,
 
@@ -59,13 +63,16 @@ pub struct Opts {
     #[arg(short, long)]
     pub no_clobber: bool,
 
-    /// Use .gitignore if present. NOTE: This is fairly basic at the
-    /// moment, and only honours a .gitignore in the directory root
-    /// for directory copies; global or sub-directory ignores are
-    /// skipped.
+    /// Use .gitignore if present.
+    ///
+    /// NOTE: This is fairly basic at the moment, and only honours a
+    /// .gitignore in the directory root for directory copies; global
+    /// or sub-directory ignores are skipped.
     #[arg(long)]
     pub gitignore: bool,
 
+    /// Expand file patterns.
+    ///
     /// Glob (expand) filename patterns natively (note; the shell may still do its own expansion first)
     #[arg(short, long)]
     pub glob: bool,
@@ -78,23 +85,29 @@ pub struct Opts {
     #[arg(long)]
     pub no_perms: bool,
 
-    /// Specify the driver. Currently there are 2; the default
-    /// "parfile", which parallelises copies across workers at the
-    /// file level, and an experimental "parblock" driver, which
-    /// parellelises at the block level. See also '--block-size'.
-    #[arg(long)]
-    pub driver: Option<Drivers>,
+    /// Driver to use, defaults to 'file-parallel'.
+    ///
+    /// Currently there are 2; the default "parfile", which
+    /// parallelises copies across workers at the file level, and an
+    /// experimental "parblock" driver, which parellelises at the
+    /// block level. See also '--block-size'.
+    #[arg(long, default_value = "parfile")]
+    pub driver: Drivers,
 
+    /// Target should not be a directory.
+    ///
     /// Analogous to cp's no-target-directory. Expected behavior is that when
     /// copying a directory to another directory, instead of creating a sub-folder
     /// in target, overwrite target.
     #[arg(short = 'T', long)]
     pub no_target_directory: bool,
 
-    /// Sync each file to disk after fully written.
+    /// Sync each file to disk after writing.
     #[arg(long)]
     pub fsync: bool,
 
+    /// Reflink options.
+    ///
     /// Whether and how to use reflinks. 'auto' (the default) will
     /// attempt to reflink and fallback to a copy if it is not
     /// possible, 'always' will return an error if it cannot reflink,
@@ -102,6 +115,9 @@ pub struct Opts {
     #[arg(long, default_value = "auto")]
     pub reflink: Reflink,
 
+    /// Path list.
+    ///
+    /// Source and destination files, or multiple source(s) to a directory.
     pub paths: Vec<String>,
 }
 

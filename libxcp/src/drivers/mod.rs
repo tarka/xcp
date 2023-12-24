@@ -23,6 +23,8 @@ use std::result;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use clap::ValueEnum;
+
 use crate::errors::{Result, XcpError};
 use crate::options::Opts;
 
@@ -31,7 +33,8 @@ pub trait CopyDriver {
     fn copy_single(&self, source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()>;
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
+#[value(rename_all = "lower")]
 pub enum Drivers {
     ParFile,
     #[cfg(feature = "parblock")]
@@ -52,9 +55,7 @@ impl FromStr for Drivers {
 }
 
 pub fn pick_driver(opts: &Opts) -> Result<Box<dyn CopyDriver>> {
-    let dopt = opts.driver.unwrap_or(Drivers::ParFile);
-
-    let driver: Box<dyn CopyDriver> = match dopt {
+    let driver: Box<dyn CopyDriver> = match opts.driver {
         Drivers::ParFile => Box::new(parfile::Driver::new(opts)?),
         #[cfg(feature = "parblock")]
         Drivers::ParBlock => Box::new(parblock::Driver::new(opts)?),

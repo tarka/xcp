@@ -21,6 +21,7 @@ use std::result;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use clap::ValueEnum;
 use libfs::{
     allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync, reflink,
 };
@@ -30,7 +31,8 @@ use crate::errors::{Result, XcpError};
 use crate::options::Opts;
 use crate::progress::{BatchUpdater, Updater};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, ValueEnum)]
+#[value(rename_all = "lower")]
 pub enum Reflink {
     Always,
     Auto,
