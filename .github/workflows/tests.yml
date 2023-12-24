@@ -18,32 +18,25 @@ jobs:
         run: tests/scripts/make-filesystems.sh ext2 ext4 xfs btrfs ntfs fat zfs
 
       - name: Run tests on ext2
-        run: cargo test --workspace --features=test_no_extents,test_no_reflink
-        working-directory: /fs/ext2/src
+        run: /fs/ext2/src/tests/scripts/test-linux.sh
 
       - name: Run tests on ext4
-        run: cargo test --workspace --features=test_no_reflink
-        working-directory: /fs/ext4/src
+        run: /fs/ext4/src/tests/scripts/test-linux.sh
 
       - name: Run tests on XFS
-        run: cargo test --workspace
-        working-directory: /fs/xfs/src
+        run: /fs/xfs/src/tests/scripts/test-linux.sh
 
       - name: Run tests on btrfs
-        run: cargo test --workspace
-        working-directory: /fs/btrfs/src
+        run: /fs/btrfs/src/tests/scripts/test-linux.sh
 
       - name: Run tests on ntfs
-        run: cargo test --workspace --features=test_no_extents,test_no_sparse,test_no_reflink
-        working-directory: /fs/ntfs/src
+        run: /fs/ntfs/src/tests/scripts/test-linux.sh
 
       - name: Run tests on fat
-        run: cargo test --workspace --features=test_no_extents,test_no_sparse,test_no_sockets,test_no_symlinks,test_no_xattr,test_no_reflink
-        working-directory: /fs/fat/src
+        run: /fs/fat/src/tests/scripts/test-linux.sh
 
       - name: Run tests on ZFS
-        run: cargo test --workspace --features=test_no_extents,test_no_reflink,test_no_sparse
-        working-directory: /fs/zfs/src
+        run: /fs/zfs/src/tests/scripts/test-linux.sh
 
   expensive:
     runs-on: ubuntu-latest
@@ -54,8 +47,7 @@ jobs:
         run: ~/.cargo/bin/rustup update
 
       - name: Run expensive tests
-        # Assume we're running on ext4
-        run: ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_run_expensive
+        run: ./tests/scripts/test-linux.sh test_run_expensive
 
   macos:
     runs-on: macos-latest
