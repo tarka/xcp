@@ -31,7 +31,7 @@ fn basic_help() {
     assert!(out.status.success());
 
     let stdout = String::from_utf8(out.stdout).unwrap();
-    assert!(stdout.contains("Copy SOURCE to DEST"));
+    assert!(stdout.contains("Usage: xcp [OPTIONS] [PATHS]..."));
 }
 
 #[test]

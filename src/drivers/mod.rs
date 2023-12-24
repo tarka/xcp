@@ -51,10 +51,8 @@ impl FromStr for Drivers {
     }
 }
 
-pub fn pick_driver(opts: &Opts) -> Result<Box<dyn CopyDriver>> {
-    let dopt = opts.driver.unwrap_or(Drivers::ParFile);
-
-    let driver: Box<dyn CopyDriver> = match dopt {
+pub fn load_driver(opts: &Opts) -> Result<Box<dyn CopyDriver>> {
+    let driver: Box<dyn CopyDriver> = match opts.driver {
         Drivers::ParFile => Box::new(parfile::Driver::new(opts)?),
         #[cfg(feature = "parblock")]
         Drivers::ParBlock => Box::new(parblock::Driver::new(opts)?),

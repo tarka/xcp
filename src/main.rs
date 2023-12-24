@@ -27,7 +27,7 @@ use libfs::is_same_file;
 use log::info;
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
-use crate::drivers::pick_driver;
+use crate::drivers::load_driver;
 use crate::errors::{Result, XcpError};
 
 fn main() -> Result<()> {
@@ -47,7 +47,7 @@ fn main() -> Result<()> {
     )
     .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
-    let driver = pick_driver(&opts)?;
+    let driver = load_driver(&opts)?;
 
     let (dest, source_patterns) = opts
         .paths
