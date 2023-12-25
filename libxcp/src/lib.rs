@@ -80,6 +80,7 @@ pub mod errors;
 pub mod feedback;
 
 // Internal
+mod backup;
 mod operations;
 mod paths;
 
