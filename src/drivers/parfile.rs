@@ -80,7 +80,7 @@ fn copy_worker(
         match op {
             Operation::Copy(from, to) => {
                 info!("Worker: Copy {:?} -> {:?}", from, to);
-                // copy_file sends back its own updates, but we should
+                // copy_file() sends back its own updates, but we should
                 // send back any errors as they may have occurred
                 // before the copy started..
                 let handle = CopyHandle::new(&from, &to, opts.clone())?;
