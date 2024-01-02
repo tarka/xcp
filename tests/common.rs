@@ -14,8 +14,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fs::{create_dir_all, metadata, set_permissions, write, File};
-use std::os::unix::fs::symlink;
+use std::fs::{create_dir_all, metadata, set_permissions, write, File, Permissions};
+use std::os::unix::fs::{symlink, PermissionsExt};
 use std::os::unix::net::UnixListener;
 use cfg_if::cfg_if;
 use test_case::test_case;
@@ -968,3 +968,26 @@ fn test_sockets_dir(drv: &str) {
     assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
 }
 
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn unreadable_file_error(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+    let text = "This is a test file.";
+
+    create_file(&source_path, text).unwrap();
+
+    let perms = Permissions::from_mode(0);
+    set_permissions(&source_path, perms).unwrap();
+
+    let out = run(&[
+        "--driver",
+        drv,
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(!out.status.success());
+}
