@@ -16,7 +16,7 @@
 
 use std::path::PathBuf;
 
-pub use anyhow::{Error, Result};
+pub use anyhow::Result;
 
 #[derive(Debug, thiserror::Error)]
 pub enum XcpError {
