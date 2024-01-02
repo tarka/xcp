@@ -73,20 +73,19 @@ fn copy_worker(
     for op in work {
         debug!("Received operation {:?}", op);
 
-        // FIXME: If we implement parallel copies (which may improve
-        // performance on some SSD configurations) we should also
-        // create the parent directory, and the dir-create operation
-        // could be out of order.
         match op {
             Operation::Copy(from, to) => {
                 info!("Worker: Copy {:?} -> {:?}", from, to);
                 // copy_file() sends back its own updates, but we should
                 // send back any errors as they may have occurred
                 // before the copy started..
-                let handle = CopyHandle::new(&from, &to, opts.clone())?;
-                let r = handle.copy_file(&mut updates);
+                let r = CopyHandle::new(&from, &to, opts.clone())
+                    .and_then(|hdl| hdl.copy_file(&mut updates));
                 if r.is_err() {
                     updates.update(r)?;
+                    error!("Error copying: {:?} -> {:?}; aborting.", from, to);
+                    // TODO: Option to continue on error?
+                    break;
                 }
             }
 
