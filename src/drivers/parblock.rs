@@ -92,18 +92,19 @@ impl CopyDriver for Driver {
 static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone)]
-struct Sender {
+struct StatSender {
     noop: bool,
     chan: cbc::Sender<StatusUpdate>,
 }
-impl Sender {
-    fn new(chan: cbc::Sender<StatusUpdate>, opts: &Opts) -> Sender {
-        Sender {
+impl StatSender {
+    fn new(chan: cbc::Sender<StatusUpdate>, opts: &Opts) -> StatSender {
+        StatSender {
             noop: opts.no_progress,
             chan,
         }
     }
 
+    // Wrapper around channel-send that groups updates together
     fn send(&self, update: StatusUpdate, bytes: u64, bsize: u64) -> Result<()> {
         if self.noop {
             return Ok(());
@@ -118,11 +119,16 @@ impl Sender {
     }
 }
 
+struct CopyOp {
+    from: PathBuf,
+    target: PathBuf,
+}
+
 fn queue_file_range(
     handle: &Arc<CopyHandle>,
     range: Range<u64>,
     pool: &ThreadPool,
-    status_channel: &Sender,
+    status_channel: &StatSender,
 ) -> Result<u64> {
     let len = range.end - range.start;
     let bsize = handle.opts.block_size;
@@ -144,12 +150,11 @@ fn queue_file_range(
     Ok(len)
 }
 
-
 fn queue_file_blocks(
     source: &Path,
     dest: &Path,
     pool: &ThreadPool,
-    status_channel: &Sender,
+    status_channel: &StatSender,
     opts: Arc<Opts>,
 ) -> Result<u64> {
     let handle = CopyHandle::new(source, dest, opts)?;
@@ -160,10 +165,10 @@ fn queue_file_blocks(
         return Ok(len);
     }
 
-    // Put the open files in an Arc, which we drop once work has
-    // been queued. This will keep them open until all work has
-    // been consumed, then close them. (This may be overkill;
-    // opening the files in the workers would also be valid.)
+    // Put the open files in an Arc, which we drop once work has been
+    // queued. This will keep the files open until all work has been
+    // consumed, then close them. (This may be overkill; opening the
+    // files in the workers would also be valid.)
     let harc = Arc::new(handle);
 
     let queue_whole_file = || {
@@ -194,7 +199,7 @@ fn copy_single_file(source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
     let pb = ProgressBar::new(&opts, len)?;
 
     let (stat_tx, stat_rx) = cbc::unbounded();
-    let sender = Sender::new(stat_tx, &opts);
+    let sender = StatSender::new(stat_tx, &opts);
     queue_file_blocks(source, dest, &pool, &sender, opts)?;
     drop(sender);
 
@@ -209,44 +214,46 @@ fn copy_single_file(source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
     Ok(())
 }
 
-struct CopyOp {
-    from: PathBuf,
-    target: PathBuf,
-}
+// Dispatch worker; receives queued files and hands them to
+// queue_file_blocks() which splits them onto the copy-pool.
+fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<Opts>) -> Result<()> {
+    let nworkers = num_workers(&opts) as usize;
+    let copy_pool = Builder::new()
+        .num_threads(nworkers)
+        // Use bounded queue for backpressure; this limits open
+        // files in-flight so we don't run out of file handles.
+        // FIXME: Number is arbitrary ATM, we should be able to
+        // calculate it from ulimits.
+        .queue_len(128)
+        .build();
+    for op in file_q {
+        queue_file_blocks(&op.from, &op.target, &copy_pool, &stat_q, opts.clone()).unwrap();
+    }
+    info!("Queuing complete");
 
+    copy_pool.join();
+    info!("Pool complete");
+
+    Ok(())
+}
 
 fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
     let pb = ProgressBar::new(&opts, 0)?;
     let mut total = 0;
 
-    let nworkers = num_workers(&opts) as usize;
     let (stat_tx, stat_rx) = cbc::unbounded::<StatusUpdate>();
-
     let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
-    let sender = Sender::new(stat_tx, &opts);
-    let q_opts = opts.clone();
-    let _dispatcher = thread::spawn(move || {
-        let pool = Builder::new()
-            .num_threads(nworkers)
-            // Use bounded queue for backpressure; this limits open
-            // files in-flight so we don't run out of file handles.
-            // FIXME: Number is arbitrary ATM, we should be able to
-            // calculate it from ulimits.
-            .queue_len(128)
-            .build();
-        for op in file_rx {
-            queue_file_blocks(&op.from, &op.target, &pool, &sender, q_opts.clone()).unwrap();
-        }
-        info!("Queuing complete");
+    let stat_q = StatSender::new(stat_tx, &opts);
 
-        pool.join();
-        info!("Pool complete");
-    });
+    // Start (single) dispatch worker
+    let q_opts = opts.clone();
+    let _dispatcher = thread::spawn(|| dispatch_worker(file_rx, stat_q, q_opts));
 
     for source in sources {
-        let sourcedir = source.components().last().ok_or(XcpError::InvalidSource(
-            "Failed to find source directory name.",
-        ))?;
+        let sourcedir = source
+            .components()
+            .last()
+            .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
 
         let target_base = if dest.exists() {
             dest.join(sourcedir)
