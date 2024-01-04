@@ -80,20 +80,20 @@ impl CopyHandle {
     }
 
     /// Copy len bytes from wherever the descriptor cursors are set.
-    fn copy_bytes(&self, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
+    fn copy_bytes(&self, len: u64, updates: &StatSender) -> Result<u64> {
         let mut written = 0u64;
         while written < len {
             let bytes_to_copy = cmp::min(len - written, self.opts.batch_size());
             let result = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
             written += result;
-            updates.update(Ok(result))?;
+            updates.send(StatusUpdate::Copied(result as u64), bytes_to_copy, self.opts.block_size)?;
         }
 
         Ok(written)
     }
 
     /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
-    fn copy_sparse(&self, updates: &mut BatchUpdater) -> Result<u64> {
+    fn copy_sparse(&self, updates: &StatSender) -> Result<u64> {
         let len = self.metadata.len();
         let mut pos = 0;
 
@@ -129,7 +129,7 @@ impl CopyHandle {
         }
     }
 
-    pub fn copy_file(&self, updates: &mut BatchUpdater) -> Result<u64> {
+    pub fn copy_file(&self, updates: &StatSender) -> Result<u64> {
         if self.try_reflink()? {
             return Ok(self.metadata.len());
         }

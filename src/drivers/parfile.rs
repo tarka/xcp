@@ -26,12 +26,9 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{CopyHandle, StatusUpdate};
+use crate::operations::{CopyHandle, StatusUpdate, StatSender};
 use crate::options::{ignore_filter, parse_ignore, Opts};
-use crate::progress::{
-    BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, Updater,
-    BATCH_DEFAULT,
-};
+use crate::progress::ProgressBar;
 use crate::utils::empty;
 
 // ********************************************************************** //
@@ -69,7 +66,7 @@ enum Operation {
 fn copy_worker(
     work: cbc::Receiver<Operation>,
     opts: &Arc<Opts>,
-    mut updates: BatchUpdater,
+    updates: StatSender,
 ) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
@@ -82,9 +79,11 @@ fn copy_worker(
                 // send back any errors as they may have occurred
                 // before the copy started..
                 let r = CopyHandle::new(&from, &to, opts)
-                    .and_then(|hdl| hdl.copy_file(&mut updates));
+                    .and_then(|hdl| hdl.copy_file(&updates));
                 if r.is_err() {
-                    updates.update(r)?;
+                    // FIXME: Send error here
+                    //updates.update(r)?;
+
                     error!("Error copying: {:?} -> {:?}; aborting.", from, to);
                     // TODO: Option to continue on error?
                     break;
@@ -116,7 +115,7 @@ fn copy_source(
     dest: &Path,
     opts: &Opts,
     work_tx: &cbc::Sender<Operation>,
-    updates: &mut BatchUpdater,
+    updates: &StatSender,
 ) -> Result<()> {
     let sourcedir = source.components().last().ok_or(XcpError::InvalidSource(
         "Failed to find source directory name.",
@@ -148,18 +147,19 @@ fn copy_source(
 
         if opts.no_clobber && target.exists() {
             work_tx.send(Operation::End)?;
-            updates.update(Err(XcpError::DestinationExists(
-                "Destination file exists and --no-clobber is set.",
-                target,
-            )
-            .into()))?;
+            // FIXME: Replace with error send
+            // updates.update(Err(XcpError::DestinationExists(
+            //     "Destination file exists and --no-clobber is set.",
+            //     target,
+            // )
+            // .into()))?;
             return Err(XcpError::EarlyShutdown("Path exists and --no-clobber set.").into());
         }
 
         match FileType::from(meta.file_type()) {
             FileType::File => {
                 debug!("Send copy operation {:?} to {:?}", from, target);
-                updates.update(Ok(meta.len()))?;
+                updates.send(StatusUpdate::Size(meta.len()), meta.len(), opts.block_size)?;
                 work_tx.send(Operation::Copy(from, target))?;
             }
 
@@ -194,12 +194,12 @@ fn tree_walker(
     dest: &Path,
     opts: &Opts,
     work_tx: cbc::Sender<Operation>,
-    mut updates: BatchUpdater,
+    updates: StatSender,
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 
     for source in sources {
-        copy_source(&source, dest, opts, &work_tx, &mut updates)?;
+        copy_source(&source, dest, opts, &work_tx, &updates)?;
     }
     work_tx.send(Operation::End)?;
     debug!("Walk-worker finished: {:?}", thread::current().id());
@@ -209,11 +209,12 @@ fn tree_walker(
 pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
     let (work_tx, work_rx) = cbc::unbounded();
     let (stat_tx, stat_rx) = cbc::unbounded();
+    let sender = StatSender::new(stat_tx, &opts);
 
-    let (pb, batch_size) = if opts.no_progress {
-        (ProgressBar::Nop, usize::max_value() as u64)
+    let pb = if opts.no_progress {
+        ProgressBar::Nop
     } else {
-        (ProgressBar::new(&opts, 0)?, BATCH_DEFAULT)
+        ProgressBar::new(&opts, 0)?
     };
 
     // Use scoped threads here so we can pass down e.g. Opts without
@@ -221,26 +222,18 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
     thread::scope(|s| {
         for _ in 0..opts.num_workers() {
             let _copy_worker = {
-                let copy_stat = BatchUpdater {
-                    sender: Box::new(stat_tx.clone()),
-                    stat: StatusUpdate::Copied(0),
-                    batch_size,
-                };
                 let wrx = work_rx.clone();
-                s.spawn(move || copy_worker(wrx, opts, copy_stat))
+                let sc = sender.clone();
+                s.spawn(move || copy_worker(wrx, opts, sc))
             };
         }
         let _walk_worker = {
-            let size_stat = BatchUpdater {
-                sender: Box::new(stat_tx),
-                stat: StatusUpdate::Size(0),
-                batch_size,
-            };
-            s.spawn(|| tree_walker(sources, dest, &opts, work_tx, size_stat))
+            let sc = sender.clone();
+            s.spawn(|| tree_walker(sources, dest, &opts, work_tx, sc))
         };
 
         for stat in stat_rx {
-            match stat? {
+            match stat {
                 StatusUpdate::Size(s) => {
                     pb.inc_size(s);
                 }
@@ -262,26 +255,23 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
 }
 
 fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
-    let mut copy_stat = if opts.no_progress {
-        BatchUpdater {
-            sender: Box::new(NopUpdater {}),
-            stat: StatusUpdate::Copied(0),
-            batch_size: usize::max_value() as u64,
-        }
-    } else {
-        let size = source.metadata()?.len();
-        BatchUpdater {
-            sender: Box::new(ProgressUpdater {
-                pb: ProgressBar::new(&opts, size)?,
-                written: 0,
-            }),
-            stat: StatusUpdate::Copied(0),
-            batch_size: BATCH_DEFAULT,
-        }
-    };
+    let len = source.metadata()?.len();
+    let pb = ProgressBar::new(&opts, len)?;
+
+    let (stat_tx, stat_rx) = cbc::unbounded();
+    let sender = StatSender::new(stat_tx, &opts);
 
     let handle = CopyHandle::new(source, dest, opts)?;
-    handle.copy_file(&mut copy_stat)?;
+    handle.copy_file(&sender)?;
+
+    // Gather the results as we go; close our end of the channel so it
+    // ends when drained. We drop our copy of StatSender so that the
+    // last sender will close the channel.
+    drop(sender);
+    for r in stat_rx {
+        pb.inc(r.value());
+    }
+    pb.end();
 
     Ok(())
 }
