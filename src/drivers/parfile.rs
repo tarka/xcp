@@ -36,21 +36,23 @@ use crate::utils::empty;
 
 // ********************************************************************** //
 
-pub struct Driver;
-
-impl Driver {
-    pub fn new(_opts: &Opts) -> Result<Self> {
-        Ok(Self {})
-    }
+pub struct Driver {
+    opts: Arc<Opts>,
 }
 
 impl CopyDriver for Driver {
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
-        copy_all(sources, dest, opts)
+    fn new(opts: Arc<Opts>) -> Result<Self> {
+        Ok(Self {
+            opts,
+        })
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
-        copy_single_file(source, dest, opts)
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path) -> Result<()> {
+        copy_all(sources, dest, &self.opts)
+    }
+
+    fn copy_single(&self, source: &Path, dest: &Path) -> Result<()> {
+        copy_single_file(source, dest, &self.opts)
     }
 }
 
@@ -66,7 +68,7 @@ enum Operation {
 
 fn copy_worker(
     work: cbc::Receiver<Operation>,
-    opts: Arc<Opts>,
+    opts: &Arc<Opts>,
     mut updates: BatchUpdater,
 ) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
@@ -79,7 +81,7 @@ fn copy_worker(
                 // copy_file() sends back its own updates, but we should
                 // send back any errors as they may have occurred
                 // before the copy started..
-                let r = CopyHandle::new(&from, &to, opts.clone())
+                let r = CopyHandle::new(&from, &to, opts)
                     .and_then(|hdl| hdl.copy_file(&mut updates));
                 if r.is_err() {
                     updates.update(r)?;
@@ -204,7 +206,7 @@ fn tree_walker(
     Ok(())
 }
 
-pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
+pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
     let (work_tx, work_rx) = cbc::unbounded();
     let (stat_tx, stat_rx) = cbc::unbounded();
 
@@ -226,7 +228,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<(
                     batch_size,
                 };
                 let wrx = work_rx.clone();
-                s.spawn(|| copy_worker(wrx, cw_opts, copy_stat))
+                s.spawn(move || copy_worker(wrx, &cw_opts, copy_stat))
             };
         }
         let _walk_worker = {
@@ -260,7 +262,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<(
     Ok(())
 }
 
-fn copy_single_file(source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
+fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
     let mut copy_stat = if opts.no_progress {
         BatchUpdater {
             sender: Box::new(NopUpdater {}),

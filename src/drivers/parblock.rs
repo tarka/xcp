@@ -59,28 +59,29 @@ const fn supported_platform() -> bool {
 }
 
 
-pub struct Driver;
+pub struct Driver {
+    opts: Arc<Opts>,
+}
 
-impl Driver {
-    pub fn new(_opts: &Opts) -> Result<Self> {
+impl CopyDriver for Driver {
+    fn new(opts: Arc<Opts>) -> Result<Self> {
         if !supported_platform() {
             let msg = "The parblock driver is not currently supported on this OS.";
             error!("{}", msg);
             return Err(XcpError::UnsupportedOS(msg).into());
         }
 
-        Ok(Self {})
-    }
-}
-
-impl CopyDriver for Driver {
-
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
-        copy_all(sources, dest, opts)
+        Ok(Self {
+            opts
+        })
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
-        copy_single_file(source, dest, opts)
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path) -> Result<()> {
+        copy_all(sources, dest, &self.opts)
+    }
+
+    fn copy_single(&self, source: &Path, dest: &Path) -> Result<()> {
+        copy_single_file(source, dest, &self.opts)
     }
 }
 
@@ -155,7 +156,7 @@ fn queue_file_blocks(
     dest: &Path,
     pool: &ThreadPool,
     status_channel: &StatSender,
-    opts: Arc<Opts>,
+    opts: &Arc<Opts>,
 ) -> Result<u64> {
     let handle = CopyHandle::new(source, dest, opts)?;
     let len = handle.metadata.len();
@@ -191,7 +192,7 @@ fn queue_file_blocks(
     }
 }
 
-fn copy_single_file(source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
+fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
     let nworkers = num_workers(&opts);
     let pool = ThreadPool::new(nworkers as usize);
 
@@ -227,7 +228,7 @@ fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<
         .queue_len(128)
         .build();
     for op in file_q {
-        queue_file_blocks(&op.from, &op.target, &copy_pool, &stat_q, opts.clone()).unwrap();
+        queue_file_blocks(&op.from, &op.target, &copy_pool, &stat_q, &opts).unwrap();
     }
     info!("Queuing complete");
 
@@ -237,7 +238,7 @@ fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<
     Ok(())
 }
 
-fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
+fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
     let pb = ProgressBar::new(&opts, 0)?;
     let mut total = 0;
 
@@ -262,7 +263,7 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
         };
         debug!("Target base is {:?}", target_base);
 
-        let gitignore = parse_ignore(&source, &opts.clone())?;
+        let gitignore = parse_ignore(&source, &opts)?;
 
         for entry in WalkDir::new(&source)
             .into_iter()
