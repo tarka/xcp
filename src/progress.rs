@@ -14,72 +14,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crossbeam_channel as cbc;
-
 use crate::errors::Result;
-use crate::operations::StatusUpdate;
 use crate::options::Opts;
-
-pub const BATCH_DEFAULT: u64 = 1024 * 1024 * 64;
-
-pub trait Updater<T> {
-    fn update(&mut self, update: T) -> Result<()>;
-}
-
-pub struct BatchUpdater {
-    pub sender: Box<dyn Updater<Result<StatusUpdate>> + Send>,
-    pub stat: StatusUpdate,
-    pub batch_size: u64,
-}
-
-impl Updater<Result<u64>> for BatchUpdater {
-    fn update(&mut self, status: Result<u64>) -> Result<()> {
-        match status {
-            Ok(bytes) => {
-                let curr = self.stat.value() + bytes;
-                self.stat = self.stat.set(curr);
-
-                if curr >= self.batch_size {
-                    self.sender.update(Ok(self.stat.clone()))?;
-                    self.stat = self.stat.set(0);
-                }
-            }
-            Err(e) => {
-                self.sender.update(Err(e))?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl Updater<Result<StatusUpdate>> for cbc::Sender<Result<StatusUpdate>> {
-    fn update(&mut self, update: Result<StatusUpdate>) -> Result<()> {
-        Ok(self.send(update)?)
-    }
-}
-
-pub struct NopUpdater;
-
-impl Updater<Result<StatusUpdate>> for NopUpdater {
-    fn update(&mut self, _update: Result<StatusUpdate>) -> Result<()> {
-        Ok(())
-    }
-}
-
-pub struct ProgressUpdater {
-    pub pb: ProgressBar,
-    pub written: u64,
-}
-
-impl Updater<Result<StatusUpdate>> for ProgressUpdater {
-    fn update(&mut self, update: Result<StatusUpdate>) -> Result<()> {
-        if let Ok(StatusUpdate::Copied(bytes)) = update {
-            self.written += bytes;
-            self.pb.set_position(self.written);
-        }
-        Ok(())
-    }
-}
 
 pub enum ProgressBar {
     Visual(indicatif::ProgressBar),
