@@ -121,14 +121,25 @@ pub struct Opts {
     pub paths: Vec<String>,
 }
 
-// StructOpt/Clap handles optional flags with optional values as nested Options.
-pub fn num_workers(opts: &Opts) -> u64 {
-    if opts.workers <= 0 {
-        num_cpus::get() as u64
-    } else {
-        opts.workers as u64
+impl Opts {
+    pub fn batch_size(&self) -> u64 {
+        if self.no_progress {
+            usize::max_value() as u64
+        } else {
+            self.block_size
+        }
+    }
+
+    // StructOpt/Clap handles optional flags with optional values as nested Options.
+    pub fn num_workers(&self) -> u64 {
+        if self.workers <= 0 {
+            num_cpus::get() as u64
+        } else {
+            self.workers as u64
+        }
     }
 }
+
 
 // Expand a list of file-paths or glob-patterns into a list of concrete paths.
 //

@@ -20,7 +20,9 @@ use std::path::Path;
 use std::result;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
+use crossbeam_channel as cbc;
 use libfs::{
     allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync, reflink,
 };
@@ -81,7 +83,7 @@ impl CopyHandle {
     fn copy_bytes(&self, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
         let mut written = 0u64;
         while written < len {
-            let bytes_to_copy = cmp::min(len - written, updates.batch_size);
+            let bytes_to_copy = cmp::min(len - written, self.opts.batch_size());
             let result = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
             written += result;
             updates.update(Ok(result))?;
@@ -180,6 +182,38 @@ impl StatusUpdate {
         match self {
             StatusUpdate::Copied(v) => *v,
             StatusUpdate::Size(v) => *v,
+        }
+    }
+}
+
+// FIXME: We should probably abstract away more of the channel setup
+// to be no-ops when --no-progress is specified.
+static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Clone)]
+pub struct StatSender {
+    noop: bool,
+    chan: cbc::Sender<StatusUpdate>,
+}
+impl StatSender {
+    pub fn new(chan: cbc::Sender<StatusUpdate>, opts: &Opts) -> StatSender {
+        StatSender {
+            noop: opts.no_progress,
+            chan,
+        }
+    }
+
+    // Wrapper around channel-send that groups updates together
+    pub fn send(&self, update: StatusUpdate, bytes: u64, bsize: u64) -> Result<()> {
+        if self.noop {
+            return Ok(());
+        }
+        // Avoid saturating the queue with small writes
+        let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
+        if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
+            Ok(self.chan.send(update)?)
+        } else {
+            Ok(())
         }
     }
 }

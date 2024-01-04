@@ -19,7 +19,6 @@ use std::fs::{create_dir_all, read_link};
 use std::ops::Range;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
 
@@ -32,8 +31,8 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{CopyHandle, StatusUpdate};
-use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
+use crate::operations::{CopyHandle, StatusUpdate, StatSender};
+use crate::options::{ignore_filter, parse_ignore, Opts};
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
 use crate::progress::ProgressBar;
 use crate::utils::empty;
@@ -87,38 +86,6 @@ impl CopyDriver for Driver {
 
 // ********************************************************************** //
 
-// FIXME: We should probably move this to the progress-bar module and
-// abstract away more of the channel setup to be no-ops when
-// --no-progress is specified.
-static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
-
-#[derive(Clone)]
-struct StatSender {
-    noop: bool,
-    chan: cbc::Sender<StatusUpdate>,
-}
-impl StatSender {
-    fn new(chan: cbc::Sender<StatusUpdate>, opts: &Opts) -> StatSender {
-        StatSender {
-            noop: opts.no_progress,
-            chan,
-        }
-    }
-
-    // Wrapper around channel-send that groups updates together
-    fn send(&self, update: StatusUpdate, bytes: u64, bsize: u64) -> Result<()> {
-        if self.noop {
-            return Ok(());
-        }
-        // Avoid saturating the queue with small writes
-        let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
-        if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
-            Ok(self.chan.send(update)?)
-        } else {
-            Ok(())
-        }
-    }
-}
 
 struct CopyOp {
     from: PathBuf,
@@ -193,7 +160,7 @@ fn queue_file_blocks(
 }
 
 fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
-    let nworkers = num_workers(&opts);
+    let nworkers = opts.num_workers();
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
@@ -218,7 +185,7 @@ fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
 // Dispatch worker; receives queued files and hands them to
 // queue_file_blocks() which splits them onto the copy-pool.
 fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<Opts>) -> Result<()> {
-    let nworkers = num_workers(&opts) as usize;
+    let nworkers = opts.num_workers() as usize;
     let copy_pool = Builder::new()
         .num_threads(nworkers)
         // Use bounded queue for backpressure; this limits open

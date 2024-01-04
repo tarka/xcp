@@ -27,7 +27,7 @@ use walkdir::WalkDir;
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
 use crate::operations::{CopyHandle, StatusUpdate};
-use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
+use crate::options::{ignore_filter, parse_ignore, Opts};
 use crate::progress::{
     BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, Updater,
     BATCH_DEFAULT,
@@ -219,7 +219,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
     // Use scoped threads here so we can pass down e.g. Opts without
     // repeated cloning.
     thread::scope(|s| {
-        for _ in 0..num_workers(&opts) {
+        for _ in 0..opts.num_workers() {
             let _copy_worker = {
                 let copy_stat = BatchUpdater {
                     sender: Box::new(stat_tx.clone()),
