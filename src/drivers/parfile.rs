@@ -220,7 +220,6 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
     // repeated cloning.
     thread::scope(|s| {
         for _ in 0..num_workers(&opts) {
-            let cw_opts = opts.clone();
             let _copy_worker = {
                 let copy_stat = BatchUpdater {
                     sender: Box::new(stat_tx.clone()),
@@ -228,7 +227,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
                     batch_size,
                 };
                 let wrx = work_rx.clone();
-                s.spawn(move || copy_worker(wrx, &cw_opts, copy_stat))
+                s.spawn(move || copy_worker(wrx, opts, copy_stat))
             };
         }
         let _walk_worker = {
@@ -237,7 +236,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
                 stat: StatusUpdate::Size(0),
                 batch_size,
             };
-            s.spawn(|| tree_walker(sources, dest, &opts.clone(), work_tx, size_stat))
+            s.spawn(|| tree_walker(sources, dest, &opts, work_tx, size_stat))
         };
 
         for stat in stat_rx {
