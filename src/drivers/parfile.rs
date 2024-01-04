@@ -232,6 +232,9 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
             s.spawn(|| tree_walker(sources, dest, &opts, work_tx, sc))
         };
 
+        // Drop our copy of StatSender so that the last sender will
+        // close the channel.
+        drop(sender);
         for stat in stat_rx {
             match stat {
                 StatusUpdate::Size(s) => {
