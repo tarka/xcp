@@ -45,14 +45,6 @@ impl ProgressBar {
         }
     }
 
-    pub fn set_position(&self, size: u64) {
-        match self {
-            ProgressBar::Visual(pb) => pb.set_position(size),
-            ProgressBar::Nop => {}
-        }
-    }
-
-    #[allow(unused)]
     pub fn inc(&self, size: u64) {
         match self {
             ProgressBar::Visual(pb) => pb.inc(size),

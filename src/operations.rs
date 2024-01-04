@@ -30,7 +30,6 @@ use log::{debug, error};
 
 use crate::errors::{Result, XcpError};
 use crate::options::Opts;
-use crate::progress::{BatchUpdater, Updater};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Reflink {
@@ -84,9 +83,9 @@ impl CopyHandle {
         let mut written = 0u64;
         while written < len {
             let bytes_to_copy = cmp::min(len - written, self.opts.batch_size());
-            let result = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
-            written += result;
-            updates.send(StatusUpdate::Copied(result as u64), bytes_to_copy, self.opts.block_size)?;
+            let bytes = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
+            written += bytes;
+            updates.send(StatusUpdate::Copied(bytes))?;
         }
 
         Ok(written)
@@ -167,16 +166,10 @@ impl Drop for CopyHandle {
 pub enum StatusUpdate {
     Copied(u64),
     Size(u64),
+//    Error(XcpError)
 }
 
 impl StatusUpdate {
-    /// Return new instance of enum with updated value
-    pub fn set(&self, bytes: u64) -> StatusUpdate {
-        match self {
-            StatusUpdate::Copied(_) => StatusUpdate::Copied(bytes),
-            StatusUpdate::Size(_) => StatusUpdate::Size(bytes),
-        }
-    }
     /// Extract the value of enum.
     pub fn value(&self) -> u64 {
         match self {
@@ -192,28 +185,31 @@ static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone)]
 pub struct StatSender {
-    noop: bool,
     chan: cbc::Sender<StatusUpdate>,
+    opts: Arc<Opts>,
 }
 impl StatSender {
-    pub fn new(chan: cbc::Sender<StatusUpdate>, opts: &Opts) -> StatSender {
+    pub fn new(chan: cbc::Sender<StatusUpdate>, opts: &Arc<Opts>) -> StatSender {
         StatSender {
-            noop: opts.no_progress,
             chan,
+            opts: opts.clone(),
         }
     }
 
     // Wrapper around channel-send that groups updates together
-    pub fn send(&self, update: StatusUpdate, bytes: u64, bsize: u64) -> Result<()> {
-        if self.noop {
+    pub fn send(&self, update: StatusUpdate) -> Result<()> {
+        if self.opts.no_progress {
             return Ok(());
         }
-        // Avoid saturating the queue with small writes
-        let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
-        if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
-            Ok(self.chan.send(update)?)
-        } else {
-            Ok(())
+
+        if let StatusUpdate::Copied(bytes) = update {
+            // Avoid saturating the queue with small writes
+            let bsize = self.opts.block_size;
+            let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
+            if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
+                self.chan.send(update)?;
+            }
         }
+        Ok(())
     }
 }

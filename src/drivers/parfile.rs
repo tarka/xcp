@@ -159,7 +159,7 @@ fn copy_source(
         match FileType::from(meta.file_type()) {
             FileType::File => {
                 debug!("Send copy operation {:?} to {:?}", from, target);
-                updates.send(StatusUpdate::Size(meta.len()), meta.len(), opts.block_size)?;
+                updates.send(StatusUpdate::Size(meta.len()))?;
                 work_tx.send(Operation::Copy(from, target))?;
             }
 
@@ -268,8 +268,8 @@ fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
     handle.copy_file(&sender)?;
 
     // Gather the results as we go; close our end of the channel so it
-    // ends when drained. We drop our copy of StatSender so that the
-    // last sender will close the channel.
+    // ends when drained. Drop our copy of StatSender so that the last
+    // sender will close the channel.
     drop(sender);
     for r in stat_rx {
         pb.inc(r.value());

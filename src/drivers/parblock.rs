@@ -46,7 +46,7 @@ const fn supported_platform() -> bool {
                 target_os = "android",
                 target_os = "freebsd",
                 target_os = "netbsd",
-                target_os="dragonfly",
+                target_os = "dragonfly",
                 target_os = "macos",
             ))]
         {
@@ -112,7 +112,8 @@ fn queue_file_range(
             // FIXME: Move into CopyHandle once settled.
             let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64).unwrap();
 
-            stat_tx.send(StatusUpdate::Copied(r as u64), bytes, bsize).unwrap();
+            // FIXME: Handle error
+            stat_tx.send(StatusUpdate::Copied(r as u64)).unwrap();
         });
     }
     Ok(len)
@@ -169,10 +170,10 @@ fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
     let (stat_tx, stat_rx) = cbc::unbounded();
     let sender = StatSender::new(stat_tx, &opts);
     queue_file_blocks(source, dest, &pool, &sender, opts)?;
-    drop(sender);
 
     // Gather the results as we go; close our end of the channel so it
     // ends when drained.
+    drop(sender);
     for r in stat_rx {
         pb.inc(r.value());
     }
@@ -291,8 +292,8 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
 
     drop(file_tx);
     pb.set_size(total);
-    for up in stat_rx {
-        match up {
+    for stat in stat_rx {
+        match stat {
             StatusUpdate::Copied(v) => pb.inc(v),
             StatusUpdate::Size(v) => pb.inc_size(v),
         }
