@@ -160,3 +160,26 @@ impl Drop for CopyHandle {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum StatusUpdate {
+    Copied(u64),
+    Size(u64),
+}
+
+impl StatusUpdate {
+    /// Return new instance of enum with updated value
+    pub fn set(&self, bytes: u64) -> StatusUpdate {
+        match self {
+            StatusUpdate::Copied(_) => StatusUpdate::Copied(bytes),
+            StatusUpdate::Size(_) => StatusUpdate::Size(bytes),
+        }
+    }
+    /// Extract the value of enum.
+    pub fn value(&self) -> u64 {
+        match self {
+            StatusUpdate::Copied(v) => *v,
+            StatusUpdate::Size(v) => *v,
+        }
+    }
+}

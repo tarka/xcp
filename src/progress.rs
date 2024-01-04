@@ -17,28 +17,8 @@
 use crossbeam_channel as cbc;
 
 use crate::errors::Result;
+use crate::operations::StatusUpdate;
 use crate::options::Opts;
-
-#[derive(Debug, Clone)]
-pub enum StatusUpdate {
-    Copied(u64),
-    Size(u64),
-}
-
-impl StatusUpdate {
-    pub fn set(&self, bytes: u64) -> StatusUpdate {
-        match self {
-            StatusUpdate::Copied(_) => StatusUpdate::Copied(bytes),
-            StatusUpdate::Size(_) => StatusUpdate::Size(bytes),
-        }
-    }
-    pub fn value(&self) -> u64 {
-        match self {
-            StatusUpdate::Copied(v) => *v,
-            StatusUpdate::Size(v) => *v,
-        }
-    }
-}
 
 pub const BATCH_DEFAULT: u64 = 1024 * 1024 * 64;
 

@@ -32,10 +32,10 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::CopyHandle;
+use crate::operations::{CopyHandle, StatusUpdate};
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
-use crate::progress::{ProgressBar, StatusUpdate};
+use crate::progress::ProgressBar;
 use crate::utils::empty;
 
 // ********************************************************************** //

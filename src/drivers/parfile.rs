@@ -26,10 +26,10 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::CopyHandle;
+use crate::operations::{CopyHandle, StatusUpdate};
 use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
 use crate::progress::{
-    BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, StatusUpdate, Updater,
+    BatchUpdater, NopUpdater, ProgressBar, ProgressUpdater, Updater,
     BATCH_DEFAULT,
 };
 use crate::utils::empty;
