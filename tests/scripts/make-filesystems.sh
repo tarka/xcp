@@ -24,6 +24,8 @@ for fs in "$@"; do
     if [[ $fs != zfs ]]; then
         if [[ $fs = fat ]]; then
             sudo mount -o uid=$(id -u) $img $root
+        elif [[ $fs = ntfs ]]; then
+            sudo mount -o uid=$(id -u),permissions $img $root
         else
             sudo mount $img $root
         fi
