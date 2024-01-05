@@ -60,7 +60,6 @@ enum Operation {
     Copy(PathBuf, PathBuf),
     Link(PathBuf, PathBuf),
     Special(PathBuf, PathBuf),
-    End,
 }
 
 fn copy_worker(
@@ -74,7 +73,7 @@ fn copy_worker(
 
         match op {
             Operation::Copy(from, to) => {
-                info!("Worker: Copy {:?} -> {:?}", from, to);
+                info!("Worker[{:?}]: Copy {:?} -> {:?}", thread::current().id(), from, to);
                 // copy_file() sends back its own updates, but we should
                 // send back any errors as they may have occurred
                 // before the copy started..
@@ -88,19 +87,15 @@ fn copy_worker(
             }
 
             Operation::Link(from, to) => {
-                info!("Worker: Symlink {:?} -> {:?}", from, to);
+                info!("Worker[{:?}]: Symlink {:?} -> {:?}", thread::current().id(), from, to);
                 let _r = symlink(&from, &to);
             }
 
             Operation::Special(from, to) => {
-                info!("Worker: Special file {:?} -> {:?}", from, to);
+                info!("Worker[{:?}]: Special file {:?} -> {:?}", thread::current().id(), from, to);
                 copy_node(&from, &to)?;
             }
 
-            Operation::End => {
-                info!("Worker received shutdown command.");
-                break;
-            }
         }
     }
     debug!("Copy worker {:?} shutting down", thread::current().id());
@@ -146,7 +141,6 @@ fn copy_source(
         };
 
         if opts.no_clobber && target.exists() {
-            work_tx.send(Operation::End)?;
             updates.send(StatusUpdate::Error(
                 XcpError::DestinationExists("Destination file exists and --no-clobber is set.", target)))?;
             return Err(XcpError::EarlyShutdown("Path exists and --no-clobber set.").into());
@@ -197,7 +191,6 @@ fn tree_walker(
     for source in sources {
         copy_source(&source, dest, opts, &work_tx, &updates)?;
     }
-    work_tx.send(Operation::End)?;
     debug!("Walk-worker finished: {:?}", thread::current().id());
     Ok(())
 }
@@ -209,6 +202,18 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
 
     let (work_tx, work_rx) = cbc::unbounded();
 
+    // Thread which walks the file tree and sends jobs to the
+    // workers. The worker tx channel is moved to the walker so it is
+    // closed, which will cause the workers to shutdown on completion.
+    let _walk_worker = {
+        let sc = sender.clone();
+        let d = dest.to_path_buf();
+        let o = opts.clone();
+        thread::spawn(move || tree_walker(sources, &d, &o, work_tx, sc))
+    };
+
+    // Worker threads. Will consume work and then shutdown once the
+    // queue is closed by the walker.
     for _ in 0..opts.num_workers() {
         let _copy_worker = {
             let wrx = work_rx.clone();
@@ -217,13 +222,6 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
             thread::spawn(move || copy_worker(wrx, &o, sc))
         };
     }
-
-    let _walk_worker = {
-        let sc = sender.clone();
-        let d = dest.to_path_buf();
-        let o = opts.clone();
-        thread::spawn(move || tree_walker(sources, &d, &o, work_tx, sc))
-    };
 
     // Drop our copy of StatSender so that the last sender will close
     // the channel.
