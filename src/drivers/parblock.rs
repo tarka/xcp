@@ -34,7 +34,7 @@ use crate::errors::{Result, XcpError};
 use crate::operations::{CopyHandle, StatusUpdate, StatSender};
 use crate::options::{ignore_filter, parse_ignore, Opts};
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
-use crate::progress::ProgressBar;
+use crate::progress;
 use crate::utils::empty;
 
 // ********************************************************************** //
@@ -170,7 +170,7 @@ fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
-    let pb = ProgressBar::new(&opts, len)?;
+    let pb = progress::create_bar(&opts, len)?;
 
     let (stat_tx, stat_rx) = cbc::unbounded();
     let sender = StatSender::new(stat_tx, &opts);
@@ -226,7 +226,7 @@ fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<
 }
 
 fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
-    let pb = ProgressBar::new(&opts, 0)?;
+    let pb = progress::create_bar(&opts, 0)?;
     let mut total = 0;
 
     let (stat_tx, stat_rx) = cbc::unbounded::<StatusUpdate>();

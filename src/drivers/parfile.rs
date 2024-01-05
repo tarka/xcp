@@ -28,7 +28,7 @@ use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
 use crate::operations::{CopyHandle, StatusUpdate, StatSender};
 use crate::options::{ignore_filter, parse_ignore, Opts};
-use crate::progress::ProgressBar;
+use crate::progress;
 use crate::utils::empty;
 
 // ********************************************************************** //
@@ -204,7 +204,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
     let (stat_tx, stat_rx) = cbc::unbounded();
     let sender = StatSender::new(stat_tx, &opts);
 
-    let pb = ProgressBar::new(&opts, 0)?;
+    let pb = progress::create_bar(&opts, 0)?;
 
     // Use scoped threads here so we can pass down e.g. Opts without
     // repeated cloning.
@@ -253,7 +253,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
 
 fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
     let len = source.metadata()?.len();
-    let pb = ProgressBar::new(&opts, len)?;
+    let pb = progress::create_bar(&opts, len)?;
 
     let (stat_tx, stat_rx) = cbc::unbounded();
     let sender = StatSender::new(stat_tx, &opts);

@@ -17,54 +17,64 @@
 use crate::errors::Result;
 use crate::options::Opts;
 
-pub enum ProgressBar {
-    Visual(indicatif::ProgressBar),
-    Nop,
+struct NoopBar;
+
+struct VisualBar {
+    bar: indicatif::ProgressBar,
 }
 
-impl ProgressBar {
-    pub fn new(opts: &Opts, size: u64) -> Result<ProgressBar> {
-        match opts.no_progress {
-            true => Ok(ProgressBar::Nop),
-            false => iprogress_bar(size),
-        }
-    }
+pub trait ProgressBar {
+    fn set_size(&self, size: u64);
+    fn inc_size(&self, size: u64);
+    fn inc(&self, size: u64);
+    fn end(&self);
+}
 
-    #[allow(unused)]
-    pub fn set_size(&self, size: u64) {
-        match self {
-            ProgressBar::Visual(pb) => pb.set_length(size),
-            ProgressBar::Nop => {}
-        }
-    }
 
-    pub fn inc_size(&self, size: u64) {
-        match self {
-            ProgressBar::Visual(pb) => pb.inc_length(size),
-            ProgressBar::Nop => {}
-        }
+impl ProgressBar for NoopBar {
+    fn set_size(&self, _size: u64) {
     }
-
-    pub fn inc(&self, size: u64) {
-        match self {
-            ProgressBar::Visual(pb) => pb.inc(size),
-            ProgressBar::Nop => {}
-        }
+    fn inc_size(&self, _size: u64) {
     }
-
-    pub fn end(&self) {
-        match self {
-            ProgressBar::Visual(pb) => pb.finish(),
-            ProgressBar::Nop => {}
-        }
+    fn inc(&self, _size: u64) {
+    }
+    fn end(&self) {
     }
 }
 
-fn iprogress_bar(size: u64) -> Result<ProgressBar> {
-    let ipb = indicatif::ProgressBar::new(size).with_style(
-        indicatif::ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?
-            .progress_chars("#>-"),
-    );
-    Ok(ProgressBar::Visual(ipb))
+impl ProgressBar for VisualBar {
+    fn set_size(&self, size: u64) {
+        self.bar.set_length(size);
+    }
+
+    fn inc_size(&self, size: u64) {
+        self.bar.inc_length(size);
+    }
+
+    fn inc(&self, size: u64) {
+        self.bar.inc(size);
+    }
+
+    fn end(&self) {
+        self.bar.finish();
+    }
+}
+
+impl VisualBar {
+    fn new(size: u64) -> Result<Self> {
+        let bar = indicatif::ProgressBar::new(size).with_style(
+            indicatif::ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?
+                .progress_chars("#>-"),
+        );
+        Ok(Self { bar })
+    }
+}
+
+pub fn create_bar(opts: &Opts, size: u64) -> Result<Box<dyn ProgressBar>> {
+    if opts.no_progress {
+        Ok(Box::new(NoopBar {}))
+    } else {
+        Ok(Box::new(VisualBar::new(size)?))
+    }
 }
