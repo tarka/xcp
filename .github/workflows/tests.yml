@@ -19,24 +19,31 @@ jobs:
 
       - name: Run tests on ext2
         run: /fs/ext2/src/tests/scripts/test-linux.sh
+        if: always()
 
       - name: Run tests on ext4
         run: /fs/ext4/src/tests/scripts/test-linux.sh
+        if: always()
 
       - name: Run tests on XFS
         run: /fs/xfs/src/tests/scripts/test-linux.sh
+        if: always()
 
       - name: Run tests on btrfs
         run: /fs/btrfs/src/tests/scripts/test-linux.sh
+        if: always()
 
       - name: Run tests on ntfs
         run: /fs/ntfs/src/tests/scripts/test-linux.sh
+        if: always()
 
       - name: Run tests on fat
         run: /fs/fat/src/tests/scripts/test-linux.sh
+        if: always()
 
       - name: Run tests on ZFS
         run: /fs/zfs/src/tests/scripts/test-linux.sh
+        if: always()
 
   expensive:
     runs-on: ubuntu-latest
