@@ -28,7 +28,6 @@ use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
 use crate::operations::{CopyHandle, StatusUpdate, StatSender};
 use crate::options::{ignore_filter, parse_ignore, Opts};
-use crate::progress;
 use crate::utils::empty;
 
 // ********************************************************************** //
@@ -44,12 +43,39 @@ impl CopyDriver for Driver {
         })
     }
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path) -> Result<()> {
-        copy_all(sources, dest, &self.opts)
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: StatSender) -> Result<()> {
+        let (work_tx, work_rx) = cbc::unbounded();
+
+        // Thread which walks the file tree and sends jobs to the
+        // workers. The worker tx channel is moved to the walker so it is
+        // closed, which will cause the workers to shutdown on completion.
+        let _walk_worker = {
+            let sc = stats.clone();
+            let d = dest.to_path_buf();
+            let o = self.opts.clone();
+            thread::spawn(move || tree_walker(sources, &d, &o, work_tx, sc))
+        };
+
+        // Worker threads. Will consume work and then shutdown once the
+        // queue is closed by the walker.
+        for _ in 0..self.opts.num_workers() {
+            let _copy_worker = {
+                let wrx = work_rx.clone();
+                let sc = stats.clone();
+                let o = self.opts.clone();
+                thread::spawn(move || copy_worker(wrx, &o, sc))
+            };
+        }
+
+        // FIXME: We should probably join the threads and consume any errors.
+
+        Ok(())
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path) -> Result<()> {
-        copy_single_file(source, dest, &self.opts)
+    fn copy_single(&self, source: &Path, dest: &Path, stats: StatSender) -> Result<()> {
+        let handle = CopyHandle::new(source, dest, &self.opts)?;
+        handle.copy_file(&stats)?;
+        Ok(())
     }
 }
 
@@ -192,90 +218,5 @@ fn tree_walker(
         copy_source(&source, dest, opts, &work_tx, &updates)?;
     }
     debug!("Walk-worker finished: {:?}", thread::current().id());
-    Ok(())
-}
-
-pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
-    let (stat_tx, stat_rx) = cbc::unbounded();
-    let sender = StatSender::new(stat_tx, &opts);
-    let pb = progress::create_bar(&opts, 0)?;
-
-    let (work_tx, work_rx) = cbc::unbounded();
-
-    // Thread which walks the file tree and sends jobs to the
-    // workers. The worker tx channel is moved to the walker so it is
-    // closed, which will cause the workers to shutdown on completion.
-    let _walk_worker = {
-        let sc = sender.clone();
-        let d = dest.to_path_buf();
-        let o = opts.clone();
-        thread::spawn(move || tree_walker(sources, &d, &o, work_tx, sc))
-    };
-
-    // Worker threads. Will consume work and then shutdown once the
-    // queue is closed by the walker.
-    for _ in 0..opts.num_workers() {
-        let _copy_worker = {
-            let wrx = work_rx.clone();
-            let sc = sender.clone();
-            let o = opts.clone();
-            thread::spawn(move || copy_worker(wrx, &o, sc))
-        };
-    }
-
-    // Drop our copy of StatSender so that the last sender will close
-    // the channel.
-    drop(sender);
-    for stat in stat_rx {
-        match stat {
-            StatusUpdate::Copied(v) => {
-                pb.inc(v);
-            },
-            StatusUpdate::Size(v) => {
-                pb.inc_size(v);
-            },
-            StatusUpdate::Error(e) => {
-                // FIXME: Optional continue?
-                error!("Received error: {}", e);
-                return Err(e.into());
-            }
-        }
-    }
-
-    // FIXME: We should probably join the threads and consume any errors.
-
-    pb.end();
-    info!("Copy complete");
-
-    Ok(())
-}
-
-fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
-    let len = source.metadata()?.len();
-    let pb = progress::create_bar(&opts, len)?;
-
-    let (stat_tx, stat_rx) = cbc::unbounded();
-    let sender = StatSender::new(stat_tx, &opts);
-
-    let handle = CopyHandle::new(source, dest, opts)?;
-    handle.copy_file(&sender)?;
-
-    // Gather the results as we go; close our end of the channel so it
-    // ends when drained. Drop our copy of StatSender so that the last
-    // sender will close the channel.
-    drop(sender);
-    for stat in stat_rx {
-        match stat {
-            StatusUpdate::Copied(v) => pb.inc(v),
-            StatusUpdate::Size(v) => pb.inc_size(v),
-            StatusUpdate::Error(e) => {
-                // FIXME: Optional continue?
-                error!("Received error: {}", e);
-                return Err(e.into());
-            }
-        }
-    }
-    pb.end();
-
     Ok(())
 }

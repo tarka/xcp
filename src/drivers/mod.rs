@@ -24,12 +24,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::errors::{Result, XcpError};
+use crate::operations::StatSender;
 use crate::options::Opts;
 
 pub trait CopyDriver {
     fn new(opts: Arc<Opts>) -> Result<Self> where Self: Sized;
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path) -> Result<()>;
-    fn copy_single(&self, source: &Path, dest: &Path) -> Result<()>;
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: StatSender) -> Result<()>;
+    fn copy_single(&self, source: &Path, dest: &Path, stats: StatSender) -> Result<()>;
 }
 
 #[derive(Debug, Clone, Copy)]

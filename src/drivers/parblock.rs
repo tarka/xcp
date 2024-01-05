@@ -34,7 +34,6 @@ use crate::errors::{Result, XcpError};
 use crate::operations::{CopyHandle, StatusUpdate, StatSender};
 use crate::options::{ignore_filter, parse_ignore, Opts};
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
-use crate::progress;
 use crate::utils::empty;
 
 // ********************************************************************** //
@@ -71,16 +70,40 @@ impl CopyDriver for Driver {
         }
 
         Ok(Self {
-            opts
+            opts,
         })
     }
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path) -> Result<()> {
-        copy_all(sources, dest, &self.opts)
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: StatSender) -> Result<()> {
+        let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
+
+        // Start (single) dispatch worker
+
+        let _dispatcher = {
+            let q_opts = self.opts.clone();
+            let st = stats.clone();
+            thread::spawn(|| dispatch_worker(file_rx, st, q_opts))
+        };
+
+        tree_walker(sources, dest, &self.opts, file_tx, stats)?;
+
+        // Join the dispatch thread to ensure we pickup any errors not on
+        // the queue. Ideally this shouldn't happen though.
+        // dispatcher.join()
+        //     .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
+
+        Ok(())
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path) -> Result<()> {
-        copy_single_file(source, dest, &self.opts)
+    fn copy_single(&self, source: &Path, dest: &Path, stats: StatSender) -> Result<()> {
+        let nworkers = self.opts.num_workers();
+        let pool = ThreadPool::new(nworkers as usize);
+
+        queue_file_blocks(source, dest, &pool, &stats, &self.opts)?;
+
+        pool.join();
+
+        Ok(())
     }
 }
 
@@ -165,38 +188,6 @@ fn queue_file_blocks(
     }
 }
 
-fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
-    let nworkers = opts.num_workers();
-    let pool = ThreadPool::new(nworkers as usize);
-
-    let len = source.metadata()?.len();
-    let pb = progress::create_bar(&opts, len)?;
-
-    let (stat_tx, stat_rx) = cbc::unbounded();
-    let sender = StatSender::new(stat_tx, &opts);
-    queue_file_blocks(source, dest, &pool, &sender, opts)?;
-
-    // Gather the results as we go; close our end of the channel so it
-    // ends when drained.
-    drop(sender);
-    for stat in stat_rx {
-        match stat {
-            StatusUpdate::Copied(v) => pb.inc(v),
-            StatusUpdate::Size(v) => pb.inc_size(v),
-            StatusUpdate::Error(e) => {
-                // FIXME: Optional continue?
-                error!("Received error: {}", e);
-                return Err(e.into());
-            }
-        }
-    }
-
-    pool.join();
-    pb.end();
-
-    Ok(())
-}
-
 // Dispatch worker; receives queued files and hands them to
 // queue_file_blocks() which splits them onto the copy-pool.
 fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<Opts>) -> Result<()> {
@@ -225,18 +216,13 @@ fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<
     Ok(())
 }
 
-fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
-    let pb = progress::create_bar(&opts, 0)?;
-    let mut total = 0;
-
-    let (stat_tx, stat_rx) = cbc::unbounded::<StatusUpdate>();
-    let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
-    let stat_q = StatSender::new(stat_tx, &opts);
-
-    // Start (single) dispatch worker
-    let q_opts = opts.clone();
-    let dispatcher = thread::spawn(|| dispatch_worker(file_rx, stat_q, q_opts));
-
+fn tree_walker(
+    sources: Vec<PathBuf>,
+    dest: &Path,
+    opts: &Opts,
+    file_tx: cbc::Sender<CopyOp>,
+    stats: StatSender,
+) -> Result<()> {
     for source in sources {
         let sourcedir = source
             .components()
@@ -278,11 +264,11 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
             match FileType::from(meta.file_type()) {
                 FileType::File => {
                     debug!("Start copy operation {:?} to {:?}", from, target);
+                    stats.send(StatusUpdate::Size(meta.len()))?;
                     file_tx.send(CopyOp {
                         from,
                         target,
                     })?;
-                    total += meta.len();
                 }
 
                 FileType::Symlink => {
@@ -309,25 +295,6 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
         }
     }
 
-    drop(file_tx);
-    pb.set_size(total);
-    for stat in stat_rx {
-        match stat {
-            StatusUpdate::Copied(v) => pb.inc(v),
-            StatusUpdate::Size(v) => pb.inc_size(v),
-            StatusUpdate::Error(e) => {
-                // FIXME: Optional continue?
-                error!("Received error: {}", e);
-                return Err(e.into());
-            }
-        }
-    }
-    pb.end();
-
-    // Join the dispatch thread to ensure we pickup any errors not on
-    // the queue. Ideally this shouldn't happen though.
-    dispatcher.join()
-        .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
-
     Ok(())
 }
+
