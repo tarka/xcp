@@ -109,11 +109,16 @@ fn queue_file_range(
         let off = range.start + (blkn * bsize);
 
         pool.execute(move || {
-            // FIXME: Move into CopyHandle once settled.
-            let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64).unwrap();
-
-            // FIXME: Handle error
-            stat_tx.send(StatusUpdate::Copied(r as u64)).unwrap();
+            let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64);
+            match r {
+                Ok(bytes) => {
+                    stat_tx.send(StatusUpdate::Copied(bytes as u64)).unwrap();
+                }
+                Err(e) => {
+                    stat_tx.send(StatusUpdate::Error(XcpError::CopyError(e.to_string()))).unwrap();
+                    error!("Error copying: aborting.");
+                }
+            }
         });
     }
     Ok(len)
@@ -181,7 +186,7 @@ fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
             StatusUpdate::Error(e) => {
                 // FIXME: Optional continue?
                 error!("Received error: {}", e);
-                break;
+                return Err(e.into());
             }
         }
     }
@@ -205,7 +210,12 @@ fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<
         .queue_len(128)
         .build();
     for op in file_q {
-        queue_file_blocks(&op.from, &op.target, &copy_pool, &stat_q, &opts).unwrap();
+        let r = queue_file_blocks(&op.from, &op.target, &copy_pool, &stat_q, &opts);
+        if let Err(e) = r {
+            stat_q.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
+            error!("Dispatcher: Error copying {:?} -> {:?}.", op.from, op.target);
+            return Err(e)
+        }
     }
     info!("Queuing complete");
 
@@ -225,7 +235,7 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
 
     // Start (single) dispatch worker
     let q_opts = opts.clone();
-    let _dispatcher = thread::spawn(|| dispatch_worker(file_rx, stat_q, q_opts));
+    let dispatcher = thread::spawn(|| dispatch_worker(file_rx, stat_q, q_opts));
 
     for source in sources {
         let sourcedir = source
@@ -308,11 +318,16 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
             StatusUpdate::Error(e) => {
                 // FIXME: Optional continue?
                 error!("Received error: {}", e);
-                break;
+                return Err(e.into());
             }
         }
     }
     pb.end();
+
+    // Join the dispatch thread to ensure we pickup any errors not on
+    // the queue. Ideally this shouldn't happen though.
+    dispatcher.join()
+        .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
 
     Ok(())
 }
