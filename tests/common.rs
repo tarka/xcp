@@ -991,3 +991,28 @@ fn unreadable_file_error(drv: &str) {
 
     assert!(!out.status.success());
 }
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn dest_file_exists_not_writable(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+
+    {
+        create_file(&source_path, "falskjdfa;lskdjfa").unwrap();
+        File::create(&dest_path).unwrap();
+    }
+    set_permissions(&dest_path, Permissions::from_mode(0)).unwrap();
+
+    let out = run(&[
+        "--driver",
+        drv,
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(!out.status.success());
+}
+
