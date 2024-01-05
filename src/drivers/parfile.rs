@@ -80,13 +80,10 @@ fn copy_worker(
                 // before the copy started..
                 let r = CopyHandle::new(&from, &to, opts)
                     .and_then(|hdl| hdl.copy_file(&updates));
-                if r.is_err() {
-                    // FIXME: Send error here
-                    //updates.update(r)?;
-
+                if let Err(e) = r {
+                    updates.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
                     error!("Error copying: {:?} -> {:?}; aborting.", from, to);
-                    // TODO: Option to continue on error?
-                    break;
+                    return Err(e)
                 }
             }
 
@@ -147,12 +144,8 @@ fn copy_source(
 
         if opts.no_clobber && target.exists() {
             work_tx.send(Operation::End)?;
-            // FIXME: Replace with error send
-            // updates.update(Err(XcpError::DestinationExists(
-            //     "Destination file exists and --no-clobber is set.",
-            //     target,
-            // )
-            // .into()))?;
+            updates.send(StatusUpdate::Error(
+                XcpError::DestinationExists("Destination file exists and --no-clobber is set.", target)))?;
             return Err(XcpError::EarlyShutdown("Path exists and --no-clobber set.").into());
         }
 
@@ -211,11 +204,7 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
     let (stat_tx, stat_rx) = cbc::unbounded();
     let sender = StatSender::new(stat_tx, &opts);
 
-    let pb = if opts.no_progress {
-        ProgressBar::Nop
-    } else {
-        ProgressBar::new(&opts, 0)?
-    };
+    let pb = ProgressBar::new(&opts, 0)?;
 
     // Use scoped threads here so we can pass down e.g. Opts without
     // repeated cloning.
@@ -237,22 +226,27 @@ pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<
         drop(sender);
         for stat in stat_rx {
             match stat {
-                StatusUpdate::Size(s) => {
-                    pb.inc_size(s);
-                }
-                StatusUpdate::Copied(s) => {
-                    pb.inc(s);
+                StatusUpdate::Copied(v) => {
+                    pb.inc(v);
+                },
+                StatusUpdate::Size(v) => {
+                    pb.inc_size(v);
+                },
+                StatusUpdate::Error(e) => {
+                    // FIXME: Optional continue?
+                    error!("Received error: {}", e);
+                    return Err(e);
                 }
             }
         }
 
-        Ok::<(), anyhow::Error>(())
+        Ok(())
     })?;
 
     // FIXME: We should probably join the threads and consume any errors.
 
     pb.end();
-    debug!("Copy complete");
+    info!("Copy complete");
 
     Ok(())
 }
@@ -271,8 +265,16 @@ fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
     // ends when drained. Drop our copy of StatSender so that the last
     // sender will close the channel.
     drop(sender);
-    for r in stat_rx {
-        pb.inc(r.value());
+    for stat in stat_rx {
+        match stat {
+            StatusUpdate::Copied(v) => pb.inc(v),
+            StatusUpdate::Size(v) => pb.inc_size(v),
+            StatusUpdate::Error(e) => {
+                // FIXME: Optional continue?
+                error!("Received error: {}", e);
+                return Err(e.into());
+            }
+        }
     }
     pb.end();
 

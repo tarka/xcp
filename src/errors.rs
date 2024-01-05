@@ -18,8 +18,11 @@ use std::path::PathBuf;
 
 pub use anyhow::Result;
 
-#[derive(Clone, Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum XcpError {
+    #[error("Error during copy: {0}")]
+    CopyError(String),
+
     #[error("Destination Exists: {0}, {1}")]
     DestinationExists(&'static str, PathBuf),
 

@@ -162,21 +162,11 @@ impl Drop for CopyHandle {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum StatusUpdate {
     Copied(u64),
     Size(u64),
-//    Error(XcpError)
-}
-
-impl StatusUpdate {
-    /// Extract the value of enum.
-    pub fn value(&self) -> u64 {
-        match self {
-            StatusUpdate::Copied(v) => *v,
-            StatusUpdate::Size(v) => *v,
-        }
-    }
+    Error(XcpError)
 }
 
 // FIXME: We should probably abstract away more of the channel setup
@@ -198,10 +188,6 @@ impl StatSender {
 
     // Wrapper around channel-send that groups updates together
     pub fn send(&self, update: StatusUpdate) -> Result<()> {
-        if self.opts.no_progress {
-            return Ok(());
-        }
-
         if let StatusUpdate::Copied(bytes) = update {
             // Avoid saturating the queue with small writes
             let bsize = self.opts.block_size;
@@ -209,6 +195,8 @@ impl StatSender {
             if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
                 self.chan.send(update)?;
             }
+        } else {
+            self.chan.send(update)?;
         }
         Ok(())
     }

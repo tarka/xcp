@@ -174,9 +174,18 @@ fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
     // Gather the results as we go; close our end of the channel so it
     // ends when drained.
     drop(sender);
-    for r in stat_rx {
-        pb.inc(r.value());
+    for stat in stat_rx {
+        match stat {
+            StatusUpdate::Copied(v) => pb.inc(v),
+            StatusUpdate::Size(v) => pb.inc_size(v),
+            StatusUpdate::Error(e) => {
+                // FIXME: Optional continue?
+                error!("Received error: {}", e);
+                break;
+            }
+        }
     }
+
     pool.join();
     pb.end();
 
@@ -296,6 +305,11 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> 
         match stat {
             StatusUpdate::Copied(v) => pb.inc(v),
             StatusUpdate::Size(v) => pb.inc_size(v),
+            StatusUpdate::Error(e) => {
+                // FIXME: Optional continue?
+                error!("Received error: {}", e);
+                break;
+            }
         }
     }
     pb.end();
