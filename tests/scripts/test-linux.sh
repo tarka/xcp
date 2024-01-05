@@ -40,6 +40,7 @@ fuseblk)
     test_no_extents
     test_no_reflink
     test_no_sparse
+    test_no_perms
   )
   ;;
 
@@ -51,6 +52,7 @@ vfat)
     test_no_sparse
     test_no_symlinks
     test_no_xattr
+    test_no_perms
   )
   ;;
 

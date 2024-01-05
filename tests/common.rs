@@ -445,8 +445,8 @@ fn copy_empty_dir(drv: &str) {
     assert!(dest_base.join("mydir").is_dir());
 }
 
-#[test_case("parfile"; "Test with parallel file driver")]
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
 fn copy_all_dirs(drv: &str) {
     let dir = tempdir_rel().unwrap();
 
@@ -968,8 +968,9 @@ fn test_sockets_dir(drv: &str) {
     assert!(!ftype.is_file() && !ftype.is_dir() && !ftype.is_symlink());
 }
 
-#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[cfg_attr(all(feature = "parblock", not(feature = "test_no_perms")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_perms", ignore = "No FS support")]
 fn unreadable_file_error(drv: &str) {
     let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
@@ -992,8 +993,9 @@ fn unreadable_file_error(drv: &str) {
     assert!(!out.status.success());
 }
 
-#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[cfg_attr(all(feature = "parblock", not(feature = "test_no_perms")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_perms", ignore = "No FS support")]
 fn dest_file_exists_not_writable(drv: &str) {
     let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
