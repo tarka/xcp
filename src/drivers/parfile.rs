@@ -203,48 +203,46 @@ fn tree_walker(
 }
 
 pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
-    let (work_tx, work_rx) = cbc::unbounded();
     let (stat_tx, stat_rx) = cbc::unbounded();
     let sender = StatSender::new(stat_tx, &opts);
-
     let pb = progress::create_bar(&opts, 0)?;
 
-    // Use scoped threads here so we can pass down e.g. Opts without
-    // repeated cloning.
-    thread::scope(|s| {
-        for _ in 0..opts.num_workers() {
-            let _copy_worker = {
-                let wrx = work_rx.clone();
-                let sc = sender.clone();
-                s.spawn(move || copy_worker(wrx, opts, sc))
-            };
-        }
-        let _walk_worker = {
-            let sc = sender.clone();
-            s.spawn(|| tree_walker(sources, dest, &opts, work_tx, sc))
-        };
+    let (work_tx, work_rx) = cbc::unbounded();
 
-        // Drop our copy of StatSender so that the last sender will
-        // close the channel.
-        drop(sender);
-        for stat in stat_rx {
-            match stat {
-                StatusUpdate::Copied(v) => {
-                    pb.inc(v);
-                },
-                StatusUpdate::Size(v) => {
-                    pb.inc_size(v);
-                },
-                StatusUpdate::Error(e) => {
-                    // FIXME: Optional continue?
-                    error!("Received error: {}", e);
-                    return Err(e);
-                }
+    for _ in 0..opts.num_workers() {
+        let _copy_worker = {
+            let wrx = work_rx.clone();
+            let sc = sender.clone();
+            let o = opts.clone();
+            thread::spawn(move || copy_worker(wrx, &o, sc))
+        };
+    }
+
+    let _walk_worker = {
+        let sc = sender.clone();
+        let d = dest.to_path_buf();
+        let o = opts.clone();
+        thread::spawn(move || tree_walker(sources, &d, &o, work_tx, sc))
+    };
+
+    // Drop our copy of StatSender so that the last sender will close
+    // the channel.
+    drop(sender);
+    for stat in stat_rx {
+        match stat {
+            StatusUpdate::Copied(v) => {
+                pb.inc(v);
+            },
+            StatusUpdate::Size(v) => {
+                pb.inc_size(v);
+            },
+            StatusUpdate::Error(e) => {
+                // FIXME: Optional continue?
+                error!("Received error: {}", e);
+                return Err(e.into());
             }
         }
-
-        Ok(())
-    })?;
+    }
 
     // FIXME: We should probably join the threads and consume any errors.
 
