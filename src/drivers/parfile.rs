@@ -114,9 +114,12 @@ fn copy_source(
     work_tx: &cbc::Sender<Operation>,
     updates: &StatSender,
 ) -> Result<()> {
-    let sourcedir = source.components().last().ok_or(XcpError::InvalidSource(
-        "Failed to find source directory name.",
-    ))?;
+    let sourcedir = source
+        .components()
+        .last()
+        .ok_or(XcpError::InvalidSource(
+            "Failed to find source directory name.",
+        ))?;
 
     let target_base = if dest.exists() && !opts.no_target_directory {
         dest.join(sourcedir)
