@@ -19,7 +19,6 @@ use std::fs::{create_dir_all, read_link};
 use std::ops::Range;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
 
@@ -32,10 +31,10 @@ use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::CopyHandle;
-use crate::options::{ignore_filter, num_workers, parse_ignore, Opts};
+use crate::operations::{CopyHandle, StatusUpdate, StatSender};
+use crate::options::{ignore_filter, parse_ignore, Opts};
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
-use crate::progress::{ProgressBar, StatusUpdate};
+use crate::progress;
 use crate::utils::empty;
 
 // ********************************************************************** //
@@ -47,7 +46,7 @@ const fn supported_platform() -> bool {
                 target_os = "android",
                 target_os = "freebsd",
                 target_os = "netbsd",
-                target_os="dragonfly",
+                target_os = "dragonfly",
                 target_os = "macos",
             ))]
         {
@@ -59,70 +58,45 @@ const fn supported_platform() -> bool {
 }
 
 
-pub struct Driver;
+pub struct Driver {
+    opts: Arc<Opts>,
+}
 
-impl Driver {
-    pub fn new(_opts: &Opts) -> Result<Self> {
+impl CopyDriver for Driver {
+    fn new(opts: Arc<Opts>) -> Result<Self> {
         if !supported_platform() {
             let msg = "The parblock driver is not currently supported on this OS.";
             error!("{}", msg);
             return Err(XcpError::UnsupportedOS(msg).into());
         }
 
-        Ok(Self {})
-    }
-}
-
-impl CopyDriver for Driver {
-
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
-        copy_all(sources, dest, opts)
+        Ok(Self {
+            opts
+        })
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
-        copy_single_file(source, dest, opts)
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path) -> Result<()> {
+        copy_all(sources, dest, &self.opts)
+    }
+
+    fn copy_single(&self, source: &Path, dest: &Path) -> Result<()> {
+        copy_single_file(source, dest, &self.opts)
     }
 }
 
 // ********************************************************************** //
 
-// FIXME: We should probably move this to the progress-bar module and
-// abstract away more of the channel setup to be no-ops when
-// --no-progress is specified.
-static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
 
-#[derive(Clone)]
-struct Sender {
-    noop: bool,
-    chan: cbc::Sender<StatusUpdate>,
-}
-impl Sender {
-    fn new(chan: cbc::Sender<StatusUpdate>, opts: &Opts) -> Sender {
-        Sender {
-            noop: opts.no_progress,
-            chan,
-        }
-    }
-
-    fn send(&self, update: StatusUpdate, bytes: u64, bsize: u64) -> Result<()> {
-        if self.noop {
-            return Ok(());
-        }
-        // Avoid saturating the queue with small writes
-        let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
-        if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
-            Ok(self.chan.send(update)?)
-        } else {
-            Ok(())
-        }
-    }
+struct CopyOp {
+    from: PathBuf,
+    target: PathBuf,
 }
 
 fn queue_file_range(
     handle: &Arc<CopyHandle>,
     range: Range<u64>,
     pool: &ThreadPool,
-    status_channel: &Sender,
+    status_channel: &StatSender,
 ) -> Result<u64> {
     let len = range.end - range.start;
     let bsize = handle.opts.block_size;
@@ -135,22 +109,27 @@ fn queue_file_range(
         let off = range.start + (blkn * bsize);
 
         pool.execute(move || {
-            // FIXME: Move into CopyHandle once settled.
-            let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64).unwrap();
-
-            stat_tx.send(StatusUpdate::Copied(r as u64), bytes, bsize).unwrap();
+            let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64);
+            match r {
+                Ok(bytes) => {
+                    stat_tx.send(StatusUpdate::Copied(bytes as u64)).unwrap();
+                }
+                Err(e) => {
+                    stat_tx.send(StatusUpdate::Error(XcpError::CopyError(e.to_string()))).unwrap();
+                    error!("Error copying: aborting.");
+                }
+            }
         });
     }
     Ok(len)
 }
 
-
 fn queue_file_blocks(
     source: &Path,
     dest: &Path,
     pool: &ThreadPool,
-    status_channel: &Sender,
-    opts: Arc<Opts>,
+    status_channel: &StatSender,
+    opts: &Arc<Opts>,
 ) -> Result<u64> {
     let handle = CopyHandle::new(source, dest, opts)?;
     let len = handle.metadata.len();
@@ -160,10 +139,10 @@ fn queue_file_blocks(
         return Ok(len);
     }
 
-    // Put the open files in an Arc, which we drop once work has
-    // been queued. This will keep them open until all work has
-    // been consumed, then close them. (This may be overkill;
-    // opening the files in the workers would also be valid.)
+    // Put the open files in an Arc, which we drop once work has been
+    // queued. This will keep the files open until all work has been
+    // consumed, then close them. (This may be overkill; opening the
+    // files in the workers would also be valid.)
     let harc = Arc::new(handle);
 
     let queue_whole_file = || {
@@ -186,67 +165,83 @@ fn queue_file_blocks(
     }
 }
 
-fn copy_single_file(source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()> {
-    let nworkers = num_workers(&opts);
+fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
+    let nworkers = opts.num_workers();
     let pool = ThreadPool::new(nworkers as usize);
 
     let len = source.metadata()?.len();
-    let pb = ProgressBar::new(&opts, len)?;
+    let pb = progress::create_bar(&opts, len)?;
 
     let (stat_tx, stat_rx) = cbc::unbounded();
-    let sender = Sender::new(stat_tx, &opts);
+    let sender = StatSender::new(stat_tx, &opts);
     queue_file_blocks(source, dest, &pool, &sender, opts)?;
-    drop(sender);
 
     // Gather the results as we go; close our end of the channel so it
     // ends when drained.
-    for r in stat_rx {
-        pb.inc(r.value());
+    drop(sender);
+    for stat in stat_rx {
+        match stat {
+            StatusUpdate::Copied(v) => pb.inc(v),
+            StatusUpdate::Size(v) => pb.inc_size(v),
+            StatusUpdate::Error(e) => {
+                // FIXME: Optional continue?
+                error!("Received error: {}", e);
+                return Err(e.into());
+            }
+        }
     }
+
     pool.join();
     pb.end();
 
     Ok(())
 }
 
-struct CopyOp {
-    from: PathBuf,
-    target: PathBuf,
+// Dispatch worker; receives queued files and hands them to
+// queue_file_blocks() which splits them onto the copy-pool.
+fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<Opts>) -> Result<()> {
+    let nworkers = opts.num_workers() as usize;
+    let copy_pool = Builder::new()
+        .num_threads(nworkers)
+        // Use bounded queue for backpressure; this limits open
+        // files in-flight so we don't run out of file handles.
+        // FIXME: Number is arbitrary ATM, we should be able to
+        // calculate it from ulimits.
+        .queue_len(128)
+        .build();
+    for op in file_q {
+        let r = queue_file_blocks(&op.from, &op.target, &copy_pool, &stat_q, &opts);
+        if let Err(e) = r {
+            stat_q.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
+            error!("Dispatcher: Error copying {:?} -> {:?}.", op.from, op.target);
+            return Err(e)
+        }
+    }
+    info!("Queuing complete");
+
+    copy_pool.join();
+    info!("Pool complete");
+
+    Ok(())
 }
 
-
-fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
-    let pb = ProgressBar::new(&opts, 0)?;
+fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
+    let pb = progress::create_bar(&opts, 0)?;
     let mut total = 0;
 
-    let nworkers = num_workers(&opts) as usize;
     let (stat_tx, stat_rx) = cbc::unbounded::<StatusUpdate>();
-
     let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
-    let sender = Sender::new(stat_tx, &opts);
-    let q_opts = opts.clone();
-    let _dispatcher = thread::spawn(move || {
-        let pool = Builder::new()
-            .num_threads(nworkers)
-            // Use bounded queue for backpressure; this limits open
-            // files in-flight so we don't run out of file handles.
-            // FIXME: Number is arbitrary ATM, we should be able to
-            // calculate it from ulimits.
-            .queue_len(128)
-            .build();
-        for op in file_rx {
-            queue_file_blocks(&op.from, &op.target, &pool, &sender, q_opts.clone()).unwrap();
-        }
-        info!("Queuing complete");
+    let stat_q = StatSender::new(stat_tx, &opts);
 
-        pool.join();
-        info!("Pool complete");
-    });
+    // Start (single) dispatch worker
+    let q_opts = opts.clone();
+    let dispatcher = thread::spawn(|| dispatch_worker(file_rx, stat_q, q_opts));
 
     for source in sources {
-        let sourcedir = source.components().last().ok_or(XcpError::InvalidSource(
-            "Failed to find source directory name.",
-        ))?;
+        let sourcedir = source
+            .components()
+            .last()
+            .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
 
         let target_base = if dest.exists() {
             dest.join(sourcedir)
@@ -255,7 +250,7 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
         };
         debug!("Target base is {:?}", target_base);
 
-        let gitignore = parse_ignore(&source, &opts.clone())?;
+        let gitignore = parse_ignore(&source, &opts)?;
 
         for entry in WalkDir::new(&source)
             .into_iter()
@@ -316,13 +311,23 @@ fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()> {
 
     drop(file_tx);
     pb.set_size(total);
-    for up in stat_rx {
-        match up {
+    for stat in stat_rx {
+        match stat {
             StatusUpdate::Copied(v) => pb.inc(v),
             StatusUpdate::Size(v) => pb.inc_size(v),
+            StatusUpdate::Error(e) => {
+                // FIXME: Optional continue?
+                error!("Received error: {}", e);
+                return Err(e.into());
+            }
         }
     }
     pb.end();
+
+    // Join the dispatch thread to ensure we pickup any errors not on
+    // the queue. Ideally this shouldn't happen though.
+    dispatcher.join()
+        .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
 
     Ok(())
 }

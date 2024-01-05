@@ -20,7 +20,9 @@ use std::path::Path;
 use std::result;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
+use crossbeam_channel as cbc;
 use libfs::{
     allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync, reflink,
 };
@@ -28,7 +30,6 @@ use log::{debug, error};
 
 use crate::errors::{Result, XcpError};
 use crate::options::Opts;
-use crate::progress::{BatchUpdater, Updater};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Reflink {
@@ -60,7 +61,7 @@ pub struct CopyHandle {
 }
 
 impl CopyHandle {
-    pub fn new(from: &Path, to: &Path, opts: Arc<Opts>) -> Result<CopyHandle> {
+    pub fn new(from: &Path, to: &Path, opts: &Arc<Opts>) -> Result<CopyHandle> {
         let infd = File::open(from)?;
         let metadata = infd.metadata()?;
 
@@ -78,20 +79,20 @@ impl CopyHandle {
     }
 
     /// Copy len bytes from wherever the descriptor cursors are set.
-    fn copy_bytes(&self, len: u64, updates: &mut BatchUpdater) -> Result<u64> {
+    fn copy_bytes(&self, len: u64, updates: &StatSender) -> Result<u64> {
         let mut written = 0u64;
         while written < len {
-            let bytes_to_copy = cmp::min(len - written, updates.batch_size);
-            let result = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
-            written += result;
-            updates.update(Ok(result))?;
+            let bytes_to_copy = cmp::min(len - written, self.opts.batch_size());
+            let bytes = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
+            written += bytes;
+            updates.send(StatusUpdate::Copied(bytes))?;
         }
 
         Ok(written)
     }
 
     /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
-    fn copy_sparse(&self, updates: &mut BatchUpdater) -> Result<u64> {
+    fn copy_sparse(&self, updates: &StatSender) -> Result<u64> {
         let len = self.metadata.len();
         let mut pos = 0;
 
@@ -127,7 +128,7 @@ impl CopyHandle {
         }
     }
 
-    pub fn copy_file(&self, updates: &mut BatchUpdater) -> Result<u64> {
+    pub fn copy_file(&self, updates: &StatSender) -> Result<u64> {
         if self.try_reflink()? {
             return Ok(self.metadata.len());
         }
@@ -158,5 +159,45 @@ impl Drop for CopyHandle {
         if let Err(e) = self.finalise_copy() {
             error!("Error during finalising copy operation {:?} -> {:?}: {}", self.infd, self.outfd, e);
         }
+    }
+}
+
+#[derive(Debug)]
+pub enum StatusUpdate {
+    Copied(u64),
+    Size(u64),
+    Error(XcpError)
+}
+
+// FIXME: We should probably abstract away more of the channel setup
+// to be no-ops when --no-progress is specified.
+static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Clone)]
+pub struct StatSender {
+    chan: cbc::Sender<StatusUpdate>,
+    opts: Arc<Opts>,
+}
+impl StatSender {
+    pub fn new(chan: cbc::Sender<StatusUpdate>, opts: &Arc<Opts>) -> StatSender {
+        StatSender {
+            chan,
+            opts: opts.clone(),
+        }
+    }
+
+    // Wrapper around channel-send that groups updates together
+    pub fn send(&self, update: StatusUpdate) -> Result<()> {
+        if let StatusUpdate::Copied(bytes) = update {
+            // Avoid saturating the queue with small writes
+            let bsize = self.opts.block_size;
+            let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
+            if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
+                self.chan.send(update)?;
+            }
+        } else {
+            self.chan.send(update)?;
+        }
+        Ok(())
     }
 }

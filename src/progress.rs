@@ -14,149 +14,67 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crossbeam_channel as cbc;
-
 use crate::errors::Result;
 use crate::options::Opts;
 
-#[derive(Debug, Clone)]
-pub enum StatusUpdate {
-    Copied(u64),
-    Size(u64),
+struct NoopBar;
+
+struct VisualBar {
+    bar: indicatif::ProgressBar,
 }
 
-impl StatusUpdate {
-    pub fn set(&self, bytes: u64) -> StatusUpdate {
-        match self {
-            StatusUpdate::Copied(_) => StatusUpdate::Copied(bytes),
-            StatusUpdate::Size(_) => StatusUpdate::Size(bytes),
-        }
+pub trait ProgressBar {
+    fn set_size(&self, size: u64);
+    fn inc_size(&self, size: u64);
+    fn inc(&self, size: u64);
+    fn end(&self);
+}
+
+
+impl ProgressBar for NoopBar {
+    fn set_size(&self, _size: u64) {
     }
-    pub fn value(&self) -> u64 {
-        match self {
-            StatusUpdate::Copied(v) => *v,
-            StatusUpdate::Size(v) => *v,
-        }
+    fn inc_size(&self, _size: u64) {
     }
-}
-
-pub const BATCH_DEFAULT: u64 = 1024 * 1024 * 64;
-
-pub trait Updater<T> {
-    fn update(&mut self, update: T) -> Result<()>;
-}
-
-pub struct BatchUpdater {
-    pub sender: Box<dyn Updater<Result<StatusUpdate>> + Send>,
-    pub stat: StatusUpdate,
-    pub batch_size: u64,
-}
-
-impl Updater<Result<u64>> for BatchUpdater {
-    fn update(&mut self, status: Result<u64>) -> Result<()> {
-        match status {
-            Ok(bytes) => {
-                let curr = self.stat.value() + bytes;
-                self.stat = self.stat.set(curr);
-
-                if curr >= self.batch_size {
-                    self.sender.update(Ok(self.stat.clone()))?;
-                    self.stat = self.stat.set(0);
-                }
-            }
-            Err(e) => {
-                self.sender.update(Err(e))?;
-            }
-        }
-        Ok(())
+    fn inc(&self, _size: u64) {
+    }
+    fn end(&self) {
     }
 }
 
-impl Updater<Result<StatusUpdate>> for cbc::Sender<Result<StatusUpdate>> {
-    fn update(&mut self, update: Result<StatusUpdate>) -> Result<()> {
-        Ok(self.send(update)?)
+impl ProgressBar for VisualBar {
+    fn set_size(&self, size: u64) {
+        self.bar.set_length(size);
+    }
+
+    fn inc_size(&self, size: u64) {
+        self.bar.inc_length(size);
+    }
+
+    fn inc(&self, size: u64) {
+        self.bar.inc(size);
+    }
+
+    fn end(&self) {
+        self.bar.finish();
     }
 }
 
-pub struct NopUpdater;
-
-impl Updater<Result<StatusUpdate>> for NopUpdater {
-    fn update(&mut self, _update: Result<StatusUpdate>) -> Result<()> {
-        Ok(())
+impl VisualBar {
+    fn new(size: u64) -> Result<Self> {
+        let bar = indicatif::ProgressBar::new(size).with_style(
+            indicatif::ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?
+                .progress_chars("#>-"),
+        );
+        Ok(Self { bar })
     }
 }
 
-pub struct ProgressUpdater {
-    pub pb: ProgressBar,
-    pub written: u64,
-}
-
-impl Updater<Result<StatusUpdate>> for ProgressUpdater {
-    fn update(&mut self, update: Result<StatusUpdate>) -> Result<()> {
-        if let Ok(StatusUpdate::Copied(bytes)) = update {
-            self.written += bytes;
-            self.pb.set_position(self.written);
-        }
-        Ok(())
+pub fn create_bar(opts: &Opts, size: u64) -> Result<Box<dyn ProgressBar>> {
+    if opts.no_progress {
+        Ok(Box::new(NoopBar {}))
+    } else {
+        Ok(Box::new(VisualBar::new(size)?))
     }
-}
-
-pub enum ProgressBar {
-    Visual(indicatif::ProgressBar),
-    Nop,
-}
-
-impl ProgressBar {
-    pub fn new(opts: &Opts, size: u64) -> Result<ProgressBar> {
-        match opts.no_progress {
-            true => Ok(ProgressBar::Nop),
-            false => iprogress_bar(size),
-        }
-    }
-
-    #[allow(unused)]
-    pub fn set_size(&self, size: u64) {
-        match self {
-            ProgressBar::Visual(pb) => pb.set_length(size),
-            ProgressBar::Nop => {}
-        }
-    }
-
-    pub fn inc_size(&self, size: u64) {
-        match self {
-            ProgressBar::Visual(pb) => pb.inc_length(size),
-            ProgressBar::Nop => {}
-        }
-    }
-
-    pub fn set_position(&self, size: u64) {
-        match self {
-            ProgressBar::Visual(pb) => pb.set_position(size),
-            ProgressBar::Nop => {}
-        }
-    }
-
-    #[allow(unused)]
-    pub fn inc(&self, size: u64) {
-        match self {
-            ProgressBar::Visual(pb) => pb.inc(size),
-            ProgressBar::Nop => {}
-        }
-    }
-
-    pub fn end(&self) {
-        match self {
-            ProgressBar::Visual(pb) => pb.finish(),
-            ProgressBar::Nop => {}
-        }
-    }
-}
-
-fn iprogress_bar(size: u64) -> Result<ProgressBar> {
-    let ipb = indicatif::ProgressBar::new(size).with_style(
-        indicatif::ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?
-            .progress_chars("#>-"),
-    );
-    Ok(ProgressBar::Visual(ipb))
 }

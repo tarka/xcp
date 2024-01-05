@@ -27,8 +27,9 @@ use crate::errors::{Result, XcpError};
 use crate::options::Opts;
 
 pub trait CopyDriver {
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, opts: Arc<Opts>) -> Result<()>;
-    fn copy_single(&self, source: &Path, dest: &Path, opts: Arc<Opts>) -> Result<()>;
+    fn new(opts: Arc<Opts>) -> Result<Self> where Self: Sized;
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path) -> Result<()>;
+    fn copy_single(&self, source: &Path, dest: &Path) -> Result<()>;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -51,11 +52,11 @@ impl FromStr for Drivers {
     }
 }
 
-pub fn load_driver(opts: &Opts) -> Result<Box<dyn CopyDriver>> {
+pub fn load_driver(opts: &Arc<Opts>) -> Result<Box<dyn CopyDriver>> {
     let driver: Box<dyn CopyDriver> = match opts.driver {
-        Drivers::ParFile => Box::new(parfile::Driver::new(opts)?),
+        Drivers::ParFile => Box::new(parfile::Driver::new(opts.clone())?),
         #[cfg(feature = "parblock")]
-        Drivers::ParBlock => Box::new(parblock::Driver::new(opts)?),
+        Drivers::ParBlock => Box::new(parblock::Driver::new(opts.clone())?),
     };
 
     Ok(driver)
