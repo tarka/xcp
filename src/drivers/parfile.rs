@@ -16,19 +16,16 @@
 
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
-use libfs::{FileType, copy_node};
-use std::fs::{create_dir_all, read_link};
+use libfs::copy_node;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
-use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{CopyHandle, StatusUpdate, StatSender};
-use crate::options::{ignore_filter, parse_ignore, Opts};
-use crate::utils::empty;
+use crate::operations::{CopyHandle, StatusUpdate, StatSender, Operation, tree_walker};
+use crate::options::Opts;
 
 // ********************************************************************** //
 
@@ -81,13 +78,6 @@ impl CopyDriver for Driver {
 
 // ********************************************************************** //
 
-#[derive(Debug)]
-enum Operation {
-    Copy(PathBuf, PathBuf),
-    Link(PathBuf, PathBuf),
-    Special(PathBuf, PathBuf),
-}
-
 fn copy_worker(
     work: cbc::Receiver<Operation>,
     opts: &Arc<Opts>,
@@ -125,98 +115,5 @@ fn copy_worker(
         }
     }
     debug!("Copy worker {:?} shutting down", thread::current().id());
-    Ok(())
-}
-
-fn copy_source(
-    source: &Path,
-    dest: &Path,
-    opts: &Opts,
-    work_tx: &cbc::Sender<Operation>,
-    updates: &StatSender,
-) -> Result<()> {
-    let sourcedir = source
-        .components()
-        .last()
-        .ok_or(XcpError::InvalidSource(
-            "Failed to find source directory name.",
-        ))?;
-
-    let target_base = if dest.exists() && !opts.no_target_directory {
-        dest.join(sourcedir)
-    } else {
-        dest.to_path_buf()
-    };
-    debug!("Target base is {:?}", target_base);
-
-    let gitignore = parse_ignore(source, opts)?;
-
-    for entry in WalkDir::new(source)
-        .into_iter()
-        .filter_entry(|e| ignore_filter(e, &gitignore))
-    {
-        debug!("Got tree entry {:?}", entry);
-        let e = entry?;
-        let from = e.into_path();
-        let meta = from.symlink_metadata()?;
-        let path = from.strip_prefix(source)?;
-        let target = if !empty(path) {
-            target_base.join(path)
-        } else {
-            target_base.clone()
-        };
-
-        if opts.no_clobber && target.exists() {
-            updates.send(StatusUpdate::Error(
-                XcpError::DestinationExists("Destination file exists and --no-clobber is set.", target)))?;
-            return Err(XcpError::EarlyShutdown("Path exists and --no-clobber set.").into());
-        }
-
-        match FileType::from(meta.file_type()) {
-            FileType::File => {
-                debug!("Send copy operation {:?} to {:?}", from, target);
-                updates.send(StatusUpdate::Size(meta.len()))?;
-                work_tx.send(Operation::Copy(from, target))?;
-            }
-
-            FileType::Symlink => {
-                let lfile = read_link(from)?;
-                debug!("Send symlink operation {:?} to {:?}", lfile, target);
-                work_tx.send(Operation::Link(lfile, target))?;
-            }
-
-            FileType::Dir => {
-                debug!("Creating target directory {:?}", target);
-                create_dir_all(&target)?;
-            }
-
-            FileType::Socket | FileType::Char | FileType::Fifo => {
-                debug!("Special file found: {:?} to {:?}", from, target);
-                work_tx.send(Operation::Special(from, target))?;
-            }
-
-            FileType::Other => {
-                error!("Unknown filetype found; this should never happen!");
-                return Err(XcpError::UnknownFileType(target).into());
-            }
-        };
-    }
-
-    Ok(())
-}
-
-fn tree_walker(
-    sources: Vec<PathBuf>,
-    dest: &Path,
-    opts: &Opts,
-    work_tx: cbc::Sender<Operation>,
-    updates: StatSender,
-) -> Result<()> {
-    debug!("Starting walk worker {:?}", thread::current().id());
-
-    for source in sources {
-        copy_source(&source, dest, opts, &work_tx, &updates)?;
-    }
-    debug!("Walk-worker finished: {:?}", thread::current().id());
     Ok(())
 }

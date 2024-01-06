@@ -15,7 +15,6 @@
  */
 
 use std::cmp;
-use std::fs::{create_dir_all, read_link};
 use std::ops::Range;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -24,17 +23,15 @@ use std::thread;
 
 use cfg_if::cfg_if;
 use crossbeam_channel as cbc;
-use libfs::{FileType, copy_node};
-use log::{debug, error, info};
+use libfs::copy_node;
+use log::{error, info};
 use blocking_threadpool::{Builder, ThreadPool};
-use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{CopyHandle, StatusUpdate, StatSender};
-use crate::options::{ignore_filter, parse_ignore, Opts};
+use crate::operations::{CopyHandle, StatusUpdate, StatSender, Operation, tree_walker};
+use crate::options::Opts;
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
-use crate::utils::empty;
 
 // ********************************************************************** //
 
@@ -75,7 +72,7 @@ impl CopyDriver for Driver {
     }
 
     fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: StatSender) -> Result<()> {
-        let (file_tx, file_rx) = cbc::unbounded::<CopyOp>();
+        let (file_tx, file_rx) = cbc::unbounded::<Operation>();
 
         // Start (single) dispatch worker
 
@@ -108,12 +105,6 @@ impl CopyDriver for Driver {
 }
 
 // ********************************************************************** //
-
-
-struct CopyOp {
-    from: PathBuf,
-    target: PathBuf,
-}
 
 fn queue_file_range(
     handle: &Arc<CopyHandle>,
@@ -190,7 +181,7 @@ fn queue_file_blocks(
 
 // Dispatch worker; receives queued files and hands them to
 // queue_file_blocks() which splits them onto the copy-pool.
-fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<Opts>) -> Result<()> {
+fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: StatSender, opts: Arc<Opts>) -> Result<()> {
     let nworkers = opts.num_workers() as usize;
     let copy_pool = Builder::new()
         .num_threads(nworkers)
@@ -201,11 +192,32 @@ fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<
         .queue_len(128)
         .build();
     for op in file_q {
-        let r = queue_file_blocks(&op.from, &op.target, &copy_pool, &stat_q, &opts);
-        if let Err(e) = r {
-            stat_q.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
-            error!("Dispatcher: Error copying {:?} -> {:?}.", op.from, op.target);
-            return Err(e)
+        match op {
+            Operation::Copy(from, to) => {
+                info!("Dispatch[{:?}]: Copy {:?} -> {:?}", thread::current().id(), from, to);
+                let r = queue_file_blocks(&from, &to, &copy_pool, &stats, &opts);
+                if let Err(e) = r {
+                    stats.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
+                    error!("Dispatcher: Error copying {:?} -> {:?}.", from, to);
+                    return Err(e)
+                }
+            }
+
+            // Inline the following operations as the should be near-instant.
+            Operation::Link(from, to) => {
+                info!("Dispatch[{:?}]: Symlink {:?} -> {:?}", thread::current().id(), from, to);
+                let r = symlink(&from, &to);
+                if let Err(e) = r {
+                    stats.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
+                    error!("Error symlinking: {:?} -> {:?}; aborting.", from, to);
+                    return Err(e.into())
+                }
+            }
+
+            Operation::Special(from, to) => {
+                info!("Dispatch[{:?}]: Special file {:?} -> {:?}", thread::current().id(), from, to);
+                copy_node(&from, &to)?;
+            }
         }
     }
     info!("Queuing complete");
@@ -215,86 +227,3 @@ fn dispatch_worker(file_q: cbc::Receiver<CopyOp>, stat_q: StatSender, opts: Arc<
 
     Ok(())
 }
-
-fn tree_walker(
-    sources: Vec<PathBuf>,
-    dest: &Path,
-    opts: &Opts,
-    file_tx: cbc::Sender<CopyOp>,
-    stats: StatSender,
-) -> Result<()> {
-    for source in sources {
-        let sourcedir = source
-            .components()
-            .last()
-            .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
-
-        let target_base = if dest.exists() {
-            dest.join(sourcedir)
-        } else {
-            dest.to_path_buf()
-        };
-        debug!("Target base is {:?}", target_base);
-
-        let gitignore = parse_ignore(&source, &opts)?;
-
-        for entry in WalkDir::new(&source)
-            .into_iter()
-            .filter_entry(|e| ignore_filter(e, &gitignore))
-        {
-            debug!("Got tree entry {:?}", entry);
-            let e = entry?;
-            let from = e.into_path();
-            let meta = from.symlink_metadata()?;
-            let path = from.strip_prefix(&source)?;
-            let target = if !empty(path) {
-                target_base.join(path)
-            } else {
-                target_base.clone()
-            };
-
-            if opts.no_clobber && target.exists() {
-                return Err(XcpError::DestinationExists(
-                    "Destination file exists and --no-clobber is set.",
-                    target,
-                )
-                .into());
-            }
-
-            match FileType::from(meta.file_type()) {
-                FileType::File => {
-                    debug!("Start copy operation {:?} to {:?}", from, target);
-                    stats.send(StatusUpdate::Size(meta.len()))?;
-                    file_tx.send(CopyOp {
-                        from,
-                        target,
-                    })?;
-                }
-
-                FileType::Symlink => {
-                    let lfile = read_link(from)?;
-                    debug!("Creating symlink from {:?} to {:?}", lfile, target);
-                    let _r = symlink(&lfile, &target);
-                }
-
-                FileType::Dir => {
-                    debug!("Creating target directory {:?}", target);
-                    create_dir_all(&target)?;
-                }
-
-                FileType::Socket | FileType::Char | FileType::Fifo => {
-                    debug!("Copy special file {:?} to {:?}", from, target);
-                    copy_node(&from, &target)?;
-                }
-
-                FileType::Other => {
-                    error!("Unknown filetype found; this should never happen!");
-                    return Err(XcpError::UnknownFileType(target).into());
-                }
-            };
-        }
-    }
-
-    Ok(())
-}
-

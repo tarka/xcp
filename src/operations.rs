@@ -14,9 +14,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::cmp;
-use std::fs::{File, Metadata};
-use std::path::Path;
+use std::{cmp, thread};
+use std::fs::{File, Metadata, read_link, create_dir_all};
+use std::path::{Path, PathBuf};
 use std::result;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -24,12 +24,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crossbeam_channel as cbc;
 use libfs::{
-    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync, reflink,
+    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync, reflink, FileType,
 };
 use log::{debug, error};
+use walkdir::WalkDir;
 
 use crate::errors::{Result, XcpError};
-use crate::options::Opts;
+use crate::options::{Opts, parse_ignore, ignore_filter};
+use crate::utils::empty;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Reflink {
@@ -200,4 +202,95 @@ impl StatSender {
         }
         Ok(())
     }
+}
+
+#[derive(Debug)]
+pub enum Operation {
+    Copy(PathBuf, PathBuf),
+    Link(PathBuf, PathBuf),
+    Special(PathBuf, PathBuf),
+}
+
+pub fn tree_walker(
+    sources: Vec<PathBuf>,
+    dest: &Path,
+    opts: &Opts,
+    work_tx: cbc::Sender<Operation>,
+    stats: StatSender,
+) -> Result<()> {
+    debug!("Starting walk worker {:?}", thread::current().id());
+
+    for source in sources {
+        let sourcedir = source
+            .components()
+            .last()
+            .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
+
+        let target_base = if dest.exists() && !opts.no_target_directory {
+            dest.join(sourcedir)
+        } else {
+            dest.to_path_buf()
+        };
+        debug!("Target base is {:?}", target_base);
+
+        let gitignore = parse_ignore(&source, opts)?;
+
+        for entry in WalkDir::new(&source)
+            .into_iter()
+            .filter_entry(|e| ignore_filter(e, &gitignore))
+        {
+            debug!("Got tree entry {:?}", entry);
+            let e = entry?;
+            let from = e.into_path();
+            let meta = from.symlink_metadata()?;
+            let path = from.strip_prefix(&source)?;
+            let target = if !empty(path) {
+                target_base.join(path)
+            } else {
+                target_base.clone()
+            };
+
+            if opts.no_clobber && target.exists() {
+                let msg = "Destination file exists and --no-clobber is set.";
+                stats.send(StatusUpdate::Error(
+                    XcpError::DestinationExists(msg, target)))?;
+                return Err(XcpError::EarlyShutdown(msg).into());
+            }
+
+            match FileType::from(meta.file_type()) {
+                FileType::File => {
+                    debug!("Send copy operation {:?} to {:?}", from, target);
+                    stats.send(StatusUpdate::Size(meta.len()))?;
+                    work_tx.send(Operation::Copy(from, target))?;
+                }
+
+                FileType::Symlink => {
+                    let lfile = read_link(from)?;
+                    debug!("Send symlink operation {:?} to {:?}", lfile, target);
+                    work_tx.send(Operation::Link(lfile, target))?;
+                }
+
+                FileType::Dir => {
+                    // Create dir tree immediately as we can't
+                    // guarantee a worker will action the creation
+                    // before a subsequent copy operation requires it.
+                    debug!("Creating target directory {:?}", target);
+                    create_dir_all(&target)?;
+                }
+
+                FileType::Socket | FileType::Char | FileType::Fifo => {
+                    debug!("Special file found: {:?} to {:?}", from, target);
+                    work_tx.send(Operation::Special(from, target))?;
+                }
+
+                FileType::Other => {
+                    error!("Unknown filetype found; this should never happen!");
+                    return Err(XcpError::UnknownFileType(target).into());
+                }
+            };
+        }
+    }
+    debug!("Walk-worker finished: {:?}", thread::current().id());
+
+    Ok(())
 }
