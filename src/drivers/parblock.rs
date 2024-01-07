@@ -24,7 +24,7 @@ use std::thread;
 use cfg_if::cfg_if;
 use crossbeam_channel as cbc;
 use libfs::copy_node;
-use log::{error, info, debug};
+use log::{error, info};
 use blocking_threadpool::{Builder, ThreadPool};
 
 use crate::drivers::CopyDriver;
