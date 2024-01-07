@@ -28,28 +28,33 @@ use crossbeam_channel as cbc;
 use libfs::is_same_file;
 use log::{error, info};
 use operations::{StatSender, StatusUpdate};
+use options::Opts;
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
 use crate::drivers::load_driver;
 use crate::errors::{Result, XcpError};
 
-fn main() -> Result<()> {
-    let opts = Arc::new(options::parse_args()?);
-
+fn init_logging(opts: &Opts) -> Result<()> {
     let log_level = match opts.verbose {
         0 => LevelFilter::Warn,
         1 => LevelFilter::Info,
         2 => LevelFilter::Debug,
         _ => LevelFilter::Trace,
     };
+
     TermLogger::init(
         log_level,
         Config::default(),
         TerminalMode::Mixed,
         ColorChoice::Auto,
-    )
-    .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
+    ).or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let opts = Arc::new(options::parse_args()?);
+    init_logging(&opts)?;
 
     let (dest, source_patterns) = opts
         .paths
@@ -149,7 +154,6 @@ fn main() -> Result<()> {
 
     info!("Copy complete");
     pb.end();
-
 
     Ok(())
 }

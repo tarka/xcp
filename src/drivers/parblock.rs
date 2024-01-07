@@ -135,8 +135,8 @@ fn queue_file_range(
         let off = range.start + (blkn * bsize);
 
         pool.execute(move || {
-            let copied = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64);
-            let stat_result = match copied {
+            let copy_result = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64);
+            let stat_result = match copy_result {
                 Ok(bytes) => {
                     stat_tx.send(StatusUpdate::Copied(bytes as u64))
                 }
