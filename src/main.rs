@@ -23,8 +23,11 @@ mod utils;
 
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use crossbeam_channel as cbc;
 use libfs::is_same_file;
-use log::info;
+use log::{error, info};
+use operations::{StatSender, StatusUpdate};
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
 use crate::drivers::load_driver;
@@ -47,7 +50,6 @@ fn main() -> Result<()> {
     )
     .or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
-    let driver = load_driver(&opts)?;
 
     let (dest, source_patterns) = opts
         .paths
@@ -68,7 +70,17 @@ fn main() -> Result<()> {
     if sources.is_empty() {
         return Err(XcpError::InvalidSource("No source files found.").into());
 
-    } else if sources.len() == 1 && dest.is_file() {
+    }
+
+    let pb = progress::create_bar(&opts, 0)?;
+    let (stat_tx, stat_rx) = cbc::unbounded();
+    let stats = StatSender::new(stat_tx, &opts);
+
+    let driver = load_driver(&opts)?;
+
+    if sources.len() == 1 && dest.is_file() {
+        let source = &sources[0];
+
         // Special case; attemping to rename/overwrite existing file.
         if opts.no_clobber {
             return Err(XcpError::DestinationExists(
@@ -80,7 +92,7 @@ fn main() -> Result<()> {
 
         // Special case: Attempt to overwrite a file with
         // itself. Always disallow for now.
-        if is_same_file(&sources[0], &dest)? {
+        if is_same_file(&source, &dest)? {
             return Err(XcpError::DestinationExists(
                 "Source and destination is the same file.",
                 dest,
@@ -88,8 +100,8 @@ fn main() -> Result<()> {
             .into());
         }
 
-        info!("Copying file {:?} to {:?}", sources[0], dest);
-        driver.copy_single(&sources[0], &dest)?;
+        info!("Copying file {:?} to {:?}", source, dest);
+        driver.copy_single(source, &dest, stats)?;
 
     } else {
         // Sanity-check all sources up-front
@@ -118,8 +130,26 @@ fn main() -> Result<()> {
             }
         }
 
-        driver.copy_all(sources, &dest)?;
+        driver.copy_all(sources, &dest, stats)?;
     }
+
+    // Gather the results as we go; our end of the channel has been
+    // moved to the driver call and will end when drained.
+    for stat in stat_rx {
+        match stat {
+            StatusUpdate::Copied(v) => pb.inc(v),
+            StatusUpdate::Size(v) => pb.inc_size(v),
+            StatusUpdate::Error(e) => {
+                // FIXME: Optional continue?
+                error!("Received error: {}", e);
+                return Err(e.into());
+            }
+        }
+    }
+
+    info!("Copy complete");
+    pb.end();
+
 
     Ok(())
 }

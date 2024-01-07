@@ -47,7 +47,7 @@ pub struct Opts {
 
     /// Number of parallel workers.
     ///
-    /// Default is 1; if the value is negative or 0 it uses the number
+    /// Default is 4; if the value is negative or 0 it uses the number
     /// of logical CPUs.
     #[arg(short, long, default_value = "4")]
     pub workers: i64,

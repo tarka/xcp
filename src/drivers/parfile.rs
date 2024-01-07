@@ -16,20 +16,16 @@
 
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
-use libfs::{FileType, copy_node};
-use std::fs::{create_dir_all, read_link};
+use libfs::copy_node;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
-use walkdir::WalkDir;
 
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{CopyHandle, StatusUpdate, StatSender};
-use crate::options::{ignore_filter, parse_ignore, Opts};
-use crate::progress;
-use crate::utils::empty;
+use crate::operations::{CopyHandle, StatusUpdate, StatSender, Operation, tree_walker};
+use crate::options::Opts;
 
 // ********************************************************************** //
 
@@ -44,24 +40,46 @@ impl CopyDriver for Driver {
         })
     }
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path) -> Result<()> {
-        copy_all(sources, dest, &self.opts)
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: StatSender) -> Result<()> {
+        let (work_tx, work_rx) = cbc::unbounded();
+
+        // Thread which walks the file tree and sends jobs to the
+        // workers. The worker tx channel is moved to the walker so it is
+        // closed, which will cause the workers to shutdown on completion.
+        let _walk_worker = {
+            let sc = stats.clone();
+            let d = dest.to_path_buf();
+            let o = self.opts.clone();
+            thread::spawn(move || tree_walker(sources, &d, &o, work_tx, sc))
+        };
+
+        // Worker threads. Will consume work and then shutdown once the
+        // queue is closed by the walker.
+        for _ in 0..self.opts.num_workers() {
+            let _copy_worker = {
+                let wrx = work_rx.clone();
+                let sc = stats.clone();
+                let o = self.opts.clone();
+                thread::spawn(move || copy_worker(wrx, &o, sc))
+            };
+        }
+
+        // FIXME: Ideally we should join the dispatch and walker
+        // threads to ensure we pickup any errors not on the
+        // queue. However this would block until all work was
+        // dispatched, blocking progress bar updates.
+
+        Ok(())
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path) -> Result<()> {
-        copy_single_file(source, dest, &self.opts)
+    fn copy_single(&self, source: &Path, dest: &Path, stats: StatSender) -> Result<()> {
+        let handle = CopyHandle::new(source, dest, &self.opts)?;
+        handle.copy_file(&stats)?;
+        Ok(())
     }
 }
 
 // ********************************************************************** //
-
-#[derive(Debug)]
-enum Operation {
-    Copy(PathBuf, PathBuf),
-    Link(PathBuf, PathBuf),
-    Special(PathBuf, PathBuf),
-    End,
-}
 
 fn copy_worker(
     work: cbc::Receiver<Operation>,
@@ -74,7 +92,7 @@ fn copy_worker(
 
         match op {
             Operation::Copy(from, to) => {
-                info!("Worker: Copy {:?} -> {:?}", from, to);
+                info!("Worker[{:?}]: Copy {:?} -> {:?}", thread::current().id(), from, to);
                 // copy_file() sends back its own updates, but we should
                 // send back any errors as they may have occurred
                 // before the copy started..
@@ -88,198 +106,17 @@ fn copy_worker(
             }
 
             Operation::Link(from, to) => {
-                info!("Worker: Symlink {:?} -> {:?}", from, to);
+                info!("Worker[{:?}]: Symlink {:?} -> {:?}", thread::current().id(), from, to);
                 let _r = symlink(&from, &to);
             }
 
             Operation::Special(from, to) => {
-                info!("Worker: Special file {:?} -> {:?}", from, to);
+                info!("Worker[{:?}]: Special file {:?} -> {:?}", thread::current().id(), from, to);
                 copy_node(&from, &to)?;
             }
 
-            Operation::End => {
-                info!("Worker received shutdown command.");
-                break;
-            }
         }
     }
     debug!("Copy worker {:?} shutting down", thread::current().id());
-    Ok(())
-}
-
-fn copy_source(
-    source: &Path,
-    dest: &Path,
-    opts: &Opts,
-    work_tx: &cbc::Sender<Operation>,
-    updates: &StatSender,
-) -> Result<()> {
-    let sourcedir = source
-        .components()
-        .last()
-        .ok_or(XcpError::InvalidSource(
-            "Failed to find source directory name.",
-        ))?;
-
-    let target_base = if dest.exists() && !opts.no_target_directory {
-        dest.join(sourcedir)
-    } else {
-        dest.to_path_buf()
-    };
-    debug!("Target base is {:?}", target_base);
-
-    let gitignore = parse_ignore(source, opts)?;
-
-    for entry in WalkDir::new(source)
-        .into_iter()
-        .filter_entry(|e| ignore_filter(e, &gitignore))
-    {
-        debug!("Got tree entry {:?}", entry);
-        let e = entry?;
-        let from = e.into_path();
-        let meta = from.symlink_metadata()?;
-        let path = from.strip_prefix(source)?;
-        let target = if !empty(path) {
-            target_base.join(path)
-        } else {
-            target_base.clone()
-        };
-
-        if opts.no_clobber && target.exists() {
-            work_tx.send(Operation::End)?;
-            updates.send(StatusUpdate::Error(
-                XcpError::DestinationExists("Destination file exists and --no-clobber is set.", target)))?;
-            return Err(XcpError::EarlyShutdown("Path exists and --no-clobber set.").into());
-        }
-
-        match FileType::from(meta.file_type()) {
-            FileType::File => {
-                debug!("Send copy operation {:?} to {:?}", from, target);
-                updates.send(StatusUpdate::Size(meta.len()))?;
-                work_tx.send(Operation::Copy(from, target))?;
-            }
-
-            FileType::Symlink => {
-                let lfile = read_link(from)?;
-                debug!("Send symlink operation {:?} to {:?}", lfile, target);
-                work_tx.send(Operation::Link(lfile, target))?;
-            }
-
-            FileType::Dir => {
-                debug!("Creating target directory {:?}", target);
-                create_dir_all(&target)?;
-            }
-
-            FileType::Socket | FileType::Char | FileType::Fifo => {
-                debug!("Special file found: {:?} to {:?}", from, target);
-                work_tx.send(Operation::Special(from, target))?;
-            }
-
-            FileType::Other => {
-                error!("Unknown filetype found; this should never happen!");
-                return Err(XcpError::UnknownFileType(target).into());
-            }
-        };
-    }
-
-    Ok(())
-}
-
-fn tree_walker(
-    sources: Vec<PathBuf>,
-    dest: &Path,
-    opts: &Opts,
-    work_tx: cbc::Sender<Operation>,
-    updates: StatSender,
-) -> Result<()> {
-    debug!("Starting walk worker {:?}", thread::current().id());
-
-    for source in sources {
-        copy_source(&source, dest, opts, &work_tx, &updates)?;
-    }
-    work_tx.send(Operation::End)?;
-    debug!("Walk-worker finished: {:?}", thread::current().id());
-    Ok(())
-}
-
-pub fn copy_all(sources: Vec<PathBuf>, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
-    let (work_tx, work_rx) = cbc::unbounded();
-    let (stat_tx, stat_rx) = cbc::unbounded();
-    let sender = StatSender::new(stat_tx, &opts);
-
-    let pb = progress::create_bar(&opts, 0)?;
-
-    // Use scoped threads here so we can pass down e.g. Opts without
-    // repeated cloning.
-    thread::scope(|s| {
-        for _ in 0..opts.num_workers() {
-            let _copy_worker = {
-                let wrx = work_rx.clone();
-                let sc = sender.clone();
-                s.spawn(move || copy_worker(wrx, opts, sc))
-            };
-        }
-        let _walk_worker = {
-            let sc = sender.clone();
-            s.spawn(|| tree_walker(sources, dest, &opts, work_tx, sc))
-        };
-
-        // Drop our copy of StatSender so that the last sender will
-        // close the channel.
-        drop(sender);
-        for stat in stat_rx {
-            match stat {
-                StatusUpdate::Copied(v) => {
-                    pb.inc(v);
-                },
-                StatusUpdate::Size(v) => {
-                    pb.inc_size(v);
-                },
-                StatusUpdate::Error(e) => {
-                    // FIXME: Optional continue?
-                    error!("Received error: {}", e);
-                    return Err(e);
-                }
-            }
-        }
-
-        Ok(())
-    })?;
-
-    // FIXME: We should probably join the threads and consume any errors.
-
-    pb.end();
-    info!("Copy complete");
-
-    Ok(())
-}
-
-fn copy_single_file(source: &Path, dest: &Path, opts: &Arc<Opts>) -> Result<()> {
-    let len = source.metadata()?.len();
-    let pb = progress::create_bar(&opts, len)?;
-
-    let (stat_tx, stat_rx) = cbc::unbounded();
-    let sender = StatSender::new(stat_tx, &opts);
-
-    let handle = CopyHandle::new(source, dest, opts)?;
-    handle.copy_file(&sender)?;
-
-    // Gather the results as we go; close our end of the channel so it
-    // ends when drained. Drop our copy of StatSender so that the last
-    // sender will close the channel.
-    drop(sender);
-    for stat in stat_rx {
-        match stat {
-            StatusUpdate::Copied(v) => pb.inc(v),
-            StatusUpdate::Size(v) => pb.inc_size(v),
-            StatusUpdate::Error(e) => {
-                // FIXME: Optional continue?
-                error!("Received error: {}", e);
-                return Err(e.into());
-            }
-        }
-    }
-    pb.end();
-
     Ok(())
 }
