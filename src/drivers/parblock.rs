@@ -135,15 +135,20 @@ fn queue_file_range(
         let off = range.start + (blkn * bsize);
 
         pool.execute(move || {
-            let r = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64);
-            match r {
+            let copied = copy_file_offset(&harc.infd, &harc.outfd, bytes, off as i64);
+            let stat_result = match copied {
                 Ok(bytes) => {
-                    stat_tx.send(StatusUpdate::Copied(bytes as u64)).unwrap();
+                    stat_tx.send(StatusUpdate::Copied(bytes as u64))
                 }
                 Err(e) => {
-                    stat_tx.send(StatusUpdate::Error(XcpError::CopyError(e.to_string()))).unwrap();
                     error!("Error copying: aborting.");
+                    stat_tx.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))
                 }
+            };
+            if let Err(e) = stat_result {
+                let msg = format!("Failed to send status update message. This should not happen; aborting. Error: {}", e);
+                error!("{}", msg);
+                panic!("{}", msg);
             }
         });
     }
