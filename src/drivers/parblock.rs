@@ -24,7 +24,7 @@ use std::thread;
 use cfg_if::cfg_if;
 use crossbeam_channel as cbc;
 use libfs::copy_node;
-use log::{error, info};
+use log::{error, info, debug};
 use blocking_threadpool::{Builder, ThreadPool};
 
 use crate::drivers::CopyDriver;
@@ -82,11 +82,23 @@ impl CopyDriver for Driver {
             thread::spawn(|| dispatch_worker(file_rx, st, q_opts))
         };
 
-        tree_walker(sources, dest, &self.opts, file_tx, stats)?;
 
-        // Join the dispatch thread to ensure we pickup any errors not on
-        // the queue. Ideally this shouldn't happen though.
-        // dispatcher.join()
+        // Thread which walks the file tree and sends jobs to the
+        // workers. The worker tx channel is moved to the walker so it is
+        // closed, which will cause the workers to shutdown on completion.
+        let _walk_worker = {
+            let sc = stats.clone();
+            let d = dest.to_path_buf();
+            let o = self.opts.clone();
+            //thread::spawn(move || tree_walker(sources, dest, &self.opts, file_tx, stats))
+            thread::spawn(move || tree_walker(sources, &d, &o, file_tx, sc))
+        };
+
+        // FIXME: Ideally we should join the dispatch and walker
+        // threads to ensure we pickup any errors not on the
+        // queue. However this would block until all work was
+        // dispatched, blocking progress bar updates.
+        // _dispatcher.join()
         //     .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
 
         Ok(())

@@ -64,7 +64,10 @@ impl CopyDriver for Driver {
             };
         }
 
-        // FIXME: We should probably join the threads and consume any errors.
+        // FIXME: Ideally we should join the dispatch and walker
+        // threads to ensure we pickup any errors not on the
+        // queue. However this would block until all work was
+        // dispatched, blocking progress bar updates.
 
         Ok(())
     }
