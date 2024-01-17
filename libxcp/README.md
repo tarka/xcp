@@ -3,8 +3,8 @@
 `libxcp` contains the core functionality of [xcp](https://crates.io/crates/xcp).
 
 
-[![Crates.io](https://img.shields.io/crates/v/xcp.svg?colorA=777777)](https://crates.io/crates/libfs)
-[![doc.rs](https://docs.rs/libfs/badge.svg)](https://docs.rs/libfs)
+[![Crates.io](https://img.shields.io/crates/v/xcp.svg?colorA=777777)](https://crates.io/crates/libxcp)
+[![doc.rs](https://docs.rs/libxcp/badge.svg)](https://docs.rs/libxcp)
 ![Github Actions](https://github.com/tarka/xcp/actions/workflows/tests.yml/badge.svg)
 [![CircleCI](https://circleci.com/gh/tarka/xcp.svg?style=shield)](https://circleci.com/gh/tarka/xcp)
 
