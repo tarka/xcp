@@ -14,25 +14,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-mod drivers;
-mod errors;
-mod operations;
-mod options;
-mod progress;
-mod utils;
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use crossbeam_channel as cbc;
 use libfs::is_same_file;
+use libxcp::drivers::load_driver;
+use libxcp::errors::{Result, XcpError};
+use libxcp::operations::{StatSender, StatusUpdate};
+use libxcp::options::{self, Opts};
+use libxcp::progress;
 use log::{error, info};
-use operations::{StatSender, StatusUpdate};
-use options::Opts;
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
-use crate::drivers::load_driver;
-use crate::errors::{Result, XcpError};
 
 fn init_logging(opts: &Opts) -> Result<()> {
     let log_level = match opts.verbose {
