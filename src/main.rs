@@ -14,6 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+mod progress;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -24,7 +25,6 @@ use libxcp::drivers::load_driver;
 use libxcp::errors::{Result, XcpError};
 use libxcp::operations::{StatSender, StatusUpdate};
 use libxcp::options::{self, Opts};
-use libxcp::progress;
 use log::{error, info};
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 

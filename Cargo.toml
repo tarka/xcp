@@ -41,6 +41,7 @@ test_run_expensive = []
 [dependencies]
 anyhow = "1.0.79"
 crossbeam-channel = "0.5.11"
+indicatif = "0.17.7"
 libfs = { version = "0.5.1", path = "libfs" }
 libxcp = { version = "0.1.0", path = "libxcp" }
 log = "0.4.20"
