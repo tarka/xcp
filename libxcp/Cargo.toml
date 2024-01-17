@@ -18,17 +18,6 @@ license = "GPL-3.0-only"
 default = ["parblock", "use_linux"]
 parblock = []
 use_linux = ["libfs/use_linux"]
-# For CI; disable feature testing on filesystems that don't support
-# it. See .github/workflows/tests.yml
-test_no_reflink = ["libfs/test_no_reflink"]
-test_no_sparse = ["libfs/test_no_sparse"]
-test_no_extents = ["libfs/test_no_extents"]
-test_no_sockets = ["libfs/test_no_sockets"]
-test_no_xattr = []
-test_no_symlinks = []
-test_no_perms = []
-test_run_expensive = []
-
 
 [dependencies]
 anyhow = "1.0.79"
@@ -47,14 +36,6 @@ unbytify = "0.2.0"
 walkdir = "2.4.0"
 
 [dev-dependencies]
-# fslock = "0.2.1"
-# rand = "0.8.5"
-# rand_distr = "0.4.3"
-# rand_xorshift = "0.3.0"
-# tempfile = "3.9.0"
-# test-case = "3.3.1"
-# uuid = { version = "1.6.1", features = ["v4"] }
-# xattr = "1.2.0"
 
 [lints.clippy]
 upper_case_acronyms = "allow"

@@ -25,8 +25,8 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["parblock", "use_linux"]
-parblock = []
-use_linux = ["libfs/use_linux"]
+parblock = ["libxcp/parblock"]
+use_linux = ["libfs/use_linux", "libxcp/use_linux"]
 # For CI; disable feature testing on filesystems that don't support
 # it. See .github/workflows/tests.yml
 test_no_reflink = ["libfs/test_no_reflink"]
@@ -40,20 +40,11 @@ test_run_expensive = []
 
 [dependencies]
 anyhow = "1.0.79"
-# blocking-threadpool = "1.0.1"
-# clap = { version = "4.4.16", features = ["derive"] }
 crossbeam-channel = "0.5.11"
-# glob = "0.3.1"
-# ignore = "0.4.22"
-# indicatif = "0.17.7"
 libfs = { version = "0.5.1", path = "libfs" }
 libxcp = { version = "0.1.0", path = "libxcp" }
 log = "0.4.20"
-# num_cpus = "1.16.0"
 simplelog = "0.12.1"
-# thiserror = "1.0.56"
-# unbytify = "0.2.0"
-# walkdir = "2.4.0"
 
 [dev-dependencies]
 cfg-if = "1.0.0"
