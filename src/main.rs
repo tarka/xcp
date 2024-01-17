@@ -25,6 +25,7 @@ use libxcp::drivers::load_driver;
 use libxcp::errors::{Result, XcpError};
 use libxcp::operations::{StatSender, StatusUpdate};
 use libxcp::options::{self, Opts};
+use libxcp::paths::expand_sources;
 use log::{error, info};
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
@@ -66,7 +67,7 @@ fn main() -> Result<()> {
         .into());
     }
 
-    let sources = options::expand_sources(source_patterns, &opts)?;
+    let sources = expand_sources(source_patterns, &opts)?;
     if sources.is_empty() {
         return Err(XcpError::InvalidSource("No source files found.").into());
 

@@ -30,7 +30,8 @@ use log::{debug, error};
 use walkdir::WalkDir;
 
 use crate::errors::{Result, XcpError};
-use crate::options::{Opts, parse_ignore, ignore_filter};
+use crate::options::Opts;
+use crate::paths::{parse_ignore, ignore_filter};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Reflink {
