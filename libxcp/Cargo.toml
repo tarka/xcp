@@ -11,7 +11,7 @@ repository = "https://github.com/tarka/xcp"
 readme = "README.md"
 
 keywords = ["coreutils", "cp", "files", "filesystem"]
-categories =["command-line-utilities"]
+categories =["filesystem"]
 license = "GPL-3.0-only"
 
 [features]
