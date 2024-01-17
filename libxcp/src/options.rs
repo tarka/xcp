@@ -140,6 +140,9 @@ impl Opts {
     }
 }
 
+pub fn parse_args() -> Result<Opts> {
+    Ok(Opts::parse())
+}
 
 // Expand a list of file-paths or glob-patterns into a list of concrete paths.
 //
@@ -169,15 +172,14 @@ pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
     Ok(paths)
 }
 
-pub fn to_pathbufs(paths: &[String]) -> Vec<PathBuf> {
-    paths.iter().map(PathBuf::from).collect::<Vec<PathBuf>>()
-}
-
 pub fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
     if opts.glob {
         expand_globs(source_list)
     } else {
-        Ok(to_pathbufs(source_list))
+        let pb = source_list.iter()
+            .map(PathBuf::from)
+            .collect::<Vec<PathBuf>>();
+        Ok(pb)
     }
 }
 
@@ -204,8 +206,4 @@ pub fn ignore_filter(entry: &DirEntry, ignore: &Option<Gitignore>) -> bool {
             !m.is_ignore()
         }
     }
-}
-
-pub fn parse_args() -> Result<Opts> {
-    Ok(Opts::parse())
 }

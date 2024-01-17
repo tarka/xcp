@@ -31,7 +31,6 @@ use walkdir::WalkDir;
 
 use crate::errors::{Result, XcpError};
 use crate::options::{Opts, parse_ignore, ignore_filter};
-use crate::utils::empty;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Reflink {
@@ -244,7 +243,7 @@ pub fn tree_walker(
             let from = e.into_path();
             let meta = from.symlink_metadata()?;
             let path = from.strip_prefix(&source)?;
-            let target = if !empty(path) {
+            let target = if !empty_path(path) {
                 target_base.join(path)
             } else {
                 target_base.clone()
@@ -293,4 +292,8 @@ pub fn tree_walker(
     debug!("Walk-worker finished: {:?}", thread::current().id());
 
     Ok(())
+}
+
+fn empty_path(path: &Path) -> bool {
+    *path == PathBuf::new()
 }

@@ -18,4 +18,3 @@ pub mod drivers;
 pub mod errors;
 pub mod operations;
 pub mod options;
-mod utils;
