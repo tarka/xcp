@@ -52,6 +52,7 @@ pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
     Ok(paths)
 }
 
+/// Parse a git ignore file.
 pub fn parse_ignore(source: &Path, opts: &Opts) -> Result<Option<Gitignore>> {
     let gitignore = if opts.gitignore {
         let gifile = source.join(".gitignore");
@@ -66,6 +67,8 @@ pub fn parse_ignore(source: &Path, opts: &Opts) -> Result<Option<Gitignore>> {
     Ok(gitignore)
 }
 
+/// Filter to return whether a given file should be ignored by a
+/// filter file.
 pub fn ignore_filter(entry: &DirEntry, ignore: &Option<Gitignore>) -> bool {
     match ignore {
         None => true,
