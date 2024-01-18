@@ -25,7 +25,7 @@ use libxcp::drivers::load_driver;
 use libxcp::errors::{Result, XcpError};
 use libxcp::operations::{StatSender, StatusUpdate};
 use libxcp::options::{self, Opts};
-use libxcp::paths::expand_sources;
+use libxcp::paths::expand_globs;
 use log::{error, info};
 use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
@@ -46,6 +46,17 @@ fn init_logging(opts: &Opts) -> Result<()> {
     ).or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
 
     Ok(())
+}
+
+fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
+    if opts.glob {
+        expand_globs(source_list)
+    } else {
+        let pb = source_list.iter()
+            .map(PathBuf::from)
+            .collect::<Vec<PathBuf>>();
+        Ok(pb)
+    }
 }
 
 fn main() -> Result<()> {

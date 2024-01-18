@@ -52,17 +52,6 @@ pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
     Ok(paths)
 }
 
-pub fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
-    if opts.glob {
-        expand_globs(source_list)
-    } else {
-        let pb = source_list.iter()
-            .map(PathBuf::from)
-            .collect::<Vec<PathBuf>>();
-        Ok(pb)
-    }
-}
-
 pub fn parse_ignore(source: &Path, opts: &Opts) -> Result<Option<Gitignore>> {
     let gitignore = if opts.gitignore {
         let gifile = source.join(".gitignore");
