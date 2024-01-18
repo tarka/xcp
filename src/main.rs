@@ -43,7 +43,9 @@ fn init_logging(opts: &Opts) -> Result<()> {
         Config::default(),
         TerminalMode::Mixed,
         ColorChoice::Auto,
-    ).or_else(|_| SimpleLogger::init(log_level, Config::default()))?;
+    ).or_else(
+        |_| SimpleLogger::init(log_level, Config::default())
+    )?;
 
     Ok(())
 }
@@ -72,10 +74,7 @@ fn main() -> Result<()> {
     // Do this check before expansion otherwise it could result in
     // unexpected behaviour when the a glob expands to a single file.
     if source_patterns.len() > 1 && !dest.is_dir() {
-        return Err(XcpError::InvalidDestination(
-            "Multiple sources and destination is not a directory.",
-        )
-        .into());
+        return Err(XcpError::InvalidDestination("Multiple sources and destination is not a directory.").into());
     }
 
     let sources = expand_sources(source_patterns, &opts)?;
@@ -95,21 +94,13 @@ fn main() -> Result<()> {
 
         // Special case; attemping to rename/overwrite existing file.
         if opts.no_clobber {
-            return Err(XcpError::DestinationExists(
-                "Destination file exists and --no-clobber is set.",
-                dest,
-            )
-            .into());
+            return Err(XcpError::DestinationExists("Destination file exists and --no-clobber is set.", dest).into());
         }
 
         // Special case: Attempt to overwrite a file with
         // itself. Always disallow for now.
         if is_same_file(source, &dest)? {
-            return Err(XcpError::DestinationExists(
-                "Source and destination is the same file.",
-                dest,
-            )
-            .into());
+            return Err(XcpError::DestinationExists("Source and destination is the same file.", dest).into());
         }
 
         info!("Copying file {:?} to {:?}", source, dest);
@@ -124,10 +115,7 @@ fn main() -> Result<()> {
             }
 
             if source.is_dir() && !opts.recursive {
-                return Err(XcpError::InvalidSource(
-                    "Source is directory and --recursive not specified.",
-                )
-                .into());
+                return Err(XcpError::InvalidSource("Source is directory and --recursive not specified.").into());
             }
 
             if source == &dest {
@@ -135,10 +123,7 @@ fn main() -> Result<()> {
             }
 
             if dest.exists() && !dest.is_dir() {
-                return Err(XcpError::InvalidDestination(
-                    "Source is directory but target exists and is not a directory",
-                )
-                .into());
+                return Err(XcpError::InvalidDestination("Source is directory but target exists and is not a directory").into());
             }
         }
 
