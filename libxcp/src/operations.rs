@@ -116,9 +116,9 @@ impl CopyHandle {
                 let worked = reflink(&self.infd, &self.outfd)?;
                 if worked {
                     debug!("Reflink {:?} succeeded", self.outfd);
-                    return Ok(true)
+                    Ok(true)
                 } else if self.opts.reflink == Reflink::Always {
-                    return Err(XcpError::ReflinkFailed(format!("{:?}->{:?}", self.infd, self.outfd)).into());
+                    Err(XcpError::ReflinkFailed(format!("{:?}->{:?}", self.infd, self.outfd)).into())
                 } else {
                     debug!("Failed to reflink, falling back to copy");
                     Ok(false)

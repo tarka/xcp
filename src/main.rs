@@ -104,7 +104,7 @@ fn main() -> Result<()> {
 
         // Special case: Attempt to overwrite a file with
         // itself. Always disallow for now.
-        if is_same_file(&source, &dest)? {
+        if is_same_file(source, &dest)? {
             return Err(XcpError::DestinationExists(
                 "Source and destination is the same file.",
                 dest,
