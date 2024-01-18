@@ -40,6 +40,7 @@ pub enum Reflink {
     Never,
 }
 
+// String conversion helper as a convenience for command-line parsing.
 impl FromStr for Reflink {
     type Err = XcpError;
 

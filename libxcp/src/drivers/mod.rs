@@ -40,6 +40,7 @@ pub enum Drivers {
     ParBlock,
 }
 
+// String conversion helper as a convenience for command-line parsing.
 impl FromStr for Drivers {
     type Err = XcpError;
 
