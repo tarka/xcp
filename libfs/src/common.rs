@@ -197,11 +197,11 @@ mod tests {
     use std::ops::Range;
     use tempfile::tempdir;
 
-    impl Into<Extent> for Range<u64> {
-        fn into(self) -> Extent {
+    impl From<Range<u64>> for Extent {
+        fn from(r: Range<u64>) -> Self {
             Extent {
-                start: self.start,
-                end: self.end,
+                start: r.start,
+                end: r.end,
                 shared: false,
             }
         }
