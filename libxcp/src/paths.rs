@@ -14,47 +14,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::{Path, PathBuf};
-use std::result;
-
-use glob::{glob, Paths};
+use std::path::Path;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use log::info;
 use walkdir::DirEntry;
 
+use crate::config::Config;
 use crate::errors::Result;
-use crate::options::Opts;
-
-/// Expand a list of file-paths or glob-patterns into a list of concrete paths.
-pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
-    // Note: This is probably iterator overkill, but it took me a
-    // whole day to work this out and I'm not prepared to give it up
-    // yet.
-    //
-    // FIXME: This currently eats non-existent files that are not
-    // globs. Should we convert empty glob results into errors?
-    let mut globs = patterns
-        .iter()
-        .map(|s| glob(s.as_str())) // -> Vec<Result<Paths>>
-        .collect::<result::Result<Vec<Paths>, _>>()?; // -> Result<Vec<Paths>>
-    let path_vecs = globs
-        .iter_mut()
-        // Force resolve each glob Paths iterator into a vector of the results...
-        .map::<result::Result<Vec<PathBuf>, _>, _>(|p| p.collect())
-        // And lift all the results up to the top.
-        .collect::<result::Result<Vec<Vec<PathBuf>>, _>>()?;
-    // And finally flatten the nested paths into a single collection of the results
-    let paths = path_vecs
-        .iter()
-        .flat_map(|p| p.to_owned())
-        .collect::<Vec<PathBuf>>();
-
-    Ok(paths)
-}
 
 /// Parse a git ignore file.
-pub fn parse_ignore(source: &Path, opts: &Opts) -> Result<Option<Gitignore>> {
-    let gitignore = if opts.gitignore {
+pub fn parse_ignore(source: &Path, config: &Config) -> Result<Option<Gitignore>> {
+    let gitignore = if config.gitignore {
         let gifile = source.join(".gitignore");
         info!("Using .gitignore file {:?}", gifile);
         let mut builder = GitignoreBuilder::new(source);

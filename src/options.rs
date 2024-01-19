@@ -16,11 +16,12 @@
 
 use clap::{ArgAction, Parser};
 
+use libxcp::config::Config;
 use unbytify::unbytify;
 
-use crate::drivers::Drivers;
-use crate::errors::Result;
-use crate::operations::Reflink;
+use libxcp::drivers::Drivers;
+use libxcp::errors::Result;
+use libxcp::operations::Reflink;
 
 #[derive(Clone, Debug, Parser)]
 #[command(
@@ -43,7 +44,7 @@ pub struct Opts {
     /// Default is 4; if the value is negative or 0 it uses the number
     /// of logical CPUs.
     #[arg(short, long, default_value = "4")]
-    pub workers: i64,
+    pub workers: usize,
 
     /// Block size for operations.
     ///
@@ -114,25 +115,29 @@ pub struct Opts {
     pub paths: Vec<String>,
 }
 
-impl Opts {
-    pub fn batch_size(&self) -> u64 {
-        if self.no_progress {
-            usize::max_value() as u64
-        } else {
-            self.block_size
-        }
-    }
-
-    // StructOpt/Clap handles optional flags with optional values as nested Options.
-    pub fn num_workers(&self) -> u64 {
-        if self.workers <= 0 {
-            num_cpus::get() as u64
-        } else {
-            self.workers as u64
-        }
-    }
-}
-
 pub fn parse_args() -> Result<Opts> {
     Ok(Opts::parse())
+}
+
+impl From<&Opts> for Config {
+    fn from(opts: &Opts) -> Self {
+        Config {
+            workers: if opts.workers <= 0 {
+                num_cpus::get()
+            } else {
+                opts.workers
+            },
+            block_size: if opts.no_progress {
+                usize::max_value() as u64
+            } else {
+                opts.block_size
+            },
+            gitignore: opts.gitignore,
+            no_clobber: opts.no_clobber,
+            no_perms: opts.no_perms,
+            no_target_directory: opts.no_target_directory,
+            fsync: opts.fsync,
+            reflink: opts.reflink,
+        }
+    }
 }

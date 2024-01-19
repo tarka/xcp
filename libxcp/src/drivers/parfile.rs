@@ -22,21 +22,21 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 
+use crate::config::Config;
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
 use crate::operations::{CopyHandle, StatusUpdate, StatSender, Operation, tree_walker};
-use crate::options::Opts;
 
 // ********************************************************************** //
 
 pub struct Driver {
-    opts: Arc<Opts>,
+    config: Arc<Config>,
 }
 
 impl CopyDriver for Driver {
-    fn new(opts: Arc<Opts>) -> Result<Self> {
+    fn new(config: Arc<Config>) -> Result<Self> {
         Ok(Self {
-            opts,
+            config,
         })
     }
 
@@ -49,17 +49,17 @@ impl CopyDriver for Driver {
         let _walk_worker = {
             let sc = stats.clone();
             let d = dest.to_path_buf();
-            let o = self.opts.clone();
+            let o = self.config.clone();
             thread::spawn(move || tree_walker(sources, &d, &o, work_tx, sc))
         };
 
         // Worker threads. Will consume work and then shutdown once the
         // queue is closed by the walker.
-        for _ in 0..self.opts.num_workers() {
+        for _ in 0..self.config.workers {
             let _copy_worker = {
                 let wrx = work_rx.clone();
                 let sc = stats.clone();
-                let o = self.opts.clone();
+                let o = self.config.clone();
                 thread::spawn(move || copy_worker(wrx, &o, sc))
             };
         }
@@ -73,7 +73,7 @@ impl CopyDriver for Driver {
     }
 
     fn copy_single(&self, source: &Path, dest: &Path, stats: StatSender) -> Result<()> {
-        let handle = CopyHandle::new(source, dest, &self.opts)?;
+        let handle = CopyHandle::new(source, dest, &self.config)?;
         handle.copy_file(&stats)?;
         Ok(())
     }
@@ -83,7 +83,7 @@ impl CopyDriver for Driver {
 
 fn copy_worker(
     work: cbc::Receiver<Operation>,
-    opts: &Arc<Opts>,
+    config: &Arc<Config>,
     updates: StatSender,
 ) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
@@ -96,7 +96,7 @@ fn copy_worker(
                 // copy_file() sends back its own updates, but we should
                 // send back any errors as they may have occurred
                 // before the copy started..
-                let r = CopyHandle::new(&from, &to, opts)
+                let r = CopyHandle::new(&from, &to, config)
                     .and_then(|hdl| hdl.copy_file(&updates));
                 if let Err(e) = r {
                     updates.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;

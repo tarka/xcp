@@ -14,23 +14,26 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+mod options;
 mod progress;
 
 use std::path::PathBuf;
+use std::result;
 use std::sync::Arc;
 
 use crossbeam_channel as cbc;
+use glob::{glob, Paths};
 use libfs::is_same_file;
+use libxcp::config::Config;
 use libxcp::drivers::load_driver;
 use libxcp::errors::{Result, XcpError};
 use libxcp::operations::{StatSender, StatusUpdate};
-use libxcp::options::{self, Opts};
-use libxcp::paths::expand_globs;
 use log::{error, info};
-use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
 
+use crate::options::Opts;
 
 fn init_logging(opts: &Opts) -> Result<()> {
+    use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
     let log_level = match opts.verbose {
         0 => LevelFilter::Warn,
         1 => LevelFilter::Info,
@@ -50,6 +53,30 @@ fn init_logging(opts: &Opts) -> Result<()> {
     Ok(())
 }
 
+
+// Expand a list of file-paths or glob-patterns into a list of concrete paths.
+pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
+    // FIXME: This currently eats non-existent files that are not
+    // globs. Should we convert empty glob results into errors?
+    let mut globs = patterns
+        .iter()
+        .map(|s| glob(s.as_str())) // -> Vec<Result<Paths>>
+        .collect::<result::Result<Vec<Paths>, _>>()?; // -> Result<Vec<Paths>>
+    let path_vecs = globs
+        .iter_mut()
+        // Force resolve each glob Paths iterator into a vector of the results...
+        .map::<result::Result<Vec<PathBuf>, _>, _>(|p| p.collect())
+        // And lift all the results up to the top.
+        .collect::<result::Result<Vec<Vec<PathBuf>>, _>>()?;
+    // And finally flatten the nested paths into a single collection of the results
+    let paths = path_vecs
+        .iter()
+        .flat_map(|p| p.to_owned())
+        .collect::<Vec<PathBuf>>();
+
+    Ok(paths)
+}
+
 fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
     if opts.glob {
         expand_globs(source_list)
@@ -62,7 +89,7 @@ fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
 }
 
 fn main() -> Result<()> {
-    let opts = Arc::new(options::parse_args()?);
+    let opts = options::parse_args()?;
     init_logging(&opts)?;
 
     let (dest, source_patterns) = opts
@@ -83,11 +110,13 @@ fn main() -> Result<()> {
 
     }
 
+    let config = Arc::new(Config::from(&opts));
+
     let pb = progress::create_bar(&opts, 0)?;
     let (stat_tx, stat_rx) = cbc::unbounded();
-    let stats = StatSender::new(stat_tx, &opts);
+    let stats = StatSender::new(stat_tx, &config);
 
-    let driver = load_driver(&opts)?;
+    let driver = load_driver(&opts.driver, &config)?;
 
     if sources.len() == 1 && dest.is_file() {
         let source = &sources[0];

@@ -14,8 +14,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+pub mod config;
 pub mod drivers;
 pub mod errors;
 pub mod operations;
-pub mod options;
 pub mod paths;

@@ -23,12 +23,12 @@ use std::result;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use crate::config::Config;
 use crate::errors::{Result, XcpError};
 use crate::operations::StatSender;
-use crate::options::Opts;
 
 pub trait CopyDriver {
-    fn new(opts: Arc<Opts>) -> Result<Self> where Self: Sized;
+    fn new(config: Arc<Config>) -> Result<Self> where Self: Sized;
     fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: StatSender) -> Result<()>;
     fn copy_single(&self, source: &Path, dest: &Path, stats: StatSender) -> Result<()>;
 }
@@ -54,12 +54,12 @@ impl FromStr for Drivers {
     }
 }
 
-pub fn load_driver(opts: &Arc<Opts>) -> Result<Box<dyn CopyDriver>> {
-    let driver: Box<dyn CopyDriver> = match opts.driver {
-        Drivers::ParFile => Box::new(parfile::Driver::new(opts.clone())?),
+pub fn load_driver(driver: &Drivers, config: &Arc<Config>) -> Result<Box<dyn CopyDriver>> {
+    let driver_impl: Box<dyn CopyDriver> = match driver {
+        Drivers::ParFile => Box::new(parfile::Driver::new(config.clone())?),
         #[cfg(feature = "parblock")]
-        Drivers::ParBlock => Box::new(parblock::Driver::new(opts.clone())?),
+        Drivers::ParBlock => Box::new(parblock::Driver::new(config.clone())?),
     };
 
-    Ok(driver)
+    Ok(driver_impl)
 }

@@ -29,11 +29,11 @@ use libfs::{
 use log::{debug, error};
 use walkdir::WalkDir;
 
+use crate::config::Config;
 use crate::errors::{Result, XcpError};
-use crate::options::Opts;
 use crate::paths::{parse_ignore, ignore_filter};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Reflink {
     Always,
     Auto,
@@ -60,11 +60,11 @@ pub struct CopyHandle {
     pub infd: File,
     pub outfd: File,
     pub metadata: Metadata,
-    pub opts: Arc<Opts>,
+    pub config: Arc<Config>,
 }
 
 impl CopyHandle {
-    pub fn new(from: &Path, to: &Path, opts: &Arc<Opts>) -> Result<CopyHandle> {
+    pub fn new(from: &Path, to: &Path, config: &Arc<Config>) -> Result<CopyHandle> {
         let infd = File::open(from)?;
         let metadata = infd.metadata()?;
 
@@ -75,7 +75,7 @@ impl CopyHandle {
             infd,
             outfd,
             metadata,
-            opts: opts.clone(),
+            config: config.clone(),
         };
 
         Ok(handle)
@@ -85,7 +85,7 @@ impl CopyHandle {
     fn copy_bytes(&self, len: u64, updates: &StatSender) -> Result<u64> {
         let mut written = 0u64;
         while written < len {
-            let bytes_to_copy = cmp::min(len - written, self.opts.batch_size());
+            let bytes_to_copy = cmp::min(len - written, self.config.block_size);
             let bytes = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
             written += bytes;
             updates.send(StatusUpdate::Copied(bytes))?;
@@ -110,14 +110,14 @@ impl CopyHandle {
     }
 
     pub fn try_reflink(&self) -> Result<bool> {
-        match self.opts.reflink {
+        match self.config.reflink {
             Reflink::Always | Reflink::Auto => {
                 debug!("Attempting reflink from {:?}->{:?}", self.infd, self.outfd);
                 let worked = reflink(&self.infd, &self.outfd)?;
                 if worked {
                     debug!("Reflink {:?} succeeded", self.outfd);
                     Ok(true)
-                } else if self.opts.reflink == Reflink::Always {
+                } else if self.config.reflink == Reflink::Always {
                     Err(XcpError::ReflinkFailed(format!("{:?}->{:?}", self.infd, self.outfd)).into())
                 } else {
                     debug!("Failed to reflink, falling back to copy");
@@ -145,10 +145,10 @@ impl CopyHandle {
     }
 
     fn finalise_copy(&self) -> Result<()> {
-        if !self.opts.no_perms {
+        if !self.config.no_perms {
             copy_permissions(&self.infd, &self.outfd)?;
         }
-        if self.opts.fsync {
+        if self.config.fsync {
             debug!("Syncing file {:?}", self.outfd);
             sync(&self.outfd)?;
         }
@@ -179,13 +179,13 @@ static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
 #[derive(Clone)]
 pub struct StatSender {
     chan: cbc::Sender<StatusUpdate>,
-    opts: Arc<Opts>,
+    config: Arc<Config>,
 }
 impl StatSender {
-    pub fn new(chan: cbc::Sender<StatusUpdate>, opts: &Arc<Opts>) -> StatSender {
+    pub fn new(chan: cbc::Sender<StatusUpdate>, config: &Arc<Config>) -> StatSender {
         StatSender {
             chan,
-            opts: opts.clone(),
+            config: config.clone(),
         }
     }
 
@@ -193,7 +193,7 @@ impl StatSender {
     pub fn send(&self, update: StatusUpdate) -> Result<()> {
         if let StatusUpdate::Copied(bytes) = update {
             // Avoid saturating the queue with small writes
-            let bsize = self.opts.block_size;
+            let bsize = self.config.block_size;
             let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
             if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
                 self.chan.send(update)?;
@@ -215,7 +215,7 @@ pub enum Operation {
 pub fn tree_walker(
     sources: Vec<PathBuf>,
     dest: &Path,
-    opts: &Opts,
+    config: &Config,
     work_tx: cbc::Sender<Operation>,
     stats: StatSender,
 ) -> Result<()> {
@@ -227,14 +227,14 @@ pub fn tree_walker(
             .last()
             .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
 
-        let target_base = if dest.exists() && !opts.no_target_directory {
+        let target_base = if dest.exists() && !config.no_target_directory {
             dest.join(sourcedir)
         } else {
             dest.to_path_buf()
         };
         debug!("Target base is {:?}", target_base);
 
-        let gitignore = parse_ignore(&source, opts)?;
+        let gitignore = parse_ignore(&source, config)?;
 
         for entry in WalkDir::new(&source)
             .into_iter()
@@ -251,7 +251,7 @@ pub fn tree_walker(
                 target_base.clone()
             };
 
-            if opts.no_clobber && target.exists() {
+            if config.no_clobber && target.exists() {
                 let msg = "Destination file exists and --no-clobber is set.";
                 stats.send(StatusUpdate::Error(
                     XcpError::DestinationExists(msg, target)))?;
