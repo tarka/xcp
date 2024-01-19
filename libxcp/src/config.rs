@@ -56,6 +56,5 @@ pub struct Config {
     /// attempt to reflink and fallback to a copy if it is not
     /// possible, 'always' will return an error if it cannot reflink,
     /// and 'never' will always perform a full data copy.
-    //#[arg(long, default_value = "auto")]
     pub reflink: Reflink,
 }
