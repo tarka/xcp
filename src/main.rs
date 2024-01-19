@@ -53,23 +53,18 @@ fn init_logging(opts: &Opts) -> Result<()> {
     Ok(())
 }
 
-
 // Expand a list of file-paths or glob-patterns into a list of concrete paths.
+// FIXME: This currently eats non-existent files that are not
+// globs. Should we convert empty glob results into errors?
 pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
-    // FIXME: This currently eats non-existent files that are not
-    // globs. Should we convert empty glob results into errors?
-    let mut globs = patterns
-        .iter()
-        .map(|s| glob(s.as_str())) // -> Vec<Result<Paths>>
-        .collect::<result::Result<Vec<Paths>, _>>()?; // -> Result<Vec<Paths>>
-    let path_vecs = globs
+    let paths = patterns.iter()
+        .map(|s| glob(s.as_str()))
+        .collect::<result::Result<Vec<Paths>, _>>()?
         .iter_mut()
         // Force resolve each glob Paths iterator into a vector of the results...
         .map::<result::Result<Vec<PathBuf>, _>, _>(|p| p.collect())
         // And lift all the results up to the top.
-        .collect::<result::Result<Vec<Vec<PathBuf>>, _>>()?;
-    // And finally flatten the nested paths into a single collection of the results
-    let paths = path_vecs
+        .collect::<result::Result<Vec<Vec<PathBuf>>, _>>()?
         .iter()
         .flat_map(|p| p.to_owned())
         .collect::<Vec<PathBuf>>();
