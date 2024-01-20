@@ -14,6 +14,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+//! `libxcp` is a high-level file-copy engine. It has a support for
+//! multi-threading, fine-grained progress feedback, pluggable
+//! drivers, and `.gitignore` filters. `libxcp` is the core
+//! functionality of the [xcp] command-line utility.
+//!
+//! [xcp]: https://crates.io/crates/xcp/
+
 pub mod config;
 pub mod drivers;
 pub mod errors;

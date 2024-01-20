@@ -1,7 +1,9 @@
 # libxcp: High-level file-copy engine
 
-`libxcp` contains the core functionality of [xcp](https://crates.io/crates/xcp).
-
+`libxcp` is a high-level file-copy engine. It has a support for multi-threading,
+fine-grained progress feedback, pluggable drivers, and `.gitignore` filters.
+`libxcp` is the core functionality of the [xcp](https://crates.io/crates/xcp)
+command-line utility.
 
 [![Crates.io](https://img.shields.io/crates/v/xcp.svg?colorA=777777)](https://crates.io/crates/libxcp)
 [![doc.rs](https://docs.rs/libxcp/badge.svg)](https://docs.rs/libxcp)
@@ -15,6 +17,7 @@
   filesystem-aware, and can massively speed-up copies on network mounts by
   performing the copy operations server-side. However, unlike `copy_file_range`
   sparse files are detected and handled appropriately.
+* Support for modern filesystem features such as [reflinks](https://btrfs.readthedocs.io/en/latest/Reflink.html).
 * Optimised for 'modern' systems (i.e. multiple cores, copious RAM, and
   solid-state disks, especially ones connected into the main system bus,
   e.g. NVMe).
@@ -31,4 +34,3 @@
 * Non-Linux Unix-like OSs (OS X, *BSD) are supported via fall-back operation
   (although sparse-files are not yet supported in this case).
 * Optionally understands `.gitignore` files to limit the copied directories.
-* Optional native file-globbing.

@@ -56,7 +56,7 @@ fn init_logging(opts: &Opts) -> Result<()> {
 // Expand a list of file-paths or glob-patterns into a list of concrete paths.
 // FIXME: This currently eats non-existent files that are not
 // globs. Should we convert empty glob results into errors?
-pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
+fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
     let paths = patterns.iter()
         .map(|s| glob(s.as_str()))
         .collect::<result::Result<Vec<Paths>, _>>()?
