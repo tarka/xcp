@@ -186,6 +186,7 @@ pub struct ChannelUpdater {
 }
 
 impl ChannelUpdater {
+    /// Create a new ChannelUpdater, inclluding the channels.
     pub fn new(config: &Arc<Config>) -> ChannelUpdater {
         let (chan_tx, chan_rx) = cbc::unbounded();
         ChannelUpdater {
