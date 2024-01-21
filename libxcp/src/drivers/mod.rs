@@ -32,6 +32,9 @@ pub trait CopyDriver {
     fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
 }
 
+/// An enum specifing the driver to use. This is just a helper for
+/// applications to use with [load_driver()]. [FromStr] is implemented
+/// to help with this.
 #[derive(Debug, Clone, Copy)]
 pub enum Drivers {
     ParFile,
@@ -53,6 +56,7 @@ impl FromStr for Drivers {
     }
 }
 
+/// Load and configure the given driver.
 pub fn load_driver(driver: Drivers, config: &Arc<Config>) -> Result<Box<dyn CopyDriver>> {
     let driver_impl: Box<dyn CopyDriver> = match driver {
         Drivers::ParFile => Box::new(parfile::Driver::new(config.clone())?),
