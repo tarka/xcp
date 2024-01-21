@@ -176,13 +176,11 @@ pub trait StatSender: Sync + Send {
     fn send(&self, update: StatusUpdate) -> Result<()>;
 }
 
-// FIXME: We should probably abstract away more of the channel setup
-// to be no-ops when --no-progress is specified.
-static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
 
 pub struct ChannelUpdater {
     chan: cbc::Sender<StatusUpdate>,
     config: Arc<Config>,
+    sent: AtomicU64,
 }
 
 impl ChannelUpdater {
@@ -190,6 +188,7 @@ impl ChannelUpdater {
         ChannelUpdater {
             chan,
             config: config.clone(),
+            sent: AtomicU64::new(0),
         }
     }
 }
@@ -200,7 +199,7 @@ impl StatSender for ChannelUpdater {
         if let StatusUpdate::Copied(bytes) = update {
             // Avoid saturating the queue with small writes
             let bsize = self.config.block_size;
-            let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
+            let prev_written = self.sent.fetch_add(bytes, Ordering::Relaxed);
             if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
                 self.chan.send(update)?;
             }
