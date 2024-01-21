@@ -25,7 +25,7 @@ use std::thread;
 use crate::config::Config;
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{CopyHandle, StatusUpdate, StatSender, Operation, tree_walker};
+use crate::operations::{CopyHandle, StatusUpdate, StatusUpdater, Operation, tree_walker};
 
 // ********************************************************************** //
 
@@ -40,7 +40,7 @@ impl CopyDriver for Driver {
         })
     }
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatSender>) -> Result<()> {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let (work_tx, work_rx) = cbc::unbounded();
 
         // Thread which walks the file tree and sends jobs to the
@@ -72,7 +72,7 @@ impl CopyDriver for Driver {
         Ok(())
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatSender>) -> Result<()> {
+    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let handle = CopyHandle::new(source, dest, &self.config)?;
         handle.copy_file(&stats)?;
         Ok(())
@@ -84,7 +84,7 @@ impl CopyDriver for Driver {
 fn copy_worker(
     work: cbc::Receiver<Operation>,
     config: &Arc<Config>,
-    updates: Arc<dyn StatSender>,
+    updates: Arc<dyn StatusUpdater>,
 ) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {

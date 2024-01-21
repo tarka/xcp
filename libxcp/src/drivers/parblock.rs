@@ -30,7 +30,7 @@ use blocking_threadpool::{Builder, ThreadPool};
 use crate::config::Config;
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{CopyHandle, StatusUpdate, StatSender, Operation, tree_walker};
+use crate::operations::{CopyHandle, StatusUpdate, StatusUpdater, Operation, tree_walker};
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
 
 // ********************************************************************** //
@@ -71,7 +71,7 @@ impl CopyDriver for Driver {
         })
     }
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatSender>) -> Result<()> {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let (file_tx, file_rx) = cbc::unbounded::<Operation>();
 
         // Start (single) dispatch worker
@@ -103,7 +103,7 @@ impl CopyDriver for Driver {
         Ok(())
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatSender>) -> Result<()> {
+    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let nworkers = self.config.workers;
         let pool = ThreadPool::new(nworkers as usize);
 
@@ -121,7 +121,7 @@ fn queue_file_range(
     handle: &Arc<CopyHandle>,
     range: Range<u64>,
     pool: &ThreadPool,
-    status_channel: &Arc<dyn StatSender>,
+    status_channel: &Arc<dyn StatusUpdater>,
 ) -> Result<u64> {
     let len = range.end - range.start;
     let bsize = handle.config.block_size;
@@ -158,7 +158,7 @@ fn queue_file_blocks(
     source: &Path,
     dest: &Path,
     pool: &ThreadPool,
-    status_channel: &Arc<dyn StatSender>,
+    status_channel: &Arc<dyn StatusUpdater>,
     config: &Arc<Config>,
 ) -> Result<u64> {
     let handle = CopyHandle::new(source, dest, config)?;
@@ -197,7 +197,7 @@ fn queue_file_blocks(
 
 // Dispatch worker; receives queued files and hands them to
 // queue_file_blocks() which splits them onto the copy-pool.
-fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: &Arc<dyn StatSender>, config: Arc<Config>) -> Result<()> {
+fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: &Arc<dyn StatusUpdater>, config: Arc<Config>) -> Result<()> {
     let nworkers = config.workers as usize;
     let copy_pool = Builder::new()
         .num_threads(nworkers)

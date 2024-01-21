@@ -82,7 +82,7 @@ impl CopyHandle {
     }
 
     /// Copy len bytes from wherever the descriptor cursors are set.
-    fn copy_bytes(&self, len: u64, updates: &Arc<dyn StatSender>) -> Result<u64> {
+    fn copy_bytes(&self, len: u64, updates: &Arc<dyn StatusUpdater>) -> Result<u64> {
         let mut written = 0u64;
         while written < len {
             let bytes_to_copy = cmp::min(len - written, self.config.block_size);
@@ -95,7 +95,7 @@ impl CopyHandle {
     }
 
     /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
-    fn copy_sparse(&self, updates: &Arc<dyn StatSender>) -> Result<u64> {
+    fn copy_sparse(&self, updates: &Arc<dyn StatusUpdater>) -> Result<u64> {
         let len = self.metadata.len();
         let mut pos = 0;
 
@@ -131,7 +131,7 @@ impl CopyHandle {
         }
     }
 
-    pub fn copy_file(&self, updates: &Arc<dyn StatSender>) -> Result<u64> {
+    pub fn copy_file(&self, updates: &Arc<dyn StatusUpdater>) -> Result<u64> {
         if self.try_reflink()? {
             return Ok(self.metadata.len());
         }
@@ -172,7 +172,7 @@ pub enum StatusUpdate {
     Error(XcpError)
 }
 
-pub trait StatSender: Sync + Send {
+pub trait StatusUpdater: Sync + Send {
     fn send(&self, update: StatusUpdate) -> Result<()>;
 }
 
@@ -193,7 +193,7 @@ impl ChannelUpdater {
     }
 }
 
-impl StatSender for ChannelUpdater {
+impl StatusUpdater for ChannelUpdater {
     // Wrapper around channel-send that groups updates together
     fn send(&self, update: StatusUpdate) -> Result<()> {
         if let StatusUpdate::Copied(bytes) = update {
@@ -213,7 +213,7 @@ impl StatSender for ChannelUpdater {
 
 pub struct NoopUpdater;
 
-impl StatSender for NoopUpdater {
+impl StatusUpdater for NoopUpdater {
     fn send(&self, _update: StatusUpdate) -> Result<()> {
         Ok(())
     }
@@ -231,7 +231,7 @@ pub fn tree_walker(
     dest: &Path,
     config: &Config,
     work_tx: cbc::Sender<Operation>,
-    stats: Arc<dyn StatSender>,
+    stats: Arc<dyn StatusUpdater>,
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 

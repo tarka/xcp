@@ -27,7 +27,7 @@ use libfs::is_same_file;
 use libxcp::config::Config;
 use libxcp::drivers::load_driver;
 use libxcp::errors::{Result, XcpError};
-use libxcp::operations::{StatSender, StatusUpdate, ChannelUpdater};
+use libxcp::operations::{StatusUpdater, StatusUpdate, ChannelUpdater};
 use log::{error, info};
 
 use crate::options::Opts;
@@ -109,7 +109,7 @@ fn main() -> Result<()> {
 
     let pb = progress::create_bar(&opts, 0)?;
     let (stat_tx, stat_rx) = cbc::unbounded();
-    let stats: Arc<dyn StatSender> = Arc::new(ChannelUpdater::new(stat_tx, &config));
+    let stats: Arc<dyn StatusUpdater> = Arc::new(ChannelUpdater::new(stat_tx, &config));
 
     let driver = load_driver(&opts.driver, &config)?;
 

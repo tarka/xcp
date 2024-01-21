@@ -25,12 +25,12 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::errors::{Result, XcpError};
-use crate::operations::StatSender;
+use crate::operations::StatusUpdater;
 
 pub trait CopyDriver {
     fn new(config: Arc<Config>) -> Result<Self> where Self: Sized;
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatSender>) -> Result<()>;
-    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatSender>) -> Result<()>;
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
+    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
 }
 
 #[derive(Debug, Clone, Copy)]
