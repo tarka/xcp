@@ -36,8 +36,8 @@ use crate::paths::{parse_ignore, ignore_filter};
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Reflink {
     #[default]
-    Always,
     Auto,
+    Always,
     Never,
 }
 
