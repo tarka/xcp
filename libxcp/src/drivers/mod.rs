@@ -29,8 +29,8 @@ use crate::operations::StatSender;
 
 pub trait CopyDriver {
     fn new(config: Arc<Config>) -> Result<Self> where Self: Sized;
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: StatSender) -> Result<()>;
-    fn copy_single(&self, source: &Path, dest: &Path, stats: StatSender) -> Result<()>;
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatSender>) -> Result<()>;
+    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatSender>) -> Result<()>;
 }
 
 #[derive(Debug, Clone, Copy)]

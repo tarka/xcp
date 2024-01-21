@@ -82,7 +82,7 @@ impl CopyHandle {
     }
 
     /// Copy len bytes from wherever the descriptor cursors are set.
-    fn copy_bytes(&self, len: u64, updates: &StatSender) -> Result<u64> {
+    fn copy_bytes(&self, len: u64, updates: &Arc<dyn StatSender>) -> Result<u64> {
         let mut written = 0u64;
         while written < len {
             let bytes_to_copy = cmp::min(len - written, self.config.block_size);
@@ -95,7 +95,7 @@ impl CopyHandle {
     }
 
     /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
-    fn copy_sparse(&self, updates: &StatSender) -> Result<u64> {
+    fn copy_sparse(&self, updates: &Arc<dyn StatSender>) -> Result<u64> {
         let len = self.metadata.len();
         let mut pos = 0;
 
@@ -131,14 +131,14 @@ impl CopyHandle {
         }
     }
 
-    pub fn copy_file(&self, updates: &StatSender) -> Result<u64> {
+    pub fn copy_file(&self, updates: &Arc<dyn StatSender>) -> Result<u64> {
         if self.try_reflink()? {
             return Ok(self.metadata.len());
         }
         let total = if probably_sparse(&self.infd)? {
-            self.copy_sparse(updates)?
+            self.copy_sparse(&updates)?
         } else {
-            self.copy_bytes(self.metadata.len(), updates)?
+            self.copy_bytes(self.metadata.len(), &updates)?
         };
 
         Ok(total)
@@ -172,25 +172,31 @@ pub enum StatusUpdate {
     Error(XcpError)
 }
 
+pub trait StatSender: Sync + Send {
+    fn send(&self, update: StatusUpdate) -> Result<()>;
+}
+
 // FIXME: We should probably abstract away more of the channel setup
 // to be no-ops when --no-progress is specified.
 static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
 
-#[derive(Clone)]
-pub struct StatSender {
+pub struct ChannelUpdater {
     chan: cbc::Sender<StatusUpdate>,
     config: Arc<Config>,
 }
-impl StatSender {
-    pub fn new(chan: cbc::Sender<StatusUpdate>, config: &Arc<Config>) -> StatSender {
-        StatSender {
+
+impl ChannelUpdater {
+    pub fn new(chan: cbc::Sender<StatusUpdate>, config: &Arc<Config>) -> ChannelUpdater {
+        ChannelUpdater {
             chan,
             config: config.clone(),
         }
     }
+}
 
+impl StatSender for ChannelUpdater {
     // Wrapper around channel-send that groups updates together
-    pub fn send(&self, update: StatusUpdate) -> Result<()> {
+    fn send(&self, update: StatusUpdate) -> Result<()> {
         if let StatusUpdate::Copied(bytes) = update {
             // Avoid saturating the queue with small writes
             let bsize = self.config.block_size;
@@ -201,6 +207,15 @@ impl StatSender {
         } else {
             self.chan.send(update)?;
         }
+        Ok(())
+    }
+}
+
+
+pub struct NoopUpdater;
+
+impl StatSender for NoopUpdater {
+    fn send(&self, _update: StatusUpdate) -> Result<()> {
         Ok(())
     }
 }
@@ -217,7 +232,7 @@ pub fn tree_walker(
     dest: &Path,
     config: &Config,
     work_tx: cbc::Sender<Operation>,
-    stats: StatSender,
+    stats: Arc<dyn StatSender>,
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 

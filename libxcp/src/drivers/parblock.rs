@@ -71,7 +71,7 @@ impl CopyDriver for Driver {
         })
     }
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: StatSender) -> Result<()> {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatSender>) -> Result<()> {
         let (file_tx, file_rx) = cbc::unbounded::<Operation>();
 
         // Start (single) dispatch worker
@@ -79,7 +79,7 @@ impl CopyDriver for Driver {
         let _dispatcher = {
             let q_config = self.config.clone();
             let st = stats.clone();
-            thread::spawn(|| dispatch_worker(file_rx, st, q_config))
+            thread::spawn(move || dispatch_worker(file_rx, &st, q_config))
         };
 
 
@@ -103,7 +103,7 @@ impl CopyDriver for Driver {
         Ok(())
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, stats: StatSender) -> Result<()> {
+    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatSender>) -> Result<()> {
         let nworkers = self.config.workers;
         let pool = ThreadPool::new(nworkers as usize);
 
@@ -121,7 +121,7 @@ fn queue_file_range(
     handle: &Arc<CopyHandle>,
     range: Range<u64>,
     pool: &ThreadPool,
-    status_channel: &StatSender,
+    status_channel: &Arc<dyn StatSender>,
 ) -> Result<u64> {
     let len = range.end - range.start;
     let bsize = handle.config.block_size;
@@ -158,7 +158,7 @@ fn queue_file_blocks(
     source: &Path,
     dest: &Path,
     pool: &ThreadPool,
-    status_channel: &StatSender,
+    status_channel: &Arc<dyn StatSender>,
     config: &Arc<Config>,
 ) -> Result<u64> {
     let handle = CopyHandle::new(source, dest, config)?;
@@ -197,7 +197,7 @@ fn queue_file_blocks(
 
 // Dispatch worker; receives queued files and hands them to
 // queue_file_blocks() which splits them onto the copy-pool.
-fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: StatSender, config: Arc<Config>) -> Result<()> {
+fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: &Arc<dyn StatSender>, config: Arc<Config>) -> Result<()> {
     let nworkers = config.workers as usize;
     let copy_pool = Builder::new()
         .num_threads(nworkers)
@@ -211,7 +211,7 @@ fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: StatSender, config: 
         match op {
             Operation::Copy(from, to) => {
                 info!("Dispatch[{:?}]: Copy {:?} -> {:?}", thread::current().id(), from, to);
-                let r = queue_file_blocks(&from, &to, &copy_pool, &stats, &config);
+                let r = queue_file_blocks(&from, &to, &copy_pool, stats, &config);
                 if let Err(e) = r {
                     stats.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
                     error!("Dispatcher: Error copying {:?} -> {:?}.", from, to);
