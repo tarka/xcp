@@ -96,7 +96,9 @@ impl CopyDriver for Driver {
         // FIXME: Ideally we should join the dispatch and walker
         // threads to ensure we pickup any errors not on the
         // queue. However this would block until all work was
-        // dispatched, blocking progress bar updates.
+        // dispatched, blocking progress bar updates. On option would
+        // be to put this whole function into a thread.
+        //
         // _dispatcher.join()
         //     .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
 
@@ -104,8 +106,8 @@ impl CopyDriver for Driver {
     }
 
     fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
-        let nworkers = self.config.workers;
-        let pool = ThreadPool::new(nworkers as usize);
+        let nworkers = self.config.num_workers();
+        let pool = ThreadPool::new(nworkers);
 
         queue_file_blocks(source, dest, &pool, &stats, &self.config)?;
 
@@ -198,7 +200,7 @@ fn queue_file_blocks(
 // Dispatch worker; receives queued files and hands them to
 // queue_file_blocks() which splits them onto the copy-pool.
 fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: &Arc<dyn StatusUpdater>, config: Arc<Config>) -> Result<()> {
-    let nworkers = config.workers as usize;
+    let nworkers = config.num_workers();
     let copy_pool = Builder::new()
         .num_threads(nworkers)
         // Use bounded queue for backpressure; this limits open

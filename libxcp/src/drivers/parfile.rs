@@ -55,7 +55,7 @@ impl CopyDriver for Driver {
 
         // Worker threads. Will consume work and then shutdown once the
         // queue is closed by the walker.
-        for _ in 0..self.config.workers {
+        for _ in 0..self.config.num_workers() {
             let _copy_worker = {
                 let wrx = work_rx.clone();
                 let sc = stats.clone();

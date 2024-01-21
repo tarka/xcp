@@ -16,9 +16,10 @@
 
 use crate::operations::Reflink;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Config {
-    /// Number of parallel workers.
+    /// Number of parallel workers. 0 means use the number of logical
+    /// CPUs.
     pub workers: usize,
 
     /// Block size for operations.
@@ -54,4 +55,14 @@ pub struct Config {
     /// possible, 'always' will return an error if it cannot reflink,
     /// and 'never' will always perform a full data copy.
     pub reflink: Reflink,
+}
+
+impl Config {
+    pub(crate) fn num_workers(&self) -> usize {
+        if self.workers == 0 {
+            num_cpus::get()
+        } else {
+            self.workers
+        }
+    }
 }

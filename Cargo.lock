@@ -378,6 +378,7 @@ dependencies = [
  "ignore",
  "libfs",
  "log",
+ "num_cpus",
  "thiserror",
  "walkdir",
 ]

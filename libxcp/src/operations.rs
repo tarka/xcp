@@ -33,8 +33,9 @@ use crate::config::Config;
 use crate::errors::{Result, XcpError};
 use crate::paths::{parse_ignore, ignore_filter};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Reflink {
+    #[default]
     Always,
     Auto,
     Never,
@@ -199,18 +200,16 @@ impl ChannelUpdater {
     /// channel. Note: As ChannelUpdater is consumed by the driver
     /// call you should call this before then; e.g:
     ///
-    /// ```ignore
-    /// use libxcp::operations::ChannelUpdater;
+    /// ```
+    /// # use std::sync::Arc;
+    /// use libxcp::config::Config;
+    /// use libxcp::operations::{ChannelUpdater, StatusUpdater};
     ///
+    /// let config = Arc::new(Config::default());
     /// let updater = ChannelUpdater::new(&config);
     /// let stat_rx = updater.rx_channel();
     /// let stats: Arc<dyn StatusUpdater> = Arc::new(updater);
-    ///
-    /// ...
-    ///
-    /// driver.copy_all(sources, &dest, stats)?;
     /// ```
-
     pub fn rx_channel(&self) -> cbc::Receiver<StatusUpdate> {
         self.chan_rx.clone()
     }

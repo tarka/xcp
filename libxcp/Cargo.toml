@@ -27,6 +27,7 @@ crossbeam-channel = "0.5.11"
 ignore = "0.4.22"
 libfs = { version = "0.5.1", path = "../libfs" }
 log = "0.4.20"
+num_cpus = "1.16.0"
 thiserror = "1.0.56"
 walkdir = "2.4.0"
 
