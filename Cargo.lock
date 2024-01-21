@@ -379,6 +379,7 @@ dependencies = [
  "libfs",
  "log",
  "num_cpus",
+ "tempfile",
  "thiserror",
  "walkdir",
 ]
