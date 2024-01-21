@@ -39,7 +39,7 @@
 //! let stat_rx = updater.rx_channel();
 //! let stats: Arc<dyn StatusUpdater> = Arc::new(updater);
 //!
-//! let driver = load_driver(&Drivers::ParFile, &config).unwrap();
+//! let driver = load_driver(Drivers::ParFile, &config).unwrap();
 //!
 //! driver.copy_all(sources, dest.path(), stats).unwrap();
 //!
@@ -92,7 +92,7 @@ mod tests {
         let stat_rx = updater.rx_channel();
         let stats: Arc<dyn StatusUpdater> = Arc::new(updater);
 
-        let driver = load_driver(&Drivers::ParFile, &config)?;
+        let driver = load_driver(Drivers::ParFile, &config)?;
 
         driver.copy_all(sources, dest.path(), stats)?;
 

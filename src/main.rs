@@ -110,7 +110,7 @@ fn main() -> Result<()> {
     let stat_rx = updater.rx_channel();
     let stats: Arc<dyn StatusUpdater> = Arc::new(updater);
 
-    let driver = load_driver(&opts.driver, &config)?;
+    let driver = load_driver(opts.driver, &config)?;
 
     if sources.len() == 1 && dest.is_file() {
         let source = &sources[0];

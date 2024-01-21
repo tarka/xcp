@@ -53,7 +53,7 @@ impl FromStr for Drivers {
     }
 }
 
-pub fn load_driver(driver: &Drivers, config: &Arc<Config>) -> Result<Box<dyn CopyDriver>> {
+pub fn load_driver(driver: Drivers, config: &Arc<Config>) -> Result<Box<dyn CopyDriver>> {
     let driver_impl: Box<dyn CopyDriver> = match driver {
         Drivers::ParFile => Box::new(parfile::Driver::new(config.clone())?),
         #[cfg(feature = "parblock")]
