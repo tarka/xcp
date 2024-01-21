@@ -178,18 +178,41 @@ pub trait StatusUpdater: Sync + Send {
 
 
 pub struct ChannelUpdater {
-    chan: cbc::Sender<StatusUpdate>,
+    chan_tx: cbc::Sender<StatusUpdate>,
+    chan_rx: cbc::Receiver<StatusUpdate>,
     config: Arc<Config>,
     sent: AtomicU64,
 }
 
 impl ChannelUpdater {
-    pub fn new(chan: cbc::Sender<StatusUpdate>, config: &Arc<Config>) -> ChannelUpdater {
+    pub fn new(config: &Arc<Config>) -> ChannelUpdater {
+        let (chan_tx, chan_rx) = cbc::unbounded();
         ChannelUpdater {
-            chan,
+            chan_tx,
+            chan_rx,
             config: config.clone(),
             sent: AtomicU64::new(0),
         }
+    }
+
+    /// Retrieve a clone of the receive end of the update
+    /// channel. Note: As ChannelUpdater is consumed by the driver
+    /// call you should call this before then; e.g:
+    ///
+    /// ```ignore
+    /// use libxcp::operations::ChannelUpdater;
+    ///
+    /// let updater = ChannelUpdater::new(&config);
+    /// let stat_rx = updater.rx_channel();
+    /// let stats: Arc<dyn StatusUpdater> = Arc::new(updater);
+    ///
+    /// ...
+    ///
+    /// driver.copy_all(sources, &dest, stats)?;
+    /// ```
+
+    pub fn rx_channel(&self) -> cbc::Receiver<StatusUpdate> {
+        self.chan_rx.clone()
     }
 }
 
@@ -201,10 +224,10 @@ impl StatusUpdater for ChannelUpdater {
             let bsize = self.config.block_size;
             let prev_written = self.sent.fetch_add(bytes, Ordering::Relaxed);
             if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
-                self.chan.send(update)?;
+                self.chan_tx.send(update)?;
             }
         } else {
-            self.chan.send(update)?;
+            self.chan_tx.send(update)?;
         }
         Ok(())
     }

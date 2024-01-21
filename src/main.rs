@@ -21,7 +21,6 @@ use std::path::PathBuf;
 use std::result;
 use std::sync::Arc;
 
-use crossbeam_channel as cbc;
 use glob::{glob, Paths};
 use libfs::is_same_file;
 use libxcp::config::Config;
@@ -107,9 +106,9 @@ fn main() -> Result<()> {
 
     let config = Arc::new(Config::from(&opts));
 
-    let pb = progress::create_bar(&opts, 0)?;
-    let (stat_tx, stat_rx) = cbc::unbounded();
-    let stats: Arc<dyn StatusUpdater> = Arc::new(ChannelUpdater::new(stat_tx, &config));
+    let updater = ChannelUpdater::new(&config);
+    let stat_rx = updater.rx_channel();
+    let stats: Arc<dyn StatusUpdater> = Arc::new(updater);
 
     let driver = load_driver(&opts.driver, &config)?;
 
@@ -153,6 +152,8 @@ fn main() -> Result<()> {
 
         driver.copy_all(sources, &dest, stats)?;
     }
+
+    let pb = progress::create_bar(&opts, 0)?;
 
     // Gather the results as we go; our end of the channel has been
     // moved to the driver call and will end when drained.
