@@ -33,13 +33,15 @@ pub struct Driver {
     config: Arc<Config>,
 }
 
-impl CopyDriver for Driver {
-    fn new(config: Arc<Config>) -> Result<Self> {
+impl Driver {
+    pub fn new(config: Arc<Config>) -> Result<Self> {
         Ok(Self {
             config,
         })
     }
+}
 
+impl CopyDriver for Driver {
     fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let (work_tx, work_rx) = cbc::unbounded();
 

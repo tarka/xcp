@@ -58,8 +58,8 @@ pub struct Driver {
     config: Arc<Config>,
 }
 
-impl CopyDriver for Driver {
-    fn new(config: Arc<Config>) -> Result<Self> {
+impl Driver {
+    pub fn new(config: Arc<Config>) -> Result<Self> {
         if !supported_platform() {
             let msg = "The parblock driver is not currently supported on this OS.";
             error!("{}", msg);
@@ -70,7 +70,9 @@ impl CopyDriver for Driver {
             config,
         })
     }
+}
 
+impl CopyDriver for Driver {
     fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let (file_tx, file_rx) = cbc::unbounded::<Operation>();
 

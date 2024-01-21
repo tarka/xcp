@@ -28,7 +28,6 @@ use crate::errors::{Result, XcpError};
 use crate::operations::StatusUpdater;
 
 pub trait CopyDriver {
-    fn new(config: Arc<Config>) -> Result<Self> where Self: Sized;
     fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
     fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
 }
