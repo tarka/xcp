@@ -28,8 +28,8 @@
 //! #
 //! use libxcp::errors::Result;
 //! use libxcp::config::Config;
-//! use libxcp::operations::StatusUpdate;
-//! use libxcp::{operations::{ChannelUpdater, StatusUpdater}, drivers::{Drivers, load_driver}};
+//! use libxcp::operations::{ChannelUpdater, StatusUpdater, StatusUpdate};
+//! use libxcp::drivers::{Drivers, load_driver};
 //!
 //! let sources = vec![PathBuf::from("src")];
 //! let dest = TempDir::new().unwrap();
