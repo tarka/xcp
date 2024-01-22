@@ -30,7 +30,8 @@ use blocking_threadpool::{Builder, ThreadPool};
 use crate::config::Config;
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{CopyHandle, StatusUpdate, StatusUpdater, Operation, tree_walker};
+use crate::feedback::{StatusUpdate, StatusUpdater};
+use crate::operations::{CopyHandle, Operation, tree_walker};
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
 
 // ********************************************************************** //

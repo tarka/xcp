@@ -26,9 +26,8 @@
 //! # use std::sync::Arc;
 //! # use tempfile::TempDir;
 //! #
-//! use libxcp::errors::Result;
 //! use libxcp::config::Config;
-//! use libxcp::operations::{ChannelUpdater, StatusUpdater, StatusUpdate};
+//! use libxcp::feedback::{ChannelUpdater, StatusUpdater, StatusUpdate};
 //! use libxcp::drivers::{Drivers, load_driver};
 //!
 //! let sources = vec![PathBuf::from("src")];
@@ -65,6 +64,7 @@
 pub mod config;
 pub mod drivers;
 pub mod errors;
+pub mod feedback;
 pub mod operations;
 pub mod paths;
 
@@ -78,12 +78,12 @@ mod tests {
 
     use crate::errors::Result;
     use crate::config::Config;
-    use crate::operations::StatusUpdate;
-    use crate::{operations::{ChannelUpdater, StatusUpdater}, drivers::{Drivers, load_driver}};
+    use crate::feedback::{ChannelUpdater, StatusUpdater, StatusUpdate};
+    use crate::{drivers::{Drivers, load_driver}};
 
 
     #[test]
-    fn example_usage_test() -> Result<()> {
+    fn simple_usage_test() -> Result<()> {
         let sources = vec![PathBuf::from("src")];
         let dest = TempDir::new()?;
 

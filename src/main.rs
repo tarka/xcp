@@ -26,7 +26,7 @@ use libfs::is_same_file;
 use libxcp::config::Config;
 use libxcp::drivers::load_driver;
 use libxcp::errors::{Result, XcpError};
-use libxcp::operations::{StatusUpdater, StatusUpdate, ChannelUpdater};
+use libxcp::feedback::{ChannelUpdater, StatusUpdate, StatusUpdater};
 use log::{error, info};
 
 use crate::options::Opts;

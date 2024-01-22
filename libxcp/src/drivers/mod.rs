@@ -25,7 +25,7 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::errors::{Result, XcpError};
-use crate::operations::StatusUpdater;
+use crate::feedback::StatusUpdater;
 
 pub trait CopyDriver {
     fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
