@@ -82,13 +82,11 @@ impl CopyDriver for Driver {
         let (file_tx, file_rx) = cbc::unbounded::<Operation>();
 
         // Start (single) dispatch worker
-
-        let _dispatcher = {
+        let dispatcher = {
             let q_config = self.config.clone();
             let st = stats.clone();
             thread::spawn(move || dispatch_worker(file_rx, &st, q_config))
         };
-
 
         // Thread which walks the file tree and sends jobs to the
         // workers. The worker tx channel is moved to the walker so it is
@@ -100,14 +98,8 @@ impl CopyDriver for Driver {
             thread::spawn(move || tree_walker(sources, &d, &c, file_tx, sc))
         };
 
-        // FIXME: Ideally we should join the dispatch and walker
-        // threads to ensure we pickup any errors not on the
-        // queue. However this would block until all work was
-        // dispatched, blocking progress bar updates. On option would
-        // be to put this whole function into a thread.
-        //
-        // _dispatcher.join()
-        //     .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
+        dispatcher.join()
+            .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
 
         Ok(())
     }

@@ -18,7 +18,7 @@
 //!
 
 //! Users of `libxcp` can implement the [StatusUpdater] trait and pass
-//! an instance to the driver, usually using [load_driver()]. Two
+//! an instance to the driver, usually using `load_driver()`. Two
 //! implementations are provided:
 //!
 //! * [NoopUpdater]

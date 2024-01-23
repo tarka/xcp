@@ -61,19 +61,22 @@ impl CopyDriver for Driver {
 
         // Worker threads. Will consume work and then shutdown once the
         // queue is closed by the walker.
-        for _ in 0..self.config.num_workers() {
-            let _copy_worker = {
+        let nworkers = self.config.num_workers();
+        let mut joins = Vec::with_capacity(nworkers);
+        for _ in 0..nworkers {
+            let copy_worker = {
                 let wrx = work_rx.clone();
                 let sc = stats.clone();
-                let o = self.config.clone();
-                thread::spawn(move || copy_worker(wrx, &o, sc))
+                let conf = self.config.clone();
+                thread::spawn(move || copy_worker(wrx, &conf, sc))
             };
+            joins.push(copy_worker);
         }
 
-        // FIXME: Ideally we should join the dispatch and walker
-        // threads to ensure we pickup any errors not on the
-        // queue. However this would block until all work was
-        // dispatched, blocking progress bar updates.
+        for handle in joins {
+            handle.join()
+                .map_err(|_| XcpError::CopyError("Error during copy operation".to_string()))??;
+        }
 
         Ok(())
     }

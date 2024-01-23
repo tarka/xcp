@@ -18,7 +18,7 @@ mod options;
 mod progress;
 
 use std::path::PathBuf;
-use std::result;
+use std::{result, thread};
 use std::sync::Arc;
 
 use glob::{glob, Paths};
@@ -112,8 +112,8 @@ fn main() -> Result<()> {
 
     let driver = load_driver(opts.driver, &config)?;
 
-    if sources.len() == 1 && dest.is_file() {
-        let source = &sources[0];
+    let handle = if sources.len() == 1 && dest.is_file() {
+        let source = sources[0].clone();
 
         // Special case; attemping to rename/overwrite existing file.
         if opts.no_clobber {
@@ -122,12 +122,14 @@ fn main() -> Result<()> {
 
         // Special case: Attempt to overwrite a file with
         // itself. Always disallow for now.
-        if is_same_file(source, &dest)? {
+        if is_same_file(&source, &dest)? {
             return Err(XcpError::DestinationExists("Source and destination is the same file.", dest).into());
         }
 
         info!("Copying file {:?} to {:?}", source, dest);
-        driver.copy_single(source, &dest, stats)?;
+        thread::spawn(move || -> Result<()> {
+            driver.copy_single(&source, &dest, stats)
+        })
 
     } else {
         // Sanity-check all sources up-front
@@ -150,8 +152,10 @@ fn main() -> Result<()> {
             }
         }
 
-        driver.copy_all(sources, &dest, stats)?;
-    }
+        thread::spawn(move || -> Result<()> {
+            driver.copy_all(sources, &dest, stats)
+        })
+    };
 
     let pb = progress::create_bar(&opts, 0)?;
 
@@ -168,6 +172,9 @@ fn main() -> Result<()> {
             }
         }
     }
+
+    handle.join()
+            .map_err(|_| XcpError::CopyError("Error during copy operation".to_string()))??;
 
     info!("Copy complete");
     pb.end();
