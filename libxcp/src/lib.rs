@@ -79,7 +79,7 @@ mod tests {
     use crate::errors::Result;
     use crate::config::Config;
     use crate::feedback::{ChannelUpdater, StatusUpdater, StatusUpdate};
-    use crate::{drivers::{Drivers, load_driver}};
+    use crate::drivers::{Drivers, load_driver};
 
 
     #[test]

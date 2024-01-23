@@ -28,7 +28,14 @@ use crate::errors::{Result, XcpError};
 use crate::feedback::StatusUpdater;
 
 pub trait CopyDriver {
+    /// Recursively copy a set of paths to a
+    /// destination. `StatusUpdater.send()` will be called with
+    /// `StatusUpdate` objects depending on the driver configuration.
     fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
+
+    /// Copy a single file to a destination. `StatusUpdater.send()`
+    /// will be called with `StatusUpdate` objects depending on the
+    /// driver configuration. For directory copies use `copy_all()`.
     fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
 }
 
