@@ -34,3 +34,9 @@ command-line utility.
 * Non-Linux Unix-like OSs (OS X, *BSD) are supported via fall-back operation
   (although sparse-files are not yet supported in this case).
 * Optionally understands `.gitignore` files to limit the copied directories.
+
+## Testing
+
+`libxcp` itself doesn't have many tests; the top-level `xcp` application however
+has many tests, including fuzzed stress-tests. This should be considered the
+test suite for now.
