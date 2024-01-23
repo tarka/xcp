@@ -55,7 +55,7 @@ impl FromStr for Reflink {
 
 /// A structure defining the runtime options for copy-drivers. This
 /// would normally be passed to `load_driver()`.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Config {
     /// Number of parallel workers. 0 means use the number of logical
     /// CPUs.
@@ -102,6 +102,21 @@ impl Config {
             num_cpus::get()
         } else {
             self.workers
+        }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            workers: num_cpus::get(),
+            block_size: u64::max_value(),
+            gitignore: false,
+            no_clobber: false,
+            no_perms: false,
+            no_target_directory: false,
+            fsync: false,
+            reflink: Reflink::Auto,
         }
     }
 }
