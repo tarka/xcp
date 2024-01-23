@@ -16,12 +16,11 @@
 
 use clap::{ArgAction, Parser};
 
-use libxcp::config::Config;
+use libxcp::config::{Config, Reflink};
 use unbytify::unbytify;
 
 use libxcp::drivers::Drivers;
 use libxcp::errors::Result;
-use libxcp::operations::Reflink;
 
 #[derive(Clone, Debug, Parser)]
 #[command(

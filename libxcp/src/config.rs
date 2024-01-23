@@ -14,7 +14,34 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::operations::Reflink;
+//! Driver configuration support.
+
+use std::result;
+use std::str::FromStr;
+
+use crate::errors::XcpError;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum Reflink {
+    #[default]
+    Auto,
+    Always,
+    Never,
+}
+
+// String conversion helper as a convenience for command-line parsing.
+impl FromStr for Reflink {
+    type Err = XcpError;
+
+    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "always" => Ok(Reflink::Always),
+            "auto" => Ok(Reflink::Auto),
+            "never" => Ok(Reflink::Never),
+            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'reflink': {}", s))),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct Config {

@@ -65,8 +65,8 @@ pub mod config;
 pub mod drivers;
 pub mod errors;
 pub mod feedback;
-pub mod operations;
-pub mod paths;
+mod operations;
+mod paths;
 
 #[cfg(test)]
 #[allow(unused)]

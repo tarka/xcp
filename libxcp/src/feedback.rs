@@ -14,6 +14,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+//! Support for runtime feedback of copy progress.
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use crossbeam_channel as cbc;

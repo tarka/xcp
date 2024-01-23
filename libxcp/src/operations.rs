@@ -17,8 +17,6 @@
 use std::{cmp, thread};
 use std::fs::{File, Metadata, read_link, create_dir_all};
 use std::path::{Path, PathBuf};
-use std::result;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use crossbeam_channel as cbc;
@@ -28,33 +26,10 @@ use libfs::{
 use log::{debug, error};
 use walkdir::WalkDir;
 
-use crate::config::Config;
+use crate::config::{Config, Reflink};
 use crate::errors::{Result, XcpError};
 use crate::feedback::{StatusUpdate, StatusUpdater};
 use crate::paths::{parse_ignore, ignore_filter};
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub enum Reflink {
-    #[default]
-    Auto,
-    Always,
-    Never,
-}
-
-// String conversion helper as a convenience for command-line parsing.
-impl FromStr for Reflink {
-    type Err = XcpError;
-
-    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "always" => Ok(Reflink::Always),
-            "auto" => Ok(Reflink::Auto),
-            "never" => Ok(Reflink::Never),
-            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'reflink': {}", s))),
-        }
-    }
-}
-
 
 #[derive(Debug)]
 pub struct CopyHandle {

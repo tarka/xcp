@@ -14,6 +14,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+//! Support for pluggable copy drivers.
+
 pub mod parfile;
 #[cfg(feature = "parblock")]
 pub mod parblock;
