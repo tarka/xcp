@@ -26,9 +26,16 @@ use crate::errors::XcpError;
 /// is supported.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Reflink {
+    /// Attempt to reflink and fallback to a copy if it is not
+    /// possible.
     #[default]
     Auto,
+    /// Always attempt a reflink; return an error if not supported.
     Always,
+    /// Always perform a full data copy. Note: when using Linux
+    /// accelerated copy operations (the default when available) the
+    /// kernel may choose to reflink rather than perform a fully copy
+    /// regardless of this setting.
     Never,
 }
 

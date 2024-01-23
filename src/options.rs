@@ -105,6 +105,10 @@ pub struct Opts {
     /// attempt to reflink and fallback to a copy if it is not
     /// possible, 'always' will return an error if it cannot reflink,
     /// and 'never' will always perform a full data copy.
+    ///
+    /// Note: when using Linux accelerated copy operations (the
+    /// default when available) the kernel may choose to reflink
+    /// rather than perform a fully copy regardless of this setting.
     #[arg(long, default_value = "auto")]
     pub reflink: Reflink,
 

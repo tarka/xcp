@@ -83,7 +83,6 @@ mod tests {
     use crate::feedback::{ChannelUpdater, StatusUpdater, StatusUpdate};
     use crate::drivers::{Drivers, load_driver};
 
-
     #[test]
     fn simple_usage_test() -> Result<()> {
         let sources = vec![PathBuf::from("src")];
