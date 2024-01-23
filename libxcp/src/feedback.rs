@@ -15,6 +15,14 @@
  */
 
 //! Support for runtime feedback of copy progress.
+//!
+
+//! Users of `libxcp` can implement the [StatusUpdater] trait and pass
+//! an instance to the driver, usually using [load_driver()]. Two
+//! implementations are provided:
+//!
+//! * [NoopUpdater]
+//! * [ChannelUpdater]
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -23,10 +31,15 @@ use crossbeam_channel as cbc;
 use crate::config::Config;
 use crate::errors::{Result, XcpError};
 
+/// A struct representing an updated status.
 #[derive(Debug)]
 pub enum StatusUpdate {
+    /// An update representing a successful copy of bytes between
+    /// files.
     Copied(u64),
+    /// An update representing that this number of bytes will need to be copied.
     Size(u64),
+    /// An error during a copy operation.
     Error(XcpError)
 }
 
@@ -34,7 +47,11 @@ pub trait StatusUpdater: Sync + Send {
     fn send(&self, update: StatusUpdate) -> Result<()>;
 }
 
-
+/// An implementation of [StatusUpdater] which will return
+/// [StatusUpdate] objects via a channel. On copy completion the
+/// channel will be closed, allowing the caller to iterator over
+/// returned updates. See the top-level module for an example of
+/// usage.
 pub struct ChannelUpdater {
     chan_tx: cbc::Sender<StatusUpdate>,
     chan_rx: cbc::Receiver<StatusUpdate>,
@@ -43,7 +60,7 @@ pub struct ChannelUpdater {
 }
 
 impl ChannelUpdater {
-    /// Create a new ChannelUpdater, inclluding the channels.
+    /// Create a new ChannelUpdater, including the channels.
     pub fn new(config: &Arc<Config>) -> ChannelUpdater {
         let (chan_tx, chan_rx) = cbc::unbounded();
         ChannelUpdater {
@@ -90,7 +107,7 @@ impl StatusUpdater for ChannelUpdater {
     }
 }
 
-
+/// A null updater for when no feedback is required.
 pub struct NoopUpdater;
 
 impl StatusUpdater for NoopUpdater {
