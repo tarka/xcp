@@ -14,6 +14,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+//! Parallelise copying at the file level. This can improve speed on
+//! modern NVME devices, but can bottleneck on larger files.
+
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
 use libfs::copy_node;

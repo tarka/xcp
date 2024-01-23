@@ -15,6 +15,21 @@
  */
 
 //! Support for pluggable copy drivers.
+//!
+//! Two drivers are currently supported:
+//! * `parfile`: Parallelise copying at the file level. This can improve
+//!   speed on modern NVME devices, but can bottleneck on larger files.
+//! * `parblock`: Parallelise copying at the block level. Block-size is
+//!   configurable. This can have better performance for large files,
+//!   but has a higher overhead.
+//!
+//! Drivers are configured with the [Config] struct. A convenience
+//! function [load_driver()] is provided to load a dynamic-dispatched
+//! instance of each driver.
+//!
+//! # Example
+//!
+//! See the example in top-level module.
 
 pub mod parfile;
 #[cfg(feature = "parblock")]
@@ -29,6 +44,8 @@ use crate::config::Config;
 use crate::errors::{Result, XcpError};
 use crate::feedback::StatusUpdater;
 
+/// The trait specifying driver operations; drivers should implement
+/// this.
 pub trait CopyDriver {
     /// Recursively copy a set of paths to a
     /// destination. `StatusUpdater.send()` will be called with

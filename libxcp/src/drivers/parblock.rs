@@ -14,6 +14,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+//! Parallelise copying at the block level. Block-size is
+//! configurable. This can have better performance for large files,
+//! but has a higher overhead.
+
 use std::cmp;
 use std::ops::Range;
 use std::os::unix::fs::symlink;

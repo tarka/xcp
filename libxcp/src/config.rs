@@ -21,6 +21,9 @@ use std::str::FromStr;
 
 use crate::errors::XcpError;
 
+/// Enum defining configuration options for handling
+/// [reflinks](https://btrfs.readthedocs.io/en/latest/Reflink.html). [FromStr]
+/// is supported.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Reflink {
     #[default]
@@ -43,6 +46,8 @@ impl FromStr for Reflink {
     }
 }
 
+/// A structure defining the runtime options for copy-drivers. This
+/// would normally be passed to `load_driver()`.
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     /// Number of parallel workers. 0 means use the number of logical

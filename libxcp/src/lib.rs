@@ -65,6 +65,8 @@ pub mod config;
 pub mod drivers;
 pub mod errors;
 pub mod feedback;
+
+// Internal
 mod operations;
 mod paths;
 
