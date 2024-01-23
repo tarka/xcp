@@ -137,9 +137,9 @@ impl CopyHandle {
             return Ok(self.metadata.len());
         }
         let total = if probably_sparse(&self.infd)? {
-            self.copy_sparse(&updates)?
+            self.copy_sparse(updates)?
         } else {
-            self.copy_bytes(self.metadata.len(), &updates)?
+            self.copy_bytes(self.metadata.len(), updates)?
         };
 
         Ok(total)

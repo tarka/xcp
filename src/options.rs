@@ -122,7 +122,7 @@ pub fn parse_args() -> Result<Opts> {
 impl From<&Opts> for Config {
     fn from(opts: &Opts) -> Self {
         Config {
-            workers: if opts.workers <= 0 {
+            workers: if opts.workers == 0 {
                 num_cpus::get()
             } else {
                 opts.workers
