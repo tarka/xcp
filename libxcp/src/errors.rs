@@ -14,6 +14,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+//! Custom error types.
+
 use std::path::PathBuf;
 
 pub use anyhow::Result;

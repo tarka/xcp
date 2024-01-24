@@ -14,20 +14,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::{Path, PathBuf};
-use std::result;
-
 use clap::{ArgAction, Parser};
-use glob::{glob, Paths};
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
-use log::info;
 
+use libxcp::config::{Config, Reflink};
 use unbytify::unbytify;
-use walkdir::DirEntry;
 
-use crate::drivers::Drivers;
-use crate::errors::Result;
-use crate::operations::Reflink;
+use libxcp::drivers::Drivers;
+use libxcp::errors::Result;
 
 #[derive(Clone, Debug, Parser)]
 #[command(
@@ -50,7 +43,7 @@ pub struct Opts {
     /// Default is 4; if the value is negative or 0 it uses the number
     /// of logical CPUs.
     #[arg(short, long, default_value = "4")]
-    pub workers: i64,
+    pub workers: usize,
 
     /// Block size for operations.
     ///
@@ -112,6 +105,10 @@ pub struct Opts {
     /// attempt to reflink and fallback to a copy if it is not
     /// possible, 'always' will return an error if it cannot reflink,
     /// and 'never' will always perform a full data copy.
+    ///
+    /// Note: when using Linux accelerated copy operations (the
+    /// default when available) the kernel may choose to reflink
+    /// rather than perform a fully copy regardless of this setting.
     #[arg(long, default_value = "auto")]
     pub reflink: Reflink,
 
@@ -121,91 +118,29 @@ pub struct Opts {
     pub paths: Vec<String>,
 }
 
-impl Opts {
-    pub fn batch_size(&self) -> u64 {
-        if self.no_progress {
-            usize::max_value() as u64
-        } else {
-            self.block_size
-        }
-    }
-
-    // StructOpt/Clap handles optional flags with optional values as nested Options.
-    pub fn num_workers(&self) -> u64 {
-        if self.workers <= 0 {
-            num_cpus::get() as u64
-        } else {
-            self.workers as u64
-        }
-    }
-}
-
-
-// Expand a list of file-paths or glob-patterns into a list of concrete paths.
-//
-// Note: This is probably iterator overkill, but it took me a whole
-// day to work this out and I'm not prepared to give it up yet.
-//
-// FIXME: This currently eats non-existent files that are not
-// globs. Should we convert empty glob results into errors?
-//
-pub fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
-    let mut globs = patterns
-        .iter()
-        .map(|s| glob(s.as_str())) // -> Vec<Result<Paths>>
-        .collect::<result::Result<Vec<Paths>, _>>()?; // -> Result<Vec<Paths>>
-    let path_vecs = globs
-        .iter_mut()
-        // Force resolve each glob Paths iterator into a vector of the results...
-        .map::<result::Result<Vec<PathBuf>, _>, _>(|p| p.collect())
-        // And lift all the results up to the top.
-        .collect::<result::Result<Vec<Vec<PathBuf>>, _>>()?;
-    // And finally flatten the nested paths into a single collection of the results
-    let paths = path_vecs
-        .iter()
-        .flat_map(|p| p.to_owned())
-        .collect::<Vec<PathBuf>>();
-
-    Ok(paths)
-}
-
-pub fn to_pathbufs(paths: &[String]) -> Vec<PathBuf> {
-    paths.iter().map(PathBuf::from).collect::<Vec<PathBuf>>()
-}
-
-pub fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
-    if opts.glob {
-        expand_globs(source_list)
-    } else {
-        Ok(to_pathbufs(source_list))
-    }
-}
-
-pub fn parse_ignore(source: &Path, opts: &Opts) -> Result<Option<Gitignore>> {
-    let gitignore = if opts.gitignore {
-        let gifile = source.join(".gitignore");
-        info!("Using .gitignore file {:?}", gifile);
-        let mut builder = GitignoreBuilder::new(source);
-        builder.add(&gifile);
-        let ignore = builder.build()?;
-        Some(ignore)
-    } else {
-        None
-    };
-    Ok(gitignore)
-}
-
-pub fn ignore_filter(entry: &DirEntry, ignore: &Option<Gitignore>) -> bool {
-    match ignore {
-        None => true,
-        Some(gi) => {
-            let path = entry.path();
-            let m = gi.matched(path, path.is_dir());
-            !m.is_ignore()
-        }
-    }
-}
-
 pub fn parse_args() -> Result<Opts> {
     Ok(Opts::parse())
+}
+
+impl From<&Opts> for Config {
+    fn from(opts: &Opts) -> Self {
+        Config {
+            workers: if opts.workers == 0 {
+                num_cpus::get()
+            } else {
+                opts.workers
+            },
+            block_size: if opts.no_progress {
+                usize::max_value() as u64
+            } else {
+                opts.block_size
+            },
+            gitignore: opts.gitignore,
+            no_clobber: opts.no_clobber,
+            no_perms: opts.no_perms,
+            no_target_directory: opts.no_target_directory,
+            fsync: opts.fsync,
+            reflink: opts.reflink,
+        }
+    }
 }

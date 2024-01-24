@@ -14,6 +14,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+//! Parallelise copying at the file level. This can improve speed on
+//! modern NVME devices, but can bottleneck on larger files.
+
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
 use libfs::copy_node;
@@ -22,25 +25,28 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 
+use crate::config::Config;
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{CopyHandle, StatusUpdate, StatSender, Operation, tree_walker};
-use crate::options::Opts;
+use crate::feedback::{StatusUpdate, StatusUpdater};
+use crate::operations::{CopyHandle, Operation, tree_walker};
 
 // ********************************************************************** //
 
 pub struct Driver {
-    opts: Arc<Opts>,
+    config: Arc<Config>,
+}
+
+impl Driver {
+    pub fn new(config: Arc<Config>) -> Result<Self> {
+        Ok(Self {
+            config,
+        })
+    }
 }
 
 impl CopyDriver for Driver {
-    fn new(opts: Arc<Opts>) -> Result<Self> {
-        Ok(Self {
-            opts,
-        })
-    }
-
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: StatSender) -> Result<()> {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let (work_tx, work_rx) = cbc::unbounded();
 
         // Thread which walks the file tree and sends jobs to the
@@ -49,31 +55,34 @@ impl CopyDriver for Driver {
         let _walk_worker = {
             let sc = stats.clone();
             let d = dest.to_path_buf();
-            let o = self.opts.clone();
+            let o = self.config.clone();
             thread::spawn(move || tree_walker(sources, &d, &o, work_tx, sc))
         };
 
         // Worker threads. Will consume work and then shutdown once the
         // queue is closed by the walker.
-        for _ in 0..self.opts.num_workers() {
-            let _copy_worker = {
+        let nworkers = self.config.num_workers();
+        let mut joins = Vec::with_capacity(nworkers);
+        for _ in 0..nworkers {
+            let copy_worker = {
                 let wrx = work_rx.clone();
                 let sc = stats.clone();
-                let o = self.opts.clone();
-                thread::spawn(move || copy_worker(wrx, &o, sc))
+                let conf = self.config.clone();
+                thread::spawn(move || copy_worker(wrx, &conf, sc))
             };
+            joins.push(copy_worker);
         }
 
-        // FIXME: Ideally we should join the dispatch and walker
-        // threads to ensure we pickup any errors not on the
-        // queue. However this would block until all work was
-        // dispatched, blocking progress bar updates.
+        for handle in joins {
+            handle.join()
+                .map_err(|_| XcpError::CopyError("Error during copy operation".to_string()))??;
+        }
 
         Ok(())
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, stats: StatSender) -> Result<()> {
-        let handle = CopyHandle::new(source, dest, &self.opts)?;
+    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
+        let handle = CopyHandle::new(source, dest, &self.config)?;
         handle.copy_file(&stats)?;
         Ok(())
     }
@@ -83,8 +92,8 @@ impl CopyDriver for Driver {
 
 fn copy_worker(
     work: cbc::Receiver<Operation>,
-    opts: &Arc<Opts>,
-    updates: StatSender,
+    config: &Arc<Config>,
+    updates: Arc<dyn StatusUpdater>,
 ) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
@@ -96,7 +105,7 @@ fn copy_worker(
                 // copy_file() sends back its own updates, but we should
                 // send back any errors as they may have occurred
                 // before the copy started..
-                let r = CopyHandle::new(&from, &to, opts)
+                let r = CopyHandle::new(&from, &to, config)
                     .and_then(|hdl| hdl.copy_file(&updates));
                 if let Err(e) = r {
                     updates.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;

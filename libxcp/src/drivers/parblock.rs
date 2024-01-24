@@ -14,6 +14,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+//! Parallelise copying at the block level. Block-size is
+//! configurable. This can have better performance for large files,
+//! but has a higher overhead.
+
 use std::cmp;
 use std::ops::Range;
 use std::os::unix::fs::symlink;
@@ -27,10 +31,11 @@ use libfs::copy_node;
 use log::{error, info};
 use blocking_threadpool::{Builder, ThreadPool};
 
+use crate::config::Config;
 use crate::drivers::CopyDriver;
 use crate::errors::{Result, XcpError};
-use crate::operations::{CopyHandle, StatusUpdate, StatSender, Operation, tree_walker};
-use crate::options::Opts;
+use crate::feedback::{StatusUpdate, StatusUpdater};
+use crate::operations::{CopyHandle, Operation, tree_walker};
 use libfs::{copy_file_offset, map_extents, merge_extents, probably_sparse};
 
 // ********************************************************************** //
@@ -55,11 +60,11 @@ const fn supported_platform() -> bool {
 
 
 pub struct Driver {
-    opts: Arc<Opts>,
+    config: Arc<Config>,
 }
 
-impl CopyDriver for Driver {
-    fn new(opts: Arc<Opts>) -> Result<Self> {
+impl Driver {
+    pub fn new(config: Arc<Config>) -> Result<Self> {
         if !supported_platform() {
             let msg = "The parblock driver is not currently supported on this OS.";
             error!("{}", msg);
@@ -67,21 +72,21 @@ impl CopyDriver for Driver {
         }
 
         Ok(Self {
-            opts,
+            config,
         })
     }
+}
 
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: StatSender) -> Result<()> {
+impl CopyDriver for Driver {
+    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let (file_tx, file_rx) = cbc::unbounded::<Operation>();
 
         // Start (single) dispatch worker
-
-        let _dispatcher = {
-            let q_opts = self.opts.clone();
+        let dispatcher = {
+            let q_config = self.config.clone();
             let st = stats.clone();
-            thread::spawn(|| dispatch_worker(file_rx, st, q_opts))
+            thread::spawn(move || dispatch_worker(file_rx, &st, q_config))
         };
-
 
         // Thread which walks the file tree and sends jobs to the
         // workers. The worker tx channel is moved to the walker so it is
@@ -89,26 +94,21 @@ impl CopyDriver for Driver {
         let _walk_worker = {
             let sc = stats.clone();
             let d = dest.to_path_buf();
-            let o = self.opts.clone();
-            //thread::spawn(move || tree_walker(sources, dest, &self.opts, file_tx, stats))
-            thread::spawn(move || tree_walker(sources, &d, &o, file_tx, sc))
+            let c = self.config.clone();
+            thread::spawn(move || tree_walker(sources, &d, &c, file_tx, sc))
         };
 
-        // FIXME: Ideally we should join the dispatch and walker
-        // threads to ensure we pickup any errors not on the
-        // queue. However this would block until all work was
-        // dispatched, blocking progress bar updates.
-        // _dispatcher.join()
-        //     .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
+        dispatcher.join()
+            .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
 
         Ok(())
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, stats: StatSender) -> Result<()> {
-        let nworkers = self.opts.num_workers();
-        let pool = ThreadPool::new(nworkers as usize);
+    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
+        let nworkers = self.config.num_workers();
+        let pool = ThreadPool::new(nworkers);
 
-        queue_file_blocks(source, dest, &pool, &stats, &self.opts)?;
+        queue_file_blocks(source, dest, &pool, &stats, &self.config)?;
 
         pool.join();
 
@@ -122,10 +122,10 @@ fn queue_file_range(
     handle: &Arc<CopyHandle>,
     range: Range<u64>,
     pool: &ThreadPool,
-    status_channel: &StatSender,
+    status_channel: &Arc<dyn StatusUpdater>,
 ) -> Result<u64> {
     let len = range.end - range.start;
-    let bsize = handle.opts.block_size;
+    let bsize = handle.config.block_size;
     let blocks = (len / bsize) + (if len % bsize > 0 { 1 } else { 0 });
 
     for blkn in 0..blocks {
@@ -159,10 +159,10 @@ fn queue_file_blocks(
     source: &Path,
     dest: &Path,
     pool: &ThreadPool,
-    status_channel: &StatSender,
-    opts: &Arc<Opts>,
+    status_channel: &Arc<dyn StatusUpdater>,
+    config: &Arc<Config>,
 ) -> Result<u64> {
-    let handle = CopyHandle::new(source, dest, opts)?;
+    let handle = CopyHandle::new(source, dest, config)?;
     let len = handle.metadata.len();
 
     if handle.try_reflink()? {
@@ -198,8 +198,8 @@ fn queue_file_blocks(
 
 // Dispatch worker; receives queued files and hands them to
 // queue_file_blocks() which splits them onto the copy-pool.
-fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: StatSender, opts: Arc<Opts>) -> Result<()> {
-    let nworkers = opts.num_workers() as usize;
+fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: &Arc<dyn StatusUpdater>, config: Arc<Config>) -> Result<()> {
+    let nworkers = config.num_workers();
     let copy_pool = Builder::new()
         .num_threads(nworkers)
         // Use bounded queue for backpressure; this limits open
@@ -212,7 +212,7 @@ fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: StatSender, opts: Ar
         match op {
             Operation::Copy(from, to) => {
                 info!("Dispatch[{:?}]: Copy {:?} -> {:?}", thread::current().id(), from, to);
-                let r = queue_file_blocks(&from, &to, &copy_pool, &stats, &opts);
+                let r = queue_file_blocks(&from, &to, &copy_pool, stats, &config);
                 if let Err(e) = r {
                     stats.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
                     error!("Dispatcher: Error copying {:?} -> {:?}.", from, to);

@@ -17,10 +17,7 @@
 use std::{cmp, thread};
 use std::fs::{File, Metadata, read_link, create_dir_all};
 use std::path::{Path, PathBuf};
-use std::result;
-use std::str::FromStr;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use crossbeam_channel as cbc;
 use libfs::{
@@ -29,41 +26,21 @@ use libfs::{
 use log::{debug, error};
 use walkdir::WalkDir;
 
+use crate::config::{Config, Reflink};
 use crate::errors::{Result, XcpError};
-use crate::options::{Opts, parse_ignore, ignore_filter};
-use crate::utils::empty;
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Reflink {
-    Always,
-    Auto,
-    Never,
-}
-
-impl FromStr for Reflink {
-    type Err = XcpError;
-
-    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "always" => Ok(Reflink::Always),
-            "auto" => Ok(Reflink::Auto),
-            "never" => Ok(Reflink::Never),
-            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'reflink': {}", s))),
-        }
-    }
-}
-
+use crate::feedback::{StatusUpdate, StatusUpdater};
+use crate::paths::{parse_ignore, ignore_filter};
 
 #[derive(Debug)]
 pub struct CopyHandle {
     pub infd: File,
     pub outfd: File,
     pub metadata: Metadata,
-    pub opts: Arc<Opts>,
+    pub config: Arc<Config>,
 }
 
 impl CopyHandle {
-    pub fn new(from: &Path, to: &Path, opts: &Arc<Opts>) -> Result<CopyHandle> {
+    pub fn new(from: &Path, to: &Path, config: &Arc<Config>) -> Result<CopyHandle> {
         let infd = File::open(from)?;
         let metadata = infd.metadata()?;
 
@@ -74,17 +51,17 @@ impl CopyHandle {
             infd,
             outfd,
             metadata,
-            opts: opts.clone(),
+            config: config.clone(),
         };
 
         Ok(handle)
     }
 
     /// Copy len bytes from wherever the descriptor cursors are set.
-    fn copy_bytes(&self, len: u64, updates: &StatSender) -> Result<u64> {
+    fn copy_bytes(&self, len: u64, updates: &Arc<dyn StatusUpdater>) -> Result<u64> {
         let mut written = 0u64;
         while written < len {
-            let bytes_to_copy = cmp::min(len - written, self.opts.batch_size());
+            let bytes_to_copy = cmp::min(len - written, self.config.block_size);
             let bytes = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
             written += bytes;
             updates.send(StatusUpdate::Copied(bytes))?;
@@ -94,7 +71,7 @@ impl CopyHandle {
     }
 
     /// Wrapper around copy_bytes that looks for sparse blocks and skips them.
-    fn copy_sparse(&self, updates: &StatSender) -> Result<u64> {
+    fn copy_sparse(&self, updates: &Arc<dyn StatusUpdater>) -> Result<u64> {
         let len = self.metadata.len();
         let mut pos = 0;
 
@@ -109,15 +86,15 @@ impl CopyHandle {
     }
 
     pub fn try_reflink(&self) -> Result<bool> {
-        match self.opts.reflink {
+        match self.config.reflink {
             Reflink::Always | Reflink::Auto => {
                 debug!("Attempting reflink from {:?}->{:?}", self.infd, self.outfd);
                 let worked = reflink(&self.infd, &self.outfd)?;
                 if worked {
                     debug!("Reflink {:?} succeeded", self.outfd);
-                    return Ok(true)
-                } else if self.opts.reflink == Reflink::Always {
-                    return Err(XcpError::ReflinkFailed(format!("{:?}->{:?}", self.infd, self.outfd)).into());
+                    Ok(true)
+                } else if self.config.reflink == Reflink::Always {
+                    Err(XcpError::ReflinkFailed(format!("{:?}->{:?}", self.infd, self.outfd)).into())
                 } else {
                     debug!("Failed to reflink, falling back to copy");
                     Ok(false)
@@ -130,7 +107,7 @@ impl CopyHandle {
         }
     }
 
-    pub fn copy_file(&self, updates: &StatSender) -> Result<u64> {
+    pub fn copy_file(&self, updates: &Arc<dyn StatusUpdater>) -> Result<u64> {
         if self.try_reflink()? {
             return Ok(self.metadata.len());
         }
@@ -144,10 +121,10 @@ impl CopyHandle {
     }
 
     fn finalise_copy(&self) -> Result<()> {
-        if !self.opts.no_perms {
+        if !self.config.no_perms {
             copy_permissions(&self.infd, &self.outfd)?;
         }
-        if self.opts.fsync {
+        if self.config.fsync {
             debug!("Syncing file {:?}", self.outfd);
             sync(&self.outfd)?;
         }
@@ -165,46 +142,6 @@ impl Drop for CopyHandle {
 }
 
 #[derive(Debug)]
-pub enum StatusUpdate {
-    Copied(u64),
-    Size(u64),
-    Error(XcpError)
-}
-
-// FIXME: We should probably abstract away more of the channel setup
-// to be no-ops when --no-progress is specified.
-static BYTE_COUNT: AtomicU64 = AtomicU64::new(0);
-
-#[derive(Clone)]
-pub struct StatSender {
-    chan: cbc::Sender<StatusUpdate>,
-    opts: Arc<Opts>,
-}
-impl StatSender {
-    pub fn new(chan: cbc::Sender<StatusUpdate>, opts: &Arc<Opts>) -> StatSender {
-        StatSender {
-            chan,
-            opts: opts.clone(),
-        }
-    }
-
-    // Wrapper around channel-send that groups updates together
-    pub fn send(&self, update: StatusUpdate) -> Result<()> {
-        if let StatusUpdate::Copied(bytes) = update {
-            // Avoid saturating the queue with small writes
-            let bsize = self.opts.block_size;
-            let prev_written = BYTE_COUNT.fetch_add(bytes, Ordering::Relaxed);
-            if ((prev_written + bytes) / bsize) > (prev_written / bsize) {
-                self.chan.send(update)?;
-            }
-        } else {
-            self.chan.send(update)?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
 pub enum Operation {
     Copy(PathBuf, PathBuf),
     Link(PathBuf, PathBuf),
@@ -214,9 +151,9 @@ pub enum Operation {
 pub fn tree_walker(
     sources: Vec<PathBuf>,
     dest: &Path,
-    opts: &Opts,
+    config: &Config,
     work_tx: cbc::Sender<Operation>,
-    stats: StatSender,
+    stats: Arc<dyn StatusUpdater>,
 ) -> Result<()> {
     debug!("Starting walk worker {:?}", thread::current().id());
 
@@ -226,14 +163,14 @@ pub fn tree_walker(
             .last()
             .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
 
-        let target_base = if dest.exists() && !opts.no_target_directory {
+        let target_base = if dest.exists() && !config.no_target_directory {
             dest.join(sourcedir)
         } else {
             dest.to_path_buf()
         };
         debug!("Target base is {:?}", target_base);
 
-        let gitignore = parse_ignore(&source, opts)?;
+        let gitignore = parse_ignore(&source, config)?;
 
         for entry in WalkDir::new(&source)
             .into_iter()
@@ -244,13 +181,13 @@ pub fn tree_walker(
             let from = e.into_path();
             let meta = from.symlink_metadata()?;
             let path = from.strip_prefix(&source)?;
-            let target = if !empty(path) {
+            let target = if !empty_path(path) {
                 target_base.join(path)
             } else {
                 target_base.clone()
             };
 
-            if opts.no_clobber && target.exists() {
+            if config.no_clobber && target.exists() {
                 let msg = "Destination file exists and --no-clobber is set.";
                 stats.send(StatusUpdate::Error(
                     XcpError::DestinationExists(msg, target)))?;
@@ -293,4 +230,8 @@ pub fn tree_walker(
     debug!("Walk-worker finished: {:?}", thread::current().id());
 
     Ok(())
+}
+
+fn empty_path(path: &Path) -> bool {
+    *path == PathBuf::new()
 }

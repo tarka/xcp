@@ -29,9 +29,11 @@ libc = "0.2.152"
 linux-raw-sys = { version = "0.6.3", features = ["ioctl"] }
 log = "0.4.20"
 rustix = { version = "0.38.30", features = ["fs"] }
-tempfile = "3.9.0"
 thiserror = "1.0.56"
 xattr = "1.2.0"
+
+[dev-dependencies]
+tempfile = "3.9.0"
 
 [lints.clippy]
 upper_case_acronyms = "allow"

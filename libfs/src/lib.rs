@@ -112,8 +112,8 @@ pub struct Extent {
     pub shared: bool,
 }
 
-impl Into<Range<u64>> for Extent {
-    fn into(self) -> Range<u64> {
-        self.start..self.end
+impl From<Extent> for Range<u64> {
+    fn from(e: Extent) -> Self {
+        e.start..e.end
     }
 }

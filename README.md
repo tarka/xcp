@@ -56,6 +56,7 @@ pkgin install xcp
   filesystem-aware, and can massively speed-up copies on network mounts by
   performing the copy operations server-side. However, unlike `copy_file_range`
   sparse files are detected and handled appropriately.
+* Support for modern filesystem features such as [reflinks](https://btrfs.readthedocs.io/en/latest/Reflink.html).
 * Optimised for 'modern' systems (i.e. multiple cores, copious RAM, and
   solid-state disks, especially ones connected into the main system bus,
   e.g. NVMe).
