@@ -75,16 +75,14 @@ impl ChannelUpdater {
     /// channel. Note: As ChannelUpdater is consumed by the driver
     /// call you should call this before then; e.g:
     ///
-    /// ```
-    /// # use std::sync::Arc;
-    /// use libxcp::config::Config;
-    /// use libxcp::feedback::{ChannelUpdater, StatusUpdater};
+    ///     # use std::sync::Arc;
+    ///     use libxcp::config::Config;
+    ///     use libxcp::feedback::{ChannelUpdater, StatusUpdater};
     ///
-    /// let config = Arc::new(Config::default());
-    /// let updater = ChannelUpdater::new(&config);
-    /// let stat_rx = updater.rx_channel();
-    /// let stats: Arc<dyn StatusUpdater> = Arc::new(updater);
-    /// ```
+    ///     let config = Arc::new(Config::default());
+    ///     let updater = ChannelUpdater::new(&config);
+    ///     let stat_rx = updater.rx_channel();
+    ///     let stats: Arc<dyn StatusUpdater> = Arc::new(updater);
     pub fn rx_channel(&self) -> cbc::Receiver<StatusUpdate> {
         self.chan_rx.clone()
     }
