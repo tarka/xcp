@@ -81,33 +81,35 @@ impl FromStr for Backup {
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Number of parallel workers. 0 means use the number of logical
-    /// CPUs.
+    /// CPUs (the default).
     pub workers: usize,
 
-    /// Block size for operations.
+    /// Block size for operations. Defaults to the full file size. Use
+    /// a smaller value for finer-grained feedback.
     pub block_size: u64,
 
     /// Use .gitignore if present.
     ///
     /// NOTE: This is fairly basic at the moment, and only honours a
     /// .gitignore in the directory root for each source directory;
-    /// global or sub-directory ignores are skipped.
+    /// global or sub-directory ignores are skipped. Default is
+    /// `false`.
     pub gitignore: bool,
 
-    /// Do not overwrite existing files
+    /// Do not overwrite existing files. Default is `false`.
     pub no_clobber: bool,
 
-    /// Do not copy the file permissions.
+    /// Do not copy the file permissions. Default is `false`.
     pub no_perms: bool,
 
     /// Target should not be a directory.
     ///
     /// Analogous to cp's no-target-directory. Expected behavior is that when
     /// copying a directory to another directory, instead of creating a sub-folder
-    /// in target, overwrite target.
+    /// in target, overwrite target. Default is 'false`.
     pub no_target_directory: bool,
 
-    /// Sync each file to disk after writing.
+    /// Sync each file to disk after writing. Default is `false`.
     pub fsync: bool,
 
     /// Reflink options.
@@ -123,7 +125,7 @@ pub struct Config {
     /// Whether to create backups of overwritten files. Current
     /// options are `None` or 'Numbered'. Numbered backups follow the
     /// semantics of `cp` numbered backups
-    /// (e.g. `file.txt.~123~`). Default is 'None'.
+    /// (e.g. `file.txt.~123~`). Default is `None`.
     pub backup: Backup,
 }
 
