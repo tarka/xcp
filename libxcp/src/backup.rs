@@ -1,12 +1,21 @@
-use std::{path::Path, env::current_dir};
+use std::{
+    path::Path,
+    env::current_dir, sync::OnceLock,
+};
 
 use regex::Regex;
 
 use crate::errors::{Result, XcpError};
 
-const BAK_PATTTERN: &str = r"^~(\d+)~$";
+const BAK_PATTTERN: &str = r"^\~(\d+)\~$";
+static BAK_REGEX: OnceLock<Regex> = OnceLock::new();
 
-fn next_backup_num(file: &Path) -> Result<u64> {
+fn get_regex() -> &'static Regex {
+    // Fixed regex, so should never error.
+    BAK_REGEX.get_or_init(|| Regex::new(BAK_PATTTERN).unwrap())
+}
+
+pub(crate) fn next_backup_num(file: &Path) -> Result<u64> {
     let fname = file.file_name()
         .ok_or(XcpError::InvalidArguments(format!("Invalid path found: {:?}", file)))?
         .to_string_lossy();
@@ -34,10 +43,9 @@ fn is_num_backup(base_file: &str, candidate: &Path) -> Option<u64> {
     }
     let suf = candidate.extension()?
         .to_string_lossy();
-    let cap = Regex::new(BAK_PATTTERN)
-        .unwrap() // Fixed regex, so should never error.
-        .captures(&suf)?;
-    let num = cap.get(1)?
+    let num = get_regex()
+        .captures(&suf)?
+        .get(1)?
         .as_str()
         .parse::<u64>()
         .ok()?;
@@ -72,15 +80,24 @@ mod tests {
         let tdir = TempDir::new()?;
         let dir = tdir.path();
         let base = dir.join("file.txt");
-        { File::create(&base)?; }
 
+        {
+            File::create(&base)?;
+        }
         let next = next_backup_num(&base)?;
         assert_eq!(1, next);
 
-        { File::create(dir.join("file.txt.~123~"))?; }
-
+        {
+            File::create(dir.join("file.txt.~123~"))?;
+        }
         let next = next_backup_num(&base)?;
         assert_eq!(124, next);
+
+        {
+            File::create(dir.join("file.txt.~999~"))?;
+        }
+        let next = next_backup_num(&base)?;
+        assert_eq!(1000, next);
 
         Ok(())
     }

@@ -53,6 +53,29 @@ impl FromStr for Reflink {
     }
 }
 
+/// Enum defining configuration options for handling backups of
+/// overwritten files. [FromStr] is supported.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Backup {
+    /// Do not create backups.
+    None,
+    /// Create numbered backups. Numbered backups follow the semantics
+    /// of `cp` numbered backups (e.g. `file.txt.~123~`).
+    Numbered
+}
+
+impl FromStr for Backup {
+    type Err = XcpError;
+
+    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "none" | "off" => Ok(Backup::None),
+            "numbered" => Ok(Backup::Numbered),
+            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'backup': {}", s))),
+        }
+    }
+}
+
 /// A structure defining the runtime options for copy-drivers. This
 /// would normally be passed to `load_driver()`.
 #[derive(Clone, Debug)]
@@ -94,6 +117,14 @@ pub struct Config {
     /// possible, 'always' will return an error if it cannot reflink,
     /// and 'never' will always perform a full data copy.
     pub reflink: Reflink,
+
+    /// Backup options
+    ///
+    /// Whether to create backups of overwritten files. Current
+    /// options are `None` or 'Numbered'. Numbered backups follow the
+    /// semantics of `cp` numbered backups
+    /// (e.g. `file.txt.~123~`). Default is 'None'.
+    pub backup: Backup,
 }
 
 impl Config {
@@ -117,6 +148,7 @@ impl Default for Config {
             no_target_directory: false,
             fsync: false,
             reflink: Reflink::Auto,
+            backup: Backup::None,
         }
     }
 }
