@@ -65,11 +65,9 @@ fn is_num_backup(base_file: &str, candidate: &Path) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::PathBuf, fs::File};
-
-    use tempfile::TempDir;
-
     use super::*;
+    use std::{path::PathBuf, fs::File};
+    use tempfile::TempDir;
 
     #[test]
     fn test_is_backup() {
@@ -129,5 +127,4 @@ mod tests {
 
         Ok(())
     }
-
 }

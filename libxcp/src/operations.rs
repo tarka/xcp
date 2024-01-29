@@ -50,14 +50,14 @@ impl CopyHandle {
             match config.backup {
                 Backup::None => {},
                 Backup::Numbered => {
-                    let backup = get_backup_path(&to)?;
+                    let backup = get_backup_path(to)?;
                     info!("Backup: Rename {:?} to {:?}", to, backup);
-                    fs::rename(&to, &backup)?;
+                    fs::rename(to, backup)?;
                 }
             }
         }
 
-        let outfd = File::create(&to)?;
+        let outfd = File::create(to)?;
         allocate_file(&outfd, metadata.len())?;
 
         let handle = CopyHandle {
