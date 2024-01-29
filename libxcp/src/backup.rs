@@ -1,5 +1,5 @@
 use std::{
-    path::Path,
+    path::{Path, PathBuf},
     env::current_dir, sync::OnceLock,
 };
 
@@ -15,7 +15,18 @@ fn get_regex() -> &'static Regex {
     BAK_REGEX.get_or_init(|| Regex::new(BAK_PATTTERN).unwrap())
 }
 
-pub(crate) fn next_backup_num(file: &Path) -> Result<u64> {
+pub(crate) fn get_backup_path(file: &Path) -> Result<PathBuf> {
+    let num = next_backup_num(file)?;
+    let suffix = format!(".~{}~", num);
+    // Messy but PathBuf has no concept of mulitiple extensions.
+    let mut bstr = file.to_path_buf().into_os_string();
+    bstr.push(suffix);
+    let backup = PathBuf::from(bstr);
+    Ok(backup)
+}
+
+
+fn next_backup_num(file: &Path) -> Result<u64> {
     let fname = file.file_name()
         .ok_or(XcpError::InvalidArguments(format!("Invalid path found: {:?}", file)))?
         .to_string_lossy();
@@ -98,6 +109,23 @@ mod tests {
         }
         let next = next_backup_num(&base)?;
         assert_eq!(1000, next);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_gen_backup_path() -> Result<()> {
+        let tdir = TempDir::new()?;
+        let dir = tdir.path();
+        let base = dir.join("file.txt");
+        {
+            File::create(&base)?;
+        }
+
+        let backup = get_backup_path(&base)?;
+        let mut bs = base.into_os_string();
+        bs.push(".~1~");
+        assert_eq!(PathBuf::from(bs), backup);
 
         Ok(())
     }
