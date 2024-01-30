@@ -118,7 +118,7 @@ pub struct Opts {
     /// options are 'none'/'off', or 'numbered'. Numbered backups
     /// follow the semantics of `cp` numbered backups
     /// (e.g. `file.txt.~123~`). Default is 'none'.
-    #[arg(short = 'b', long, default_value = "none")]
+    #[arg(long, default_value = "none")]
     pub backup: Backup,
 
     /// Path list.
