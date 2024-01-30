@@ -11,7 +11,7 @@ set -l reflinks '
 
 set -l backup '
   none\t"no backups (default)"
-  numbered\t"follow the semantics of `cp` numbered backups"
+  numbered\t"follow the semantics of cp numbered backups"
 '
 
 # short + long
