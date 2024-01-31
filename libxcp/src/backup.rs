@@ -52,7 +52,8 @@ fn is_num_backup(base_file: &str, candidate: &Path) -> Option<u64> {
     if !cname.starts_with(base_file) {
         return None
     }
-    let suf = candidate.extension()?
+    let suf = candidate
+        .extension()?
         .to_string_lossy();
     let num = get_regex()
         .captures(&suf)?

@@ -61,11 +61,11 @@ fn expand_globs(patterns: &[String]) -> Result<Vec<PathBuf>> {
         .collect::<result::Result<Vec<Paths>, _>>()?
         .iter_mut()
         // Force resolve each glob Paths iterator into a vector of the results...
-        .map::<result::Result<Vec<PathBuf>, _>, _>(|p| p.collect())
+        .map::<result::Result<Vec<PathBuf>, _>, _>(Iterator::collect)
         // And lift all the results up to the top.
         .collect::<result::Result<Vec<Vec<PathBuf>>, _>>()?
         .iter()
-        .flat_map(|p| p.to_owned())
+        .flat_map(ToOwned::to_owned)
         .collect::<Vec<PathBuf>>();
 
     Ok(paths)
