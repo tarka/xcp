@@ -1030,6 +1030,8 @@ fn copy_dirs_backup(drv: &str) {
 
     let dest_base = dir.path().join("dest");
     create_dir_all(&dest_base).unwrap();
+    let dummy = dest_base.join("mydir/dummy_dir"); // Non-file member test
+    create_dir_all(&dummy).unwrap();
     let dest_file = dest_base.join("mydir/file.txt");
 
     let mut out = run(&[
