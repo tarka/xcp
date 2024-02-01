@@ -115,9 +115,10 @@ pub struct Opts {
     /// Backup options
     ///
     /// Whether to create backups of overwritten files. Current
-    /// options are 'none'/'off', or 'numbered'. Numbered backups
-    /// follow the semantics of `cp` numbered backups
-    /// (e.g. `file.txt.~123~`). Default is 'none'.
+    /// options are 'none'/'off', or 'numbered', or 'auto'. Numbered
+    /// backups follow the semantics of `cp` numbered backups
+    /// (e.g. `file.txt.~123~`). 'auto' will only create a numbered
+    /// backup if a previous backups exists. Default is 'none'.
     #[arg(long, default_value = "none")]
     pub backup: Backup,
 

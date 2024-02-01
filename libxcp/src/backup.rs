@@ -1,11 +1,11 @@
 use std::{
     path::{Path, PathBuf},
-    env::current_dir, sync::OnceLock,
+    env::current_dir, sync::OnceLock, fs::ReadDir,
 };
 
 use regex::Regex;
 
-use crate::errors::{Result, XcpError};
+use crate::{errors::{Result, XcpError}, config::{Config, Backup}};
 
 const BAK_PATTTERN: &str = r"^\~(\d+)\~$";
 static BAK_REGEX: OnceLock<Regex> = OnceLock::new();
@@ -25,21 +25,53 @@ pub(crate) fn get_backup_path(file: &Path) -> Result<PathBuf> {
     Ok(backup)
 }
 
+pub(crate) fn needs_backup(file: &Path, conf: &Config) -> Result<bool> {
+    let need = match conf.backup {
+        Backup::None => false,
+        Backup::Auto if file.exists() => {
+            has_backup(file)?
+        }
+        Backup::Numbered if file.exists() => true,
+        _ => false,
+    };
+    return Ok(need)
+}
 
-fn next_backup_num(file: &Path) -> Result<u64> {
-    let fname = file.file_name()
-        .ok_or(XcpError::InvalidArguments(format!("Invalid path found: {:?}", file)))?
-        .to_string_lossy();
+fn ls_file_dir(file: &Path) -> Result<ReadDir> {
     let cwd = current_dir()?;
-    let current = file.parent()
+    let ls_dir = file.parent()
         .map(|p| if p.as_os_str().is_empty() {
             &cwd
         } else {
             p
         })
         .unwrap_or(&cwd)
-        .read_dir()?
-        .filter_map(|de| is_num_backup(&fname, &de.ok()?.path()))
+        .read_dir()?;
+    Ok(ls_dir)
+}
+
+fn filename(path: &Path) -> Result<String> {
+    let fname = path.file_name()
+        .ok_or(XcpError::InvalidArguments(format!("Invalid path found: {:?}", path)))?
+        .to_string_lossy();
+    Ok(fname.to_string())
+}
+
+fn has_backup(file: &Path) -> Result<bool> {
+    let fname = filename(file)?;
+    let exists = ls_file_dir(file)?
+        .any(|der| if let Ok(de) = der {
+            is_num_backup(&fname, &de.path()).is_some()
+        } else {
+            false
+        });
+    Ok(exists)
+}
+
+fn next_backup_num(file: &Path) -> Result<u64> {
+    let fname = filename(file)?;
+    let current = ls_file_dir(file)?
+        .filter_map(|der| is_num_backup(&fname, &der.ok()?.path()))
         .max()
         .unwrap_or(0);
     Ok(current + 1)
@@ -52,11 +84,11 @@ fn is_num_backup(base_file: &str, candidate: &Path) -> Option<u64> {
     if !cname.starts_with(base_file) {
         return None
     }
-    let suf = candidate
+    let ext = candidate
         .extension()?
         .to_string_lossy();
     let num = get_regex()
-        .captures(&suf)?
+        .captures(&ext)?
         .get(1)?
         .as_str()
         .parse::<u64>()
@@ -128,4 +160,29 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_needs_backup() -> Result<()> {
+        let tdir = TempDir::new()?;
+        let dir = tdir.path();
+        let base = dir.join("file.txt");
+
+        {
+            File::create(&base)?;
+        }
+        assert!(!has_backup(&base)?);
+
+        {
+            File::create(dir.join("file.txt.~123~"))?;
+        }
+        assert!(has_backup(&base)?);
+
+        {
+            File::create(dir.join("file.txt.~999~"))?;
+        }
+        assert!(has_backup(&base)?);
+
+        Ok(())
+    }
+
 }

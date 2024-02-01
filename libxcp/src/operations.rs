@@ -27,8 +27,8 @@ use libfs::{
 use log::{debug, error, info};
 use walkdir::WalkDir;
 
-use crate::backup::get_backup_path;
-use crate::config::{Config, Reflink, Backup};
+use crate::backup::{get_backup_path, needs_backup};
+use crate::config::{Config, Reflink};
 use crate::errors::{Result, XcpError};
 use crate::feedback::{StatusUpdate, StatusUpdater};
 use crate::paths::{parse_ignore, ignore_filter};
@@ -46,15 +46,10 @@ impl CopyHandle {
         let infd = File::open(from)?;
         let metadata = infd.metadata()?;
 
-        if to.exists() {
-            match config.backup {
-                Backup::None => {},
-                Backup::Numbered => {
-                    let backup = get_backup_path(to)?;
-                    info!("Backup: Rename {:?} to {:?}", to, backup);
-                    fs::rename(to, backup)?;
-                }
-            }
+        if needs_backup(to, config)? {
+            let backup = get_backup_path(to)?;
+            info!("Backup: Rename {:?} to {:?}", to, backup);
+            fs::rename(to, backup)?;
         }
 
         let outfd = File::create(to)?;

@@ -59,6 +59,8 @@ impl FromStr for Reflink {
 pub enum Backup {
     /// Do not create backups.
     None,
+    /// Create a backup if previous backups exist.
+    Auto,
     /// Create numbered backups. Numbered backups follow the semantics
     /// of `cp` numbered backups (e.g. `file.txt.~123~`).
     Numbered
@@ -70,6 +72,7 @@ impl FromStr for Backup {
     fn from_str(s: &str) -> result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "none" | "off" => Ok(Backup::None),
+            "auto" => Ok(Backup::Auto),
             "numbered" => Ok(Backup::Numbered),
             _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'backup': {}", s))),
         }

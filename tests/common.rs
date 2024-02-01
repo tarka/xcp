@@ -1044,6 +1044,17 @@ fn copy_dirs_backup(drv: &str) {
     assert!(file_contains(&dest_file, "orig").unwrap());
 
     // -- //
+
+    out = run(&[
+        "--driver", drv,
+        "-r",
+        "--backup=auto",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])
+    .unwrap();
+    assert!(out.status.success());
+
     let backup1 = dest_base.join("mydir/file.txt.~1~");
     assert!(!backup1.exists());
 
@@ -1074,7 +1085,7 @@ fn copy_dirs_backup(drv: &str) {
     out = run(&[
         "--driver", drv,
         "-r",
-        "--backup=numbered",
+        "--backup=auto",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
     ])

@@ -12,6 +12,7 @@ set -l reflinks '
 set -l backup '
   none\t"no backups (default)"
   numbered\t"follow the semantics of cp numbered backups"
+  auto\t"create a numbered backup if previous backup exists"
 '
 
 # short + long
