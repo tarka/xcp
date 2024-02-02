@@ -34,7 +34,7 @@ pub(crate) fn needs_backup(file: &Path, conf: &Config) -> Result<bool> {
         Backup::Numbered if file.exists() => true,
         _ => false,
     };
-    return Ok(need)
+    Ok(need)
 }
 
 fn ls_file_dir(file: &Path) -> Result<ReadDir> {
