@@ -28,6 +28,11 @@ _xcp() {
       always\:"return an error if it cannot reflink"
       never\:"always perform a full data copy"
     ))'
+    --backup'[Whether to create backups of overwritten files]:backup:((
+      none\:"no backups (default)"
+      numbered\:"follow the semantics of cp numbered backups"
+      auto\:"create a numbered backup if previous backup exists"
+    ))'
     --fsync'[Sync each file to disk after it is written]'
     --gitignore'[Use .gitignore if present]'
     --no-perms'[Do not copy file permissions]'

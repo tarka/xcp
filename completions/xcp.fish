@@ -9,6 +9,12 @@ set -l reflinks '
   never\t"always perform a full data copy"
 '
 
+set -l backup '
+  none\t"no backups (default)"
+  numbered\t"follow the semantics of cp numbered backups"
+  auto\t"create a numbered backup if previous backup exists"
+'
+
 # short + long
 complete -c xcp -s T -l no-target-directory -d 'Overwrite target directory, do not create a subdirectory'
 complete -c xcp -s g -l glob -d 'Expand (glob) filename patterns'
@@ -26,6 +32,7 @@ complete -c xcp -l no-progress -d 'Disable progress bar'
 complete -c xcp -l block-size -d 'Block size for file operations' -x -a '(seq 1 16){B,K,M,G}'
 complete -c xcp -l driver -d 'Parallelise at the file or at the block level' -x -a "$drivers"
 complete -c xcp -l reflink -d 'Whether and how to use reflinks' -x -a "$reflinks"
+complete -c xcp -l backup -d 'Whether to create backups of overwritten files' -x -a "$backup"
 
 # docs: https://fishshell.com/docs/current/completions.html
 # path: /usr/share/fish/vendor_completions.d/xcp.fish

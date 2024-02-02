@@ -16,7 +16,7 @@
 
 use clap::{ArgAction, Parser};
 
-use libxcp::config::{Config, Reflink};
+use libxcp::config::{Config, Reflink, Backup};
 use unbytify::unbytify;
 
 use libxcp::drivers::Drivers;
@@ -112,6 +112,16 @@ pub struct Opts {
     #[arg(long, default_value = "auto")]
     pub reflink: Reflink,
 
+    /// Backup options
+    ///
+    /// Whether to create backups of overwritten files. Current
+    /// options are 'none'/'off', or 'numbered', or 'auto'. Numbered
+    /// backups follow the semantics of `cp` numbered backups
+    /// (e.g. `file.txt.~123~`). 'auto' will only create a numbered
+    /// backup if a previous backups exists. Default is 'none'.
+    #[arg(long, default_value = "none")]
+    pub backup: Backup,
+
     /// Path list.
     ///
     /// Source and destination files, or multiple source(s) to a directory.
@@ -141,6 +151,7 @@ impl From<&Opts> for Config {
             no_target_directory: opts.no_target_directory,
             fsync: opts.fsync,
             reflink: opts.reflink,
+            backup: opts.backup,
         }
     }
 }

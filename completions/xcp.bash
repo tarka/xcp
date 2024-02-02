@@ -24,6 +24,7 @@ _xcp() {
   local units='B K M G' # in line with most completions prefer M to MB/MiB
   local drivers='parfile parblock'
   local reflink='auto always never'
+  local backup='none numbered auto'
 
   case "$prev" in
   -h | --help) return ;;
@@ -41,6 +42,11 @@ _xcp() {
 
   --reflink)
     COMPREPLY=($(compgen -W "$reflink" -- "$cur"))
+    return
+    ;;
+
+  --backup)
+    COMPREPLY=($(compgen -W "$backup" -- "$cur"))
     return
     ;;
 

@@ -15,17 +15,19 @@
  */
 
 use std::{cmp, thread};
-use std::fs::{File, Metadata, read_link, create_dir_all};
+use std::fs::{self, File, Metadata, read_link, create_dir_all};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crossbeam_channel as cbc;
 use libfs::{
-    allocate_file, copy_file_bytes, copy_permissions, next_sparse_segments, probably_sparse, sync, reflink, FileType,
+    allocate_file, copy_file_bytes, copy_permissions,
+    next_sparse_segments, probably_sparse, sync, reflink, FileType,
 };
-use log::{debug, error};
+use log::{debug, error, info};
 use walkdir::WalkDir;
 
+use crate::backup::{get_backup_path, needs_backup};
 use crate::config::{Config, Reflink};
 use crate::errors::{Result, XcpError};
 use crate::feedback::{StatusUpdate, StatusUpdater};
@@ -43,6 +45,12 @@ impl CopyHandle {
     pub fn new(from: &Path, to: &Path, config: &Arc<Config>) -> Result<CopyHandle> {
         let infd = File::open(from)?;
         let metadata = infd.metadata()?;
+
+        if needs_backup(to, config)? {
+            let backup = get_backup_path(to)?;
+            info!("Backup: Rename {:?} to {:?}", to, backup);
+            fs::rename(to, backup)?;
+        }
 
         let outfd = File::create(to)?;
         allocate_file(&outfd, metadata.len())?;

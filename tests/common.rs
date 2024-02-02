@@ -1018,3 +1018,84 @@ fn dest_file_exists_not_writable(drv: &str) {
     assert!(!out.status.success());
 }
 
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn copy_dirs_backup(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+
+    let source_path = dir.path().join("mydir");
+    let source_file = source_path.join("file.txt");
+    create_dir_all(&source_path).unwrap();
+    create_file(&source_file, "orig").unwrap();
+
+    let dest_base = dir.path().join("dest");
+    create_dir_all(&dest_base).unwrap();
+    let dummy = dest_base.join("mydir/dummy_dir"); // Non-file member test
+    create_dir_all(&dummy).unwrap();
+    let dest_file = dest_base.join("mydir/file.txt");
+
+    let mut out = run(&[
+        "--driver", drv,
+        "-r",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(out.status.success());
+    assert!(file_contains(&dest_file, "orig").unwrap());
+
+    // -- //
+
+    out = run(&[
+        "--driver", drv,
+        "-r",
+        "--backup=auto",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])
+    .unwrap();
+    assert!(out.status.success());
+
+    let backup1 = dest_base.join("mydir/file.txt.~1~");
+    assert!(!backup1.exists());
+
+    write(&source_file, "new content").unwrap();
+    assert!(file_contains(&source_file, "new content").unwrap());
+
+    out = run(&[
+        "--driver", drv,
+        "-r",
+        "--backup=numbered",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(out.status.success());
+    assert!(file_contains(&dest_file, "new content").unwrap());
+    assert!(backup1.exists());
+    assert!(files_match(&source_file, &dest_file));
+
+    // -- //
+    let backup2 = dest_base.join("mydir/file.txt.~2~");
+    assert!(!backup2.exists());
+
+    write(&source_file, "new content 2").unwrap();
+    assert!(file_contains(&source_file, "new content 2").unwrap());
+
+    out = run(&[
+        "--driver", drv,
+        "-r",
+        "--backup=auto",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(out.status.success());
+    assert!(file_contains(&dest_file, "new content 2").unwrap());
+    assert!(backup1.exists());
+    assert!(backup2.exists());
+    assert!(files_match(&source_file, &dest_file));
+}
