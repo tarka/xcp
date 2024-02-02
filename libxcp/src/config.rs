@@ -59,7 +59,7 @@ impl FromStr for Reflink {
 pub enum Backup {
     /// Do not create backups.
     None,
-    /// Create a backup if previous backups exist.
+    /// Create a numbered backup if a previous backup exists.
     Auto,
     /// Create numbered backups. Numbered backups follow the semantics
     /// of `cp` numbered backups (e.g. `file.txt.~123~`).
