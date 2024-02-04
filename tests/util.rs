@@ -22,11 +22,12 @@ use rand_distr::{Alphanumeric, Pareto, Triangular, Standard};
 use rand_xorshift::XorShiftRng;
 use std::cmp;
 use std::env::current_dir;
-use std::fs::{create_dir_all, File};
+use std::fs::{create_dir_all, File, FileTimes};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::result;
+use std::time::{Duration, SystemTime};
 use tempfile::{tempdir_in, TempDir};
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -56,6 +57,15 @@ pub fn tempdir_rel() -> Result<TempDir, Error> {
 pub fn create_file(path: &Path, text: &str) -> Result<(), Error> {
     let file = File::create(path)?;
     write!(&file, "{}", text)?;
+    Ok(())
+}
+
+pub fn set_time_past(file: &Path) -> Result<(), Error> {
+    let yr = Duration::from_secs(60 * 60 * 24 * 365);
+    let past = SystemTime::now().checked_sub(yr).unwrap();
+    let ft = FileTimes::new()
+        .set_modified(past);
+    File::open(file)?.set_times(ft)?;
     Ok(())
 }
 

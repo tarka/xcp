@@ -314,7 +314,8 @@ fn file_copy_perms(drv: &str) {
         xattr::set(&source_path, "user.test", b"my test").unwrap();
     }
 
-    let mut perms = metadata(&source_path).unwrap().permissions();
+    set_time_past(&source_path).unwrap();
+    let mut perms = source_path.metadata().unwrap().permissions();
     perms.set_readonly(true);
     set_permissions(&source_path, perms).unwrap();
 
@@ -326,13 +327,21 @@ fn file_copy_perms(drv: &str) {
     ])
     .unwrap();
 
+    let smeta = source_path.metadata().unwrap();
+    let dmeta = dest_path.metadata().unwrap();
+
     assert!(out.status.success());
     assert!(file_contains(&dest_path, text).unwrap());
     assert!(files_match(&source_path, &dest_path));
     assert_eq!(
-        metadata(&source_path).unwrap().permissions().readonly(),
-        metadata(&dest_path).unwrap().permissions().readonly()
+        smeta.permissions().readonly(),
+        dmeta.permissions().readonly()
     );
+    assert_eq!(
+        smeta.modified().unwrap(),
+        dmeta.modified().unwrap(),
+    );
+
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     if fs_supports_xattr {
         assert_eq!(
