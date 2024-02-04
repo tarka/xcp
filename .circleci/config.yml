@@ -2,7 +2,7 @@ version: 2.1
 executors:
   rust-executor:
     docker:
-      - image: cimg/rust:1.70.0
+      - image: cimg/rust:1.75.0
 
 jobs:
   test:
