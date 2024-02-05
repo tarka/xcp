@@ -11,13 +11,11 @@ jobs:
      - uses: vmactions/freebsd-vm@v1
        with:
          usesh: true
-         prepare: |
-           pkg install -y curl
          run: |
            echo test content > file1.txt
            touch file2.txt
            chmod 0 file2.txt
 
-           ls -al
+           ls -l file*txt
            cp -v file1.txt file2.txt
-           ls -al
+           ls -l file*txt
