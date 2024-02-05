@@ -14,7 +14,7 @@ jobs:
          prepare: |
            pkg install -y curl
          run: |
-           touch file1.txt
+           echo test content > file1.txt
            touch file2.txt
            chmod 0 file2.txt
 
