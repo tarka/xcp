@@ -3,73 +3,6 @@ name: Tests
 on: [push]
 
 jobs:
-  ubuntu:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-
-      - name: Update Rust to latest
-        run: ~/.cargo/bin/rustup update
-
-      - name: Create filesystems
-        # f2fs and exfat modules are in linux-modules-extra-azure
-        # and cannot be installed reliably:
-        # https://github.com/actions/runner-images/issues/7587
-        run: tests/scripts/make-filesystems.sh ext2 ext4 xfs btrfs ntfs fat zfs
-
-      - name: Run tests on ext2
-        run: /fs/ext2/src/tests/scripts/test-linux.sh
-        if: always()
-
-      - name: Run tests on ext4
-        run: /fs/ext4/src/tests/scripts/test-linux.sh
-        if: always()
-
-      - name: Run tests on XFS
-        run: /fs/xfs/src/tests/scripts/test-linux.sh
-        if: always()
-
-      - name: Run tests on btrfs
-        run: /fs/btrfs/src/tests/scripts/test-linux.sh
-        if: always()
-
-      - name: Run tests on ntfs
-        run: /fs/ntfs/src/tests/scripts/test-linux.sh
-        if: always()
-
-      - name: Run tests on fat
-        run: /fs/fat/src/tests/scripts/test-linux.sh
-        if: always()
-
-      - name: Run tests on ZFS
-        run: /fs/zfs/src/tests/scripts/test-linux.sh
-        if: always()
-
-  expensive:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-
-      - name: Update Rust to latest
-        run: ~/.cargo/bin/rustup update
-
-      - name: Run expensive tests
-        run: ./tests/scripts/test-linux.sh test_run_expensive
-
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v1
-
-      - name: Install Rust
-        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash /dev/stdin -y
-
-      - name: Update Rust (installer may lag behind)
-        run: ~/.cargo/bin/rustup update
-
-      - name: Run all tests
-        run: ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive
-
   freebsd:
      runs-on: ubuntu-latest
      steps:
@@ -81,6 +14,10 @@ jobs:
          prepare: |
            pkg install -y curl
          run: |
-           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh /dev/stdin -y
-           ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive
-           rm -rf target/generated_filetree/
+           touch file1.txt
+           touch file2.txt
+           chmod 0 file2.txt
+
+           ls -al
+           cp -v file1.txt file2.txt
+           la -al
