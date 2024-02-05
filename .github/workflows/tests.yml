@@ -20,4 +20,4 @@ jobs:
 
            ls -al
            cp -v file1.txt file2.txt
-           la -al
+           ls -al
