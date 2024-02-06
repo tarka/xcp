@@ -80,7 +80,10 @@ jobs:
          usesh: true
          prepare: |
            pkg install -y curl
+           pw user add -n testing -m
          run: |
-           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh /dev/stdin -y
-           ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive
-           rm -rf target/generated_filetree/
+           su testing -c '
+               curl -sSf https://sh.rustup.rs | sh /dev/stdin -y
+               ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive
+               rm -rf target/generated_filetree/
+           '
