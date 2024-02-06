@@ -314,7 +314,6 @@ fn file_copy_perms(drv: &str) {
         xattr::set(&source_path, "user.test", b"my test").unwrap();
     }
 
-    set_time_past(&source_path).unwrap();
     let mut perms = source_path.metadata().unwrap().permissions();
     perms.set_readonly(true);
     set_permissions(&source_path, perms).unwrap();
@@ -398,10 +397,7 @@ fn file_copy_timestamps(drv: &str) {
 
     let smeta = source_path.metadata().unwrap();
     let dmeta = dest_path.metadata().unwrap();
-    assert_eq!(
-        smeta.modified().unwrap(),
-        dmeta.modified().unwrap(),
-    );
+    assert!(timestamps_same(&smeta.modified().unwrap(), &dmeta.modified().unwrap()));
 }
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
@@ -413,9 +409,7 @@ fn file_copy_no_timestamps(drv: &str) {
     let text = "This is a test file.";
 
     create_file(&source_path, text).unwrap();
-    let mut perms = source_path.metadata().unwrap().permissions();
-    perms.set_readonly(true);
-    set_permissions(&source_path, perms).unwrap();
+    set_time_past(&source_path).unwrap();
 
     let out = run(&[
         "--driver",
@@ -432,10 +426,7 @@ fn file_copy_no_timestamps(drv: &str) {
 
     let smeta = source_path.metadata().unwrap();
     let dmeta = dest_path.metadata().unwrap();
-    assert_ne!(
-        smeta.modified().unwrap(),
-        dmeta.modified().unwrap(),
-    );
+    assert!(!timestamps_same(&smeta.modified().unwrap(), &dmeta.modified().unwrap()));
 }
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]

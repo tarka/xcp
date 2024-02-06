@@ -69,6 +69,14 @@ pub fn set_time_past(file: &Path) -> Result<(), Error> {
     Ok(())
 }
 
+pub fn timestamps_same(from: &SystemTime, to: &SystemTime) -> bool {
+    let from_s = from.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as i64;
+    let to_s = to.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as i64;
+    // 5s tolerance
+    from_s.abs_diff(to_s) < 5
+}
+
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[allow(unused)]
 pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
