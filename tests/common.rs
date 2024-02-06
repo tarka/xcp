@@ -14,7 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fs::{create_dir_all, metadata, set_permissions, write, File, Permissions};
+use std::fs::{create_dir_all, set_permissions, write, File, Permissions};
 use std::os::unix::fs::{symlink, PermissionsExt};
 use std::os::unix::net::UnixListener;
 use cfg_if::cfg_if;
@@ -293,8 +293,9 @@ fn file_copy_reflink_never(drv: &str) {
     assert!(files_match(&source_path, &dest_path));
 }
 
-#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[cfg_attr(all(feature = "parblock", not(feature = "test_no_perms")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_perms", ignore = "No FS support")]
 fn file_copy_perms(drv: &str) {
     cfg_if! {
         if #[cfg(feature = "test_no_xattr")] {
@@ -314,7 +315,7 @@ fn file_copy_perms(drv: &str) {
         xattr::set(&source_path, "user.test", b"my test").unwrap();
     }
 
-    let mut perms = metadata(&source_path).unwrap().permissions();
+    let mut perms = source_path.metadata().unwrap().permissions();
     perms.set_readonly(true);
     set_permissions(&source_path, perms).unwrap();
 
@@ -329,10 +330,9 @@ fn file_copy_perms(drv: &str) {
     assert!(out.status.success());
     assert!(file_contains(&dest_path, text).unwrap());
     assert!(files_match(&source_path, &dest_path));
-    assert_eq!(
-        metadata(&source_path).unwrap().permissions().readonly(),
-        metadata(&dest_path).unwrap().permissions().readonly()
-    );
+    assert!(dest_path.metadata().unwrap()
+        .permissions().readonly());
+
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     if fs_supports_xattr {
         assert_eq!(
@@ -342,8 +342,9 @@ fn file_copy_perms(drv: &str) {
     }
 }
 
-#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[cfg_attr(all(feature = "parblock", not(feature = "test_no_perms")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_perms", ignore = "No FS support")]
 fn file_copy_no_perms(drv: &str) {
     let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
@@ -351,7 +352,7 @@ fn file_copy_no_perms(drv: &str) {
     let text = "This is a test file.";
 
     create_file(&source_path, text).unwrap();
-    let mut perms = metadata(&source_path).unwrap().permissions();
+    let mut perms = source_path.metadata().unwrap().permissions();
     perms.set_readonly(true);
     set_permissions(&source_path, perms).unwrap();
 
@@ -367,7 +368,67 @@ fn file_copy_no_perms(drv: &str) {
     assert!(out.status.success());
     assert!(file_contains(&dest_path, text).unwrap());
     assert!(files_match(&source_path, &dest_path));
-    assert!(!metadata(&dest_path).unwrap().permissions().readonly());
+    assert!(!dest_path.metadata().unwrap()
+        .permissions().readonly());
+}
+
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn file_copy_timestamps(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+    let text = "This is a test file.";
+
+    create_file(&source_path, text).unwrap();
+
+    set_time_past(&source_path).unwrap();
+
+    let out = run(&[
+        "--driver",
+        drv,
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(out.status.success());
+    assert!(file_contains(&dest_path, text).unwrap());
+    assert!(files_match(&source_path, &dest_path));
+
+    let smeta = source_path.metadata().unwrap();
+    let dmeta = dest_path.metadata().unwrap();
+    assert!(timestamps_same(&smeta.modified().unwrap(), &dmeta.modified().unwrap()));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn file_copy_no_timestamps(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+    let text = "This is a test file.";
+
+    create_file(&source_path, text).unwrap();
+    set_time_past(&source_path).unwrap();
+
+    let out = run(&[
+        "--driver",
+        drv,
+        "--no-timestamps",
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(out.status.success());
+    assert!(file_contains(&dest_path, text).unwrap());
+    assert!(files_match(&source_path, &dest_path));
+
+    let smeta = source_path.metadata().unwrap();
+    let dmeta = dest_path.metadata().unwrap();
+    assert!(!timestamps_same(&smeta.modified().unwrap(), &dmeta.modified().unwrap()));
 }
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]

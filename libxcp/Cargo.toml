@@ -3,7 +3,7 @@ name = "libxcp"
 description = "xcp is an experimental and incomplete clone of the Unix `cp` command. This library is the core functionality, including drivers."
 version = "0.19.0"
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.75.0"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
 homepage = "https://github.com/tarka/xcp"

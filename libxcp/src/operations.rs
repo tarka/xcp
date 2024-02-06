@@ -22,7 +22,7 @@ use std::sync::Arc;
 use crossbeam_channel as cbc;
 use libfs::{
     allocate_file, copy_file_bytes, copy_permissions,
-    next_sparse_segments, probably_sparse, sync, reflink, FileType,
+    next_sparse_segments, probably_sparse, sync, reflink, FileType, copy_timestamps,
 };
 use log::{debug, error, info};
 use walkdir::WalkDir;
@@ -131,6 +131,9 @@ impl CopyHandle {
     fn finalise_copy(&self) -> Result<()> {
         if !self.config.no_perms {
             copy_permissions(&self.infd, &self.outfd)?;
+        }
+        if !self.config.no_timestamps {
+            copy_timestamps(&self.infd, &self.outfd)?;
         }
         if self.config.fsync {
             debug!("Syncing file {:?}", self.outfd);

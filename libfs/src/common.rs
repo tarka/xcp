@@ -19,7 +19,7 @@ use log::{debug, warn};
 use rustix::fs::{fsync, ftruncate};
 use rustix::io::{pread, pwrite};
 use std::cmp;
-use std::fs::File;
+use std::fs::{File, FileTimes};
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
@@ -56,10 +56,24 @@ pub fn copy_permissions(infd: &File, outfd: &File) -> Result<()> {
 
     // FIXME: ACLs, selinux, etc.
 
-    debug!("Performing permissions copy");
-    outfd.set_permissions(infd.metadata()?.permissions())?;
+    let inmeta = infd.metadata()?;
 
-    debug!("Permissions copy done");
+    debug!("Performing permissions copy");
+    outfd.set_permissions(inmeta.permissions())?;
+
+    Ok(())
+}
+
+/// Copy file timestamps.
+pub fn copy_timestamps(infd: &File, outfd: &File) -> Result<()> {
+    let inmeta = infd.metadata()?;
+
+    debug!("Performing timestamp copy");
+    let ftime = FileTimes::new()
+        .set_accessed(inmeta.accessed()?)
+        .set_modified(inmeta.modified()?);
+    outfd.set_times(ftime)?;
+
     Ok(())
 }
 
