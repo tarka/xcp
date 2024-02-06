@@ -14,7 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fs::{create_dir_all, metadata, set_permissions, write, File, Permissions};
+use std::fs::{create_dir_all, set_permissions, write, File, Permissions};
 use std::os::unix::fs::{symlink, PermissionsExt};
 use std::os::unix::net::UnixListener;
 use cfg_if::cfg_if;
@@ -360,7 +360,7 @@ fn file_copy_no_perms(drv: &str) {
     let text = "This is a test file.";
 
     create_file(&source_path, text).unwrap();
-    let mut perms = metadata(&source_path).unwrap().permissions();
+    let mut perms = source_path.metadata().unwrap().permissions();
     perms.set_readonly(true);
     set_permissions(&source_path, perms).unwrap();
 
@@ -376,7 +376,7 @@ fn file_copy_no_perms(drv: &str) {
     assert!(out.status.success());
     assert!(file_contains(&dest_path, text).unwrap());
     assert!(files_match(&source_path, &dest_path));
-    assert!(!metadata(&dest_path).unwrap().permissions().readonly());
+    assert!(!dest_path.metadata().unwrap().permissions().readonly());
 }
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
