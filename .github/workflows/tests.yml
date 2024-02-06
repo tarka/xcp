@@ -83,7 +83,7 @@ jobs:
            pw user add -n testing -m
          run: |
            su testing -c '
-               curl -sSf https://sh.rustup.rs | sh /dev/stdin -y
-               ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive
-               ~/.cargo/bin/cargo clean
+               curl -sSf https://sh.rustup.rs | sh /dev/stdin -y \
+               && ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive \
+               && ~/.cargo/bin/cargo clean
            '
