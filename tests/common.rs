@@ -293,8 +293,9 @@ fn file_copy_reflink_never(drv: &str) {
     assert!(files_match(&source_path, &dest_path));
 }
 
-#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[cfg_attr(all(feature = "parblock", not(feature = "test_no_perms")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_perms", ignore = "No FS support")]
 fn file_copy_perms(drv: &str) {
     cfg_if! {
         if #[cfg(feature = "test_no_xattr")] {
@@ -341,8 +342,9 @@ fn file_copy_perms(drv: &str) {
     }
 }
 
-#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[cfg_attr(all(feature = "parblock", not(feature = "test_no_perms")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_perms", ignore = "No FS support")]
 fn file_copy_no_perms(drv: &str) {
     let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
