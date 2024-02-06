@@ -85,7 +85,5 @@ jobs:
            su testing -c '
                curl -sSf https://sh.rustup.rs | sh /dev/stdin -y
                ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive
-
-               # Copying the build objects causes the copy-back to run out of space. We don't need this anyway.
                ~/.cargo/bin/cargo clean
            '
