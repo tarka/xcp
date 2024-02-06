@@ -36,6 +36,7 @@ _xcp() {
     --fsync'[Sync each file to disk after it is written]'
     --gitignore'[Use .gitignore if present]'
     --no-perms'[Do not copy file permissions]'
+    --no-timestamps'[Do not copy file timestamps]'
     --no-progress'[Disable progress bar]'
   )
 

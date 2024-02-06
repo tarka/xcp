@@ -28,6 +28,7 @@ complete -c xcp -s w -l workers -d 'Workers for recursive copies (0=auto)' -x -a
 complete -c xcp -l fsync -d 'Sync each file to disk after it is written'
 complete -c xcp -l gitignore -d 'Use .gitignore if present'
 complete -c xcp -l no-perms -d 'Do not copy file permissions'
+complete -c xcp -l no-timestamps -d 'Do not copy file timestamps'
 complete -c xcp -l no-progress -d 'Disable progress bar'
 complete -c xcp -l block-size -d 'Block size for file operations' -x -a '(seq 1 16){B,K,M,G}'
 complete -c xcp -l driver -d 'Parallelise at the file or at the block level' -x -a "$drivers"
