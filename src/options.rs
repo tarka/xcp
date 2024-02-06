@@ -78,6 +78,10 @@ pub struct Opts {
     #[arg(long)]
     pub no_perms: bool,
 
+    /// Do not copy the file timestamps.
+    #[arg(long)]
+    pub no_timestamps: bool,
+
     /// Driver to use, defaults to 'file-parallel'.
     ///
     /// Currently there are 2; the default "parfile", which
@@ -148,6 +152,7 @@ impl From<&Opts> for Config {
             gitignore: opts.gitignore,
             no_clobber: opts.no_clobber,
             no_perms: opts.no_perms,
+            no_timestamps: opts.no_timestamps,
             no_target_directory: opts.no_target_directory,
             fsync: opts.fsync,
             reflink: opts.reflink,

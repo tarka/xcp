@@ -45,6 +45,7 @@ pub use common::{
     allocate_file,
     copy_file,
     copy_permissions,
+    copy_timestamps,
     is_same_file,
     merge_extents,
     sync,

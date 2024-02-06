@@ -58,17 +58,22 @@ pub fn copy_permissions(infd: &File, outfd: &File) -> Result<()> {
 
     let inmeta = infd.metadata()?;
 
-    // FIXME: Should be configurable?
+    debug!("Performing permissions copy");
+    outfd.set_permissions(inmeta.permissions())?;
+
+    Ok(())
+}
+
+/// Copy file timestamps.
+pub fn copy_timestamps(infd: &File, outfd: &File) -> Result<()> {
+    let inmeta = infd.metadata()?;
+
     debug!("Performing timestamp copy");
     let ftime = FileTimes::new()
         .set_accessed(inmeta.accessed()?)
         .set_modified(inmeta.modified()?);
     outfd.set_times(ftime)?;
 
-    debug!("Performing permissions copy");
-    outfd.set_permissions(inmeta.permissions())?;
-
-    debug!("Permissions copy done");
     Ok(())
 }
 
