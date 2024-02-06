@@ -95,12 +95,11 @@ pkgin install xcp
 
 ## Performance
 
-Benchmarks are mostly meaningless, but to check we're not introducing _too_ much
-overhead for local copies, the following are results from a laptop with an NVMe
-disk and in single-user mode. The target copy directory is a git checkout of the
-Firefox codebase, having been recently gc'd (i.e. a single 4.1GB pack
-file). `fstrim -va` is run before each test run to minimise SSD allocation
-performance interference.
+Benchmarks are mostly meaningless, but the following are results from a laptop
+with an NVMe disk and in single-user mode. The target copy directory is a git
+checkout of the Firefox codebase, having been recently gc'd (i.e. a single 4.1GB
+pack file). `fstrim -va` and `echo 3 | sudo tee /proc/sys/vm/drop_caches` are
+run before each test run to minimise SSD allocation performance interference.
 
 ### Local copy
 
