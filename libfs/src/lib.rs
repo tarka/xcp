@@ -77,11 +77,13 @@ pub enum FileType {
     Socket,
     Fifo,
     Char,
+    Block,
     Other
 }
 
 impl From<fs::FileType> for FileType {
     fn from(ft: fs::FileType) -> Self {
+        println!("FILETYPE is {:?}", ft);
         if ft.is_dir() {
             FileType::Dir
         } else if ft.is_file() {
@@ -94,6 +96,8 @@ impl From<fs::FileType> for FileType {
             FileType::Fifo
         } else if ft.is_char_device() {
             FileType::Char
+        } else if ft.is_block_device() {
+            FileType::Block
         } else {
             FileType::Other
         }

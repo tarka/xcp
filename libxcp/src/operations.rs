@@ -24,7 +24,7 @@ use libfs::{
     allocate_file, copy_file_bytes, copy_permissions,
     next_sparse_segments, probably_sparse, sync, reflink, FileType, copy_timestamps,
 };
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use walkdir::WalkDir;
 
 use crate::backup::{get_backup_path, needs_backup};
@@ -226,7 +226,7 @@ pub fn tree_walker(
                     create_dir_all(&target)?;
                 }
 
-                FileType::Socket | FileType::Char | FileType::Fifo => {
+                FileType::Socket | FileType::Char | FileType::Fifo | FileType::Block => {
                     debug!("Special file found: {:?} to {:?}", from, target);
                     work_tx.send(Operation::Special(from, target))?;
                 }
