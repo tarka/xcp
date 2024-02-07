@@ -19,6 +19,7 @@
 //! but has a higher overhead.
 
 use std::cmp;
+use std::fs::remove_file;
 use std::ops::Range;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -233,6 +234,12 @@ fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: &Arc<dyn StatusUpdat
 
             Operation::Special(from, to) => {
                 info!("Dispatch[{:?}]: Special file {:?} -> {:?}", thread::current().id(), from, to);
+                if to.exists() {
+                    if config.no_clobber {
+                        return Err(XcpError::DestinationExists("Destination file exists and --no-clobber is set.", to).into());
+                    }
+                    remove_file(&to)?;
+                }
                 copy_node(&from, &to)?;
             }
         }

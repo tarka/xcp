@@ -174,7 +174,7 @@ pub fn tree_walker(
             .last()
             .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
 
-        let target_base = if dest.exists() && !config.no_target_directory {
+        let target_base = if dest.exists() && dest.is_dir() && !config.no_target_directory {
             dest.join(sourcedir)
         } else {
             dest.to_path_buf()

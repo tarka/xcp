@@ -22,7 +22,6 @@ use std::{result, thread};
 use std::sync::Arc;
 
 use glob::{glob, Paths};
-use libfs::is_same_file;
 use libxcp::config::Config;
 use libxcp::drivers::load_driver;
 use libxcp::errors::{Result, XcpError};
@@ -112,50 +111,25 @@ fn main() -> Result<()> {
 
     let driver = load_driver(opts.driver, &config)?;
 
-    let handle = if sources.len() == 1 && dest.is_file() {
-        let source = sources[0].clone();
-
-        // Special case; attemping to rename/overwrite existing file.
-        if opts.no_clobber {
-            return Err(XcpError::DestinationExists("Destination file exists and --no-clobber is set.", dest).into());
+    // Sanity-check all sources up-front
+    for source in &sources {
+        info!("Copying source {:?} to {:?}", source, dest);
+        if !source.exists() {
+            return Err(XcpError::InvalidSource("Source does not exist.").into());
         }
 
-        // Special case: Attempt to overwrite a file with
-        // itself. Always disallow for now.
-        if is_same_file(&source, &dest)? {
-            return Err(XcpError::DestinationExists("Source and destination is the same file.", dest).into());
+        if source.is_dir() && !opts.recursive {
+            return Err(XcpError::InvalidSource("Source is directory and --recursive not specified.").into());
         }
 
-        info!("Copying file {:?} to {:?}", source, dest);
-        thread::spawn(move || -> Result<()> {
-            driver.copy_single(&source, &dest, stats)
-        })
-
-    } else {
-        // Sanity-check all sources up-front
-        for source in &sources {
-            info!("Copying source {:?} to {:?}", source, dest);
-            if !source.exists() {
-                return Err(XcpError::InvalidSource("Source does not exist.").into());
-            }
-
-            if source.is_dir() && !opts.recursive {
-                return Err(XcpError::InvalidSource("Source is directory and --recursive not specified.").into());
-            }
-
-            if source == &dest {
-                return Err(XcpError::InvalidSource("Cannot copy a directory into itself").into());
-            }
-
-            if dest.exists() && !dest.is_dir() {
-                return Err(XcpError::InvalidDestination("Source is directory but target exists and is not a directory").into());
-            }
+        if source == &dest {
+            return Err(XcpError::InvalidSource("Cannot copy a directory into itself").into());
         }
+    }
 
-        thread::spawn(move || -> Result<()> {
-            driver.copy_all(sources, &dest, stats)
-        })
-    };
+    let handle = thread::spawn(move || -> Result<()> {
+        driver.copy_all(sources, &dest, stats)
+    });
 
     let pb = progress::create_bar(&opts, 0)?;
 

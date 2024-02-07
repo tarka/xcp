@@ -84,7 +84,6 @@ pub enum FileType {
 
 impl From<fs::FileType> for FileType {
     fn from(ft: fs::FileType) -> Self {
-        println!("FILETYPE is {:?}", ft);
         if ft.is_dir() {
             FileType::Dir
         } else if ft.is_file() {

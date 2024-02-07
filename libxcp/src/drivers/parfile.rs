@@ -19,7 +19,8 @@
 
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
-use libfs::copy_node;
+use libfs::{copy_node, FileType};
+use std::fs::remove_file;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -82,19 +83,49 @@ impl CopyDriver for Driver {
     }
 
     fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
-        let handle = CopyHandle::new(source, dest, &self.config)?;
-        handle.copy_file(&stats)?;
+        let ft = FileType::from(source.metadata()?.file_type());
+        match ft {
+            FileType::File => {
+                debug!("[Single] Copy file {:?} to {:?}", source, dest);
+                CopyHandle::new(source, dest, &self.config)?
+                    .copy_file(&stats)?;
+            }
+
+            FileType::Symlink => {
+                debug!("[Single] Symlink {:?} to {:?}", source, dest);
+                let _r = symlink(&source, &dest);
+            }
+
+            FileType::Dir => {
+                let msg = format!("Attempt to copy directory in single-file operation: {:?} to {:?}", source, dest);
+                error!("{}", msg);
+                return Err(XcpError::InvalidArguments(msg).into());
+            }
+
+            FileType::Socket | FileType::Char | FileType::Fifo => {
+                debug!("[Single] Special file {:?} -> {:?}", source, dest);
+                if dest.exists() {
+                    if self.config.no_clobber {
+                        return Err(XcpError::DestinationExists("Destination file exists and --no-clobber is set.", dest.to_path_buf()).into());
+                    }
+                    remove_file(dest)?;
+                }
+                copy_node(&source, &dest)?;
+            }
+
+            FileType::Block | FileType::Other => {
+                error!("Unsupported filetype found: {:?} -> {:?}", source, ft);
+                return Err(XcpError::UnknownFileType(source.to_path_buf()).into());
+            }
+        };
+
         Ok(())
     }
 }
 
 // ********************************************************************** //
 
-fn copy_worker(
-    work: cbc::Receiver<Operation>,
-    config: &Arc<Config>,
-    updates: Arc<dyn StatusUpdater>,
-) -> Result<()> {
+fn copy_worker(work: cbc::Receiver<Operation>, config: &Arc<Config>, updates: Arc<dyn StatusUpdater>) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
         debug!("Received operation {:?}", op);
@@ -121,6 +152,12 @@ fn copy_worker(
 
             Operation::Special(from, to) => {
                 info!("Worker[{:?}]: Special file {:?} -> {:?}", thread::current().id(), from, to);
+                if to.exists() {
+                    if config.no_clobber {
+                        return Err(XcpError::DestinationExists("Destination file exists and --no-clobber is set.", to).into());
+                    }
+                    remove_file(&to)?;
+                }
                 copy_node(&from, &to)?;
             }
 
