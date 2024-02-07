@@ -17,7 +17,7 @@
 mod common;
 mod errors;
 
-use std::{fs, ops::Range};
+use std::{fs::{self, File}, ops::Range, path::Path};
 
 use cfg_if::cfg_if;
 use rustix::fs::FileTypeExt;
@@ -51,6 +51,26 @@ pub use common::{
     sync,
 };
 pub use errors::Error;
+
+use errors::Result;
+
+pub trait Backend {
+    fn copy_file_bytes(infd: &File, outfd: &File, bytes: u64) -> Result<usize>;
+    fn copy_file_offset(infd: &File, outfd: &File, bytes: u64, off: i64) -> Result<usize>;
+    fn probably_sparse(fd: &File) -> Result<bool>;
+    fn map_extents(fd: &File) -> Result<Option<Vec<Extent>>>;
+    fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64, u64)>;
+    fn copy_sparse(infd: &File, outfd: &File) -> Result<u64>;
+    fn copy_node(src: &Path, dest: &Path) -> Result<()>;
+    fn reflink(infd: &File, outfd: &File) -> Result<bool>;
+    fn copy_permissions(infd: &File, outfd: &File) -> Result<()>;
+    fn copy_timestamps(infd: &File, outfd: &File) -> Result<()>;
+    fn allocate_file(fd: &File, len: u64) -> Result<()>;
+    fn merge_extents(extents: Vec<Extent>) -> Result<Vec<Extent>>;
+    fn is_same_file(src: &Path, dest: &Path) -> Result<bool>;
+    fn copy_file(from: &Path, to: &Path) -> Result<u64>;
+    fn sync(fd: &File) -> Result<()>;
+}
 
 /// Flag whether the current OS support
 /// [xattrs](https://man7.org/linux/man-pages/man7/xattr.7.html).
