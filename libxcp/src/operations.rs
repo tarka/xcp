@@ -205,7 +205,8 @@ pub fn tree_walker(
                 return Err(XcpError::EarlyShutdown(msg).into());
             }
 
-            match FileType::from(meta.file_type()) {
+            let ft = FileType::from(meta.file_type());
+            match ft {
                 FileType::File => {
                     debug!("Send copy operation {:?} to {:?}", from, target);
                     stats.send(StatusUpdate::Size(meta.len()))?;
@@ -231,8 +232,8 @@ pub fn tree_walker(
                     work_tx.send(Operation::Special(from, target))?;
                 }
 
-                FileType::Other => {
-                    error!("Unknown filetype found; this should never happen!");
+                FileType::Block | FileType::Other => {
+                    error!("Unsupported filetype found: {:?} -> {:?}", target, ft);
                     return Err(XcpError::UnknownFileType(target).into());
                 }
             };
