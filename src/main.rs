@@ -148,7 +148,7 @@ fn main() -> Result<()> {
     }
 
     handle.join()
-            .map_err(|_| XcpError::CopyError("Error during copy operation".to_string()))??;
+        .map_err(|_| XcpError::CopyError("Error during copy operation".to_string()))??;
 
     info!("Copy complete");
     pb.end();

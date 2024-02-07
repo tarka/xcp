@@ -19,7 +19,7 @@
 
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
-use libfs::{copy_node, FileType};
+use libfs::copy_node;
 use std::fs::remove_file;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -82,45 +82,6 @@ impl CopyDriver for Driver {
         Ok(())
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
-        let ft = FileType::from(source.metadata()?.file_type());
-        match ft {
-            FileType::File => {
-                debug!("[Single] Copy file {:?} to {:?}", source, dest);
-                CopyHandle::new(source, dest, &self.config)?
-                    .copy_file(&stats)?;
-            }
-
-            FileType::Symlink => {
-                debug!("[Single] Symlink {:?} to {:?}", source, dest);
-                let _r = symlink(&source, &dest);
-            }
-
-            FileType::Dir => {
-                let msg = format!("Attempt to copy directory in single-file operation: {:?} to {:?}", source, dest);
-                error!("{}", msg);
-                return Err(XcpError::InvalidArguments(msg).into());
-            }
-
-            FileType::Socket | FileType::Char | FileType::Fifo => {
-                debug!("[Single] Special file {:?} -> {:?}", source, dest);
-                if dest.exists() {
-                    if self.config.no_clobber {
-                        return Err(XcpError::DestinationExists("Destination file exists and --no-clobber is set.", dest.to_path_buf()).into());
-                    }
-                    remove_file(dest)?;
-                }
-                copy_node(&source, &dest)?;
-            }
-
-            FileType::Block | FileType::Other => {
-                error!("Unsupported filetype found: {:?} -> {:?}", source, ft);
-                return Err(XcpError::UnknownFileType(source.to_path_buf()).into());
-            }
-        };
-
-        Ok(())
-    }
 }
 
 // ********************************************************************** //

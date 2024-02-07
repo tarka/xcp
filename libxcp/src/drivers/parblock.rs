@@ -104,17 +104,6 @@ impl CopyDriver for Driver {
 
         Ok(())
     }
-
-    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
-        let nworkers = self.config.num_workers();
-        let pool = ThreadPool::new(nworkers);
-
-        queue_file_blocks(source, dest, &pool, &stats, &self.config)?;
-
-        pool.join();
-
-        Ok(())
-    }
 }
 
 // ********************************************************************** //
