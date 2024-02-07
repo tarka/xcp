@@ -50,7 +50,7 @@ pub trait CopyDriver {
     /// Recursively copy a set of paths to a
     /// destination. `StatusUpdater.send()` will be called with
     /// `StatusUpdate` objects depending on the driver configuration.
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
+    fn copy(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
 }
 
 /// An enum specifing the driver to use. This is just a helper for

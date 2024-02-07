@@ -47,7 +47,7 @@ impl Driver {
 }
 
 impl CopyDriver for Driver {
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
+    fn copy(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let (work_tx, work_rx) = cbc::unbounded();
 
         // Thread which walks the file tree and sends jobs to the

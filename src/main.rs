@@ -128,7 +128,7 @@ fn main() -> Result<()> {
     }
 
     let handle = thread::spawn(move || -> Result<()> {
-        driver.copy_all(sources, &dest, stats)
+        driver.copy(sources, &dest, stats)
     });
 
     let pb = progress::create_bar(&opts, 0)?;

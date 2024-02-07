@@ -79,7 +79,7 @@ impl Driver {
 }
 
 impl CopyDriver for Driver {
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
+    fn copy(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let (file_tx, file_rx) = cbc::unbounded::<Operation>();
 
         // Start (single) dispatch worker
