@@ -31,21 +31,15 @@ use log::{error, info};
 use crate::options::Opts;
 
 fn init_logging(opts: &Opts) -> Result<()> {
-    use simplelog::{ColorChoice, Config, LevelFilter, SimpleLogger, TermLogger, TerminalMode};
-    let log_level = match opts.verbose {
-        0 => LevelFilter::Warn,
-        1 => LevelFilter::Info,
-        2 => LevelFilter::Debug,
-        _ => LevelFilter::Trace,
-    };
+    use simplelog::{ColorChoice, Config, SimpleLogger, TermLogger, TerminalMode};
 
     TermLogger::init(
-        log_level,
+        opts.log_level(),
         Config::default(),
         TerminalMode::Mixed,
         ColorChoice::Auto,
     ).or_else(
-        |_| SimpleLogger::init(log_level, Config::default())
+        |_| SimpleLogger::init(opts.log_level(), Config::default())
     )?;
 
     Ok(())
@@ -82,7 +76,7 @@ fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
 }
 
 fn main() -> Result<()> {
-    let opts = options::parse_args()?;
+    let opts = Opts::from_args()?;
     init_logging(&opts)?;
 
     let (dest, source_patterns) = opts
