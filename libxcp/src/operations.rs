@@ -224,7 +224,11 @@ pub fn tree_walker(
                     // guarantee a worker will action the creation
                     // before a subsequent copy operation requires it.
                     debug!("Creating target directory {:?}", target);
-                    create_dir_all(&target)?;
+                    if let Err(err) = create_dir_all(&target) {
+                        let msg = format!("Error creating target directory: {}", err);
+                        error!("{msg}");
+                        return Err(XcpError::CopyError(msg).into())
+                    }
                 }
 
                 FileType::Socket | FileType::Char | FileType::Fifo => {

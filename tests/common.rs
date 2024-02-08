@@ -150,6 +150,58 @@ fn dest_file_in_dir_exists(drv: &str) {
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+fn multiple_files_to_a_file(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let source1_path = dir.path().join("source1.txt");
+    let source2_path = dir.path().join("source2.txt");
+    let dest_path = dir.path().join("dest.txt");
+
+    {
+        File::create(&source1_path).unwrap();
+        File::create(&source2_path).unwrap();
+        File::create(&dest_path).unwrap();
+    }
+
+    let out = run(&[
+        "--driver", drv,
+        source1_path.to_str().unwrap(),
+        source2_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ]).unwrap();
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.contains("Multiple sources and destination is not a directory"));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn directory_to_a_file(drv: &str) {
+    let src_dir = tempdir_rel().unwrap();
+    let source_file = src_dir.path().join("file.txt");
+
+    let dir = tempdir_rel().unwrap();
+    let dest_file = dir.path().join("dest.txt");
+
+    {
+        File::create(&source_file).unwrap();
+        File::create(&dest_file).unwrap();
+    }
+
+    let out = run(&[
+        "-r",
+        "--driver", drv,
+        src_dir.path().to_str().unwrap(),
+        dest_file.to_str().unwrap(),
+    ]).unwrap();
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.contains("Cannot copy a directory to a file"));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
 fn dest_file_exists_overwrites(drv: &str) {
     let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");

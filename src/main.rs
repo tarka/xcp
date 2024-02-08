@@ -91,16 +91,16 @@ fn main() -> Result<()> {
         .ok_or(XcpError::InvalidArguments("Insufficient arguments".to_string()))
         .map(|(d, s)| (PathBuf::from(d), s))?;
 
-    // Do this check before expansion otherwise it could result in
-    // unexpected behaviour when the a glob expands to a single file.
-    if source_patterns.len() > 1 && !dest.is_dir() {
-        return Err(XcpError::InvalidDestination("Multiple sources and destination is not a directory.").into());
-    }
 
     let sources = expand_sources(source_patterns, &opts)?;
     if sources.is_empty() {
         return Err(XcpError::InvalidSource("No source files found.").into());
-
+    } else if !dest.is_dir() {
+        if sources.len() == 1 && sources[0].is_dir() && dest.exists() {
+            return Err(XcpError::InvalidDestination("Cannot copy a directory to a file.").into());
+        } else if sources.len() > 1 {
+            return Err(XcpError::InvalidDestination("Multiple sources and destination is not a directory.").into());
+        }
     }
 
     let config = Arc::new(Config::from(&opts));
