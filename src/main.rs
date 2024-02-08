@@ -103,14 +103,6 @@ fn main() -> Result<()> {
         }
     }
 
-    let config = Arc::new(Config::from(&opts));
-
-    let updater = ChannelUpdater::new(&config);
-    let stat_rx = updater.rx_channel();
-    let stats: Arc<dyn StatusUpdater> = Arc::new(updater);
-
-    let driver = load_driver(opts.driver, &config)?;
-
     // Sanity-check all sources up-front
     for source in &sources {
         info!("Copying source {:?} to {:?}", source, dest);
@@ -127,9 +119,22 @@ fn main() -> Result<()> {
         }
     }
 
+
+    // ========== Start copy ============
+
+    let config = Arc::new(Config::from(&opts));
+    let driver = load_driver(opts.driver, &config)?;
+
+    let updater = ChannelUpdater::new(&config);
+    let stat_rx = updater.rx_channel();
+    let stats: Arc<dyn StatusUpdater> = Arc::new(updater);
+
     let handle = thread::spawn(move || -> Result<()> {
         driver.copy(sources, &dest, stats)
     });
+
+
+    // ========== Collect output and display ============
 
     let pb = progress::create_bar(&opts, 0)?;
 
