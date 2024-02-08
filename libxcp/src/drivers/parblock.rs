@@ -92,13 +92,15 @@ impl CopyDriver for Driver {
         // Thread which walks the file tree and sends jobs to the
         // workers. The worker tx channel is moved to the walker so it is
         // closed, which will cause the workers to shutdown on completion.
-        let _walk_worker = {
+        let walk_worker = {
             let sc = stats.clone();
             let d = dest.to_path_buf();
             let c = self.config.clone();
             thread::spawn(move || tree_walker(sources, &d, &c, file_tx, sc))
         };
 
+        walk_worker.join()
+            .map_err(|_| XcpError::CopyError("Error walking copy tree".to_string()))??;
         dispatcher.join()
             .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
 
