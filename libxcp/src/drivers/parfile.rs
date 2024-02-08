@@ -20,6 +20,7 @@
 use crossbeam_channel as cbc;
 use log::{debug, error, info};
 use libfs::copy_node;
+use std::fs::remove_file;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -46,13 +47,13 @@ impl Driver {
 }
 
 impl CopyDriver for Driver {
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
+    fn copy(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let (work_tx, work_rx) = cbc::unbounded();
 
         // Thread which walks the file tree and sends jobs to the
         // workers. The worker tx channel is moved to the walker so it is
         // closed, which will cause the workers to shutdown on completion.
-        let _walk_worker = {
+        let walk_worker = {
             let sc = stats.clone();
             let d = dest.to_path_buf();
             let o = self.config.clone();
@@ -73,6 +74,8 @@ impl CopyDriver for Driver {
             joins.push(copy_worker);
         }
 
+        walk_worker.join()
+            .map_err(|_| XcpError::CopyError("Error walking copy tree".to_string()))??;
         for handle in joins {
             handle.join()
                 .map_err(|_| XcpError::CopyError("Error during copy operation".to_string()))??;
@@ -81,20 +84,11 @@ impl CopyDriver for Driver {
         Ok(())
     }
 
-    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
-        let handle = CopyHandle::new(source, dest, &self.config)?;
-        handle.copy_file(&stats)?;
-        Ok(())
-    }
 }
 
 // ********************************************************************** //
 
-fn copy_worker(
-    work: cbc::Receiver<Operation>,
-    config: &Arc<Config>,
-    updates: Arc<dyn StatusUpdater>,
-) -> Result<()> {
+fn copy_worker(work: cbc::Receiver<Operation>, config: &Arc<Config>, updates: Arc<dyn StatusUpdater>) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
         debug!("Received operation {:?}", op);
@@ -121,6 +115,12 @@ fn copy_worker(
 
             Operation::Special(from, to) => {
                 info!("Worker[{:?}]: Special file {:?} -> {:?}", thread::current().id(), from, to);
+                if to.exists() {
+                    if config.no_clobber {
+                        return Err(XcpError::DestinationExists("Destination file exists and --no-clobber is set.", to).into());
+                    }
+                    remove_file(&to)?;
+                }
                 copy_node(&from, &to)?;
             }
 

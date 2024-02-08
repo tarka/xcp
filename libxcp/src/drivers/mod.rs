@@ -47,15 +47,11 @@ use crate::feedback::StatusUpdater;
 /// The trait specifying driver operations; drivers should implement
 /// this.
 pub trait CopyDriver {
-    /// Recursively copy a set of paths to a
-    /// destination. `StatusUpdater.send()` will be called with
+    /// Recursively copy a set of directories or files to a
+    /// destination. `dest` can be a file if a single file is provided
+    /// the source.  `StatusUpdater.send()` will be called with
     /// `StatusUpdate` objects depending on the driver configuration.
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
-
-    /// Copy a single file to a destination. `StatusUpdater.send()`
-    /// will be called with `StatusUpdate` objects depending on the
-    /// driver configuration. For directory copies use `copy_all()`.
-    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
+    fn copy(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
 }
 
 /// An enum specifing the driver to use. This is just a helper for

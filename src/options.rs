@@ -17,6 +17,7 @@
 use clap::{ArgAction, Parser};
 
 use libxcp::config::{Config, Reflink, Backup};
+use log::LevelFilter;
 use unbytify::unbytify;
 
 use libxcp::drivers::Drivers;
@@ -132,8 +133,19 @@ pub struct Opts {
     pub paths: Vec<String>,
 }
 
-pub fn parse_args() -> Result<Opts> {
-    Ok(Opts::parse())
+impl Opts {
+    pub fn from_args() -> Result<Opts> {
+        Ok(Opts::parse())
+    }
+
+    pub fn log_level(&self) -> LevelFilter {
+        match self.verbose {
+            0 => LevelFilter::Warn,
+            1 => LevelFilter::Info,
+            2 => LevelFilter::Debug,
+            _ => LevelFilter::Trace,
+        }
+    }
 }
 
 impl From<&Opts> for Config {

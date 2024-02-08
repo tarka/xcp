@@ -47,7 +47,7 @@
 //!     // As we want realtime updates via the ChannelUpdater the
 //!     // copy operation should run in the background.
 //!     let handle = thread::spawn(move || {
-//!         driver.copy_all(sources, dest.path(), stats)
+//!         driver.copy(sources, dest.path(), stats)
 //!     });
 //!
 //!     // Gather the results as we go; our end of the channel has been
@@ -113,7 +113,7 @@ mod tests {
         let driver = load_driver(Drivers::ParFile, &config)?;
 
         let handle = thread::spawn(move || {
-            driver.copy_all(sources, dest.path(), stats)
+            driver.copy(sources, dest.path(), stats)
         });
 
         // Gather the results as we go; our end of the channel has been

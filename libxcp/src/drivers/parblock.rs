@@ -19,6 +19,7 @@
 //! but has a higher overhead.
 
 use std::cmp;
+use std::fs::remove_file;
 use std::ops::Range;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -78,7 +79,7 @@ impl Driver {
 }
 
 impl CopyDriver for Driver {
-    fn copy_all(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
+    fn copy(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
         let (file_tx, file_rx) = cbc::unbounded::<Operation>();
 
         // Start (single) dispatch worker
@@ -91,26 +92,17 @@ impl CopyDriver for Driver {
         // Thread which walks the file tree and sends jobs to the
         // workers. The worker tx channel is moved to the walker so it is
         // closed, which will cause the workers to shutdown on completion.
-        let _walk_worker = {
+        let walk_worker = {
             let sc = stats.clone();
             let d = dest.to_path_buf();
             let c = self.config.clone();
             thread::spawn(move || tree_walker(sources, &d, &c, file_tx, sc))
         };
 
+        walk_worker.join()
+            .map_err(|_| XcpError::CopyError("Error walking copy tree".to_string()))??;
         dispatcher.join()
             .map_err(|_| XcpError::CopyError("Error dispatching copy operation".to_string()))??;
-
-        Ok(())
-    }
-
-    fn copy_single(&self, source: &Path, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()> {
-        let nworkers = self.config.num_workers();
-        let pool = ThreadPool::new(nworkers);
-
-        queue_file_blocks(source, dest, &pool, &stats, &self.config)?;
-
-        pool.join();
 
         Ok(())
     }
@@ -233,6 +225,12 @@ fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: &Arc<dyn StatusUpdat
 
             Operation::Special(from, to) => {
                 info!("Dispatch[{:?}]: Special file {:?} -> {:?}", thread::current().id(), from, to);
+                if to.exists() {
+                    if config.no_clobber {
+                        return Err(XcpError::DestinationExists("Destination file exists and --no-clobber is set.", to).into());
+                    }
+                    remove_file(&to)?;
+                }
                 copy_node(&from, &to)?;
             }
         }

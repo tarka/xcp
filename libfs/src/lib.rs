@@ -70,6 +70,7 @@ pub const XATTR_SUPPORTED: bool = {
 
 /// Enum mapping for various *nix file types. Mapped from
 /// [std::fs::FileType] and [rustix::fs::FileTypeExt].
+#[derive(Debug)]
 pub enum FileType {
     File,
     Dir,
@@ -77,6 +78,7 @@ pub enum FileType {
     Socket,
     Fifo,
     Char,
+    Block,
     Other
 }
 
@@ -94,6 +96,8 @@ impl From<fs::FileType> for FileType {
             FileType::Fifo
         } else if ft.is_char_device() {
             FileType::Char
+        } else if ft.is_block_device() {
+            FileType::Block
         } else {
             FileType::Other
         }
