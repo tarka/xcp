@@ -51,6 +51,8 @@ pub trait CopyDriver {
     /// destination. `dest` can be a file if a single file is provided
     /// the source.  `StatusUpdater.send()` will be called with
     /// `StatusUpdate` objects depending on the driver configuration.
+    /// `copy()` itself will block until all work is complete, so
+    /// should be run in a thread if real-time updates are required.
     fn copy(&self, sources: Vec<PathBuf>, dest: &Path, stats: Arc<dyn StatusUpdater>) -> Result<()>;
 }
 

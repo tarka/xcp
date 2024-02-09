@@ -52,7 +52,6 @@ pub use common::{
 };
 pub use errors::Error;
 
-
 /// Flag whether the current OS support
 /// [xattrs](https://man7.org/linux/man-pages/man7/xattr.7.html).
 pub const XATTR_SUPPORTED: bool = {
