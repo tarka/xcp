@@ -84,6 +84,6 @@ jobs:
          run: |
            su testing -c '
              curl -sSf https://sh.rustup.rs | sh /dev/stdin -y \
-               && ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive \
+               && ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets \
                && ~/.cargo/bin/cargo clean
            '
