@@ -45,7 +45,7 @@ clap = { version = "4.4.18", features = ["derive"] }
 glob = "0.3.1"
 ignore = "0.4.22"
 indicatif = "0.17.7"
-libfs = { version = "0.6.0", path = "libfs" }
+libfs = { version = "0.7.0", path = "libfs" }
 libxcp = { version = "0.20.0", path = "libxcp" }
 log = "0.4.20"
 num_cpus = "1.16.0"
