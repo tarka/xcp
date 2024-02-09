@@ -38,5 +38,5 @@ command-line utility.
 ## Testing
 
 `libxcp` itself doesn't have many tests; the top-level `xcp` application however
-has many tests, including fuzzed stress-tests. This should be considered the
-test suite for now.
+has a full functional test suite, including fuzzed stress-tests. This should be
+considered the test suite for now.
