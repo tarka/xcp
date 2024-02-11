@@ -109,13 +109,60 @@ fn source_same_as_dest(drv: &str) {
     create_dir_all(&dest).unwrap();
 
     let out = run(&[
-        "--driver",
-        drv,
+        "--driver", drv,
         "-r",
         dest.to_str().unwrap(),
         dest.to_str().unwrap(),
     ])
     .unwrap();
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.contains("Cannot copy a directory into itself"));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn source_dir_same_as_dest_stub(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let dest = dir.path().join("dest");
+    let dest_file = dest.join("file.txt");
+
+    create_dir_all(&dest).unwrap();
+    {
+        File::create(&dest_file).unwrap();
+    }
+
+    let out = run(&[
+        "--driver", drv,
+        "-r",
+        dest.to_str().unwrap(),
+        dir.path().to_str().unwrap(),
+    ]).unwrap();
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.contains("Cannot copy a directory into itself"));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+fn source_file_same_as_dest_stub(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let dest = dir.path().join("dest");
+    let dest_file = dest.join("file.txt");
+
+    create_dir_all(&dest).unwrap();
+    {
+        create_file(&dest_file, "falskjdfa;lskdjfa").unwrap();
+    }
+
+    let out = run(&[
+        "--driver", drv,
+        "-r",
+        dest.to_str().unwrap(),
+        dir.path().to_str().unwrap(),
+    ]).unwrap();
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();
