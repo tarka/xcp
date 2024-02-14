@@ -123,5 +123,5 @@ in the copy occurring server-side rather than transferring across the network. F
 large files this can be a significant win:
 
 * Single 4.1GB file on NFSv4 mount
-    * `cp`: 378s
-    * `xcp`: ~37s
+    * `cp`: 6m18s
+    * `xcp`: 0m37s
