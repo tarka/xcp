@@ -110,7 +110,7 @@ fn source_same_as_dest(drv: &str) {
 
     let out = run(&[
         "--driver", drv,
-        "-r",
+        "-rvvv",
         dest.to_str().unwrap(),
         dest.to_str().unwrap(),
     ])
@@ -142,7 +142,7 @@ fn source_dir_same_as_dest_stub(drv: &str) {
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();
-    assert!(stderr.contains("Cannot copy a directory into itself"));
+    assert!(stderr.contains("Source is same as destination"));
 }
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
@@ -166,7 +166,7 @@ fn source_file_same_as_dest_stub(drv: &str) {
 
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();
-    assert!(stderr.contains("Cannot copy a directory into itself"));
+    assert!(stderr.contains("Source is same as destination"));
 }
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
@@ -178,7 +178,7 @@ fn dest_file_in_dir_exists(drv: &str) {
 
     {
         File::create(&source_path).unwrap();
-        File::create(dest_path).unwrap();
+        File::create(&dest_path).unwrap();
     }
 
     let out = run(&[
@@ -186,7 +186,7 @@ fn dest_file_in_dir_exists(drv: &str) {
         drv,
         "--no-clobber",
         source_path.to_str().unwrap(),
-        dir.path().to_str().unwrap(),
+        dest_path.to_str().unwrap(),
     ])
     .unwrap();
 
