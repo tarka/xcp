@@ -85,7 +85,6 @@ fn main() -> Result<()> {
         .ok_or(XcpError::InvalidArguments("Insufficient arguments".to_string()))
         .map(|(d, s)| (PathBuf::from(d), s))?;
 
-
     let sources = expand_sources(source_patterns, &opts)?;
     if sources.is_empty() {
         return Err(XcpError::InvalidSource("No source files found.").into());
@@ -107,9 +106,23 @@ fn main() -> Result<()> {
         if source.is_dir() && !opts.recursive {
             return Err(XcpError::InvalidSource("Source is directory and --recursive not specified.").into());
         }
-
         if source == &dest {
             return Err(XcpError::InvalidSource("Cannot copy a directory into itself").into());
+        }
+
+        let sourcedir = source
+            .components()
+            .last()
+            .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
+
+        let target_base = if dest.exists() && dest.is_dir() && !opts.no_target_directory {
+            dest.join(sourcedir)
+        } else {
+            dest.to_path_buf()
+        };
+
+        if source == &target_base {
+            return Err(XcpError::InvalidSource("Source is same as destination").into());
         }
     }
 
