@@ -88,9 +88,9 @@ pkgin install xcp
 * On non-Linux OSs sparse-files are not supported (although could be added if
   supported by the OS).
 * Assumes a 'modern' system with lots of RAM and fast, solid-state disks. In
-  particular it is likely to thrash on spinning disks as it attempts to gather
-  metadata and perform copies at the same time.
-* Currently missing a lot of `cp`'s features and flags, although these could be
+  particular it is likely to thrash on spinning disks unless they are in highly
+  parallel arrays.
+* Currently missing a lot of `cp`'s features and flags, although some could be
   added.
 
 ## Performance
