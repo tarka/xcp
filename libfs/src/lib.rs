@@ -20,16 +20,16 @@ mod attribs;
 mod backend;
 mod common;
 mod errors;
+mod fallback;
+mod linux;
 
 pub use attribs::{Extent, FileType, XATTR_SUPPORTED};
 pub use errors::Error;
 
 cfg_if! {
     if #[cfg(all(target_os = "linux", feature = "use_linux"))] {
-        mod linux;
         use linux as os_impl;
     } else {
-        mod fallback;
         use fallback as os_impl;
     }
 }
