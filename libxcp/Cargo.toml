@@ -29,11 +29,11 @@ libfs = { version = "0.7.0", path = "../libfs" }
 log = "0.4.20"
 num_cpus = "1.16.0"
 regex = "1.10.3"
-thiserror = "1.0.56"
+thiserror = "1.0.57"
 walkdir = "2.4.0"
 
 [dev-dependencies]
-tempfile = "3.9.0"
+tempfile = "3.10.0"
 
 [lints.clippy]
 upper_case_acronyms = "allow"
