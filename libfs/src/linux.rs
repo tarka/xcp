@@ -272,7 +272,7 @@ pub fn reflink(infd: &File, outfd: &File) -> Result<bool> {
 #[allow(unused)]
 mod tests {
     use super::*;
-    use crate::allocate_file;
+    use crate::{allocate_file, copy_permissions};
     use std::env::{current_dir, var};
     use std::fs::{read, OpenOptions};
     use std::io::{self, Seek, Write};
@@ -786,5 +786,41 @@ mod tests {
 
         assert!(to.exists());
         assert!(to.metadata().unwrap().file_type().is_socket());
+    }
+
+
+    #[test]
+    fn test_copy_acl() -> Result<()> {
+        use exacl::{getfacl, AclEntry, Perm, setfacl};
+
+        let dir = tempdir()?;
+        let from = dir.path().join("file.bin");
+        let to = dir.path().join("copy.bin");
+        let data = "X".repeat(1024);
+
+        {
+            let mut fd: File = File::create(&from)?;
+            write!(fd, "{}", data)?;
+
+            let mut fd: File = File::create(&to)?;
+            write!(fd, "{}", data)?;
+        }
+
+        let acl = AclEntry::allow_user("mail", Perm::READ, None);
+
+        let mut from_acl = getfacl(&from, None)?;
+        from_acl.push(acl.clone());
+        setfacl(&[&from], &from_acl, None)?;
+
+        {
+            let from_fd: File = File::open(&from)?;
+            let to_fd: File = File::open(&to)?;
+            copy_permissions(&from_fd, &to_fd)?;
+        }
+
+        let to_acl = getfacl(&from, None)?;
+        assert!(to_acl.contains(&acl));
+
+        Ok(())
     }
 }

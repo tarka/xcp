@@ -8,6 +8,9 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
+      - name: Add necessary packages
+        run: apt-get update && apt-get install -y libacl1-dev
+
       - name: Update Rust to latest
         run: ~/.cargo/bin/rustup update
 
@@ -49,6 +52,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+
+      - name: Add necessary packages
+        run: apt-get update && apt-get install -y libacl1-dev
 
       - name: Update Rust to latest
         run: ~/.cargo/bin/rustup update
