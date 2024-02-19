@@ -37,6 +37,7 @@ f2fs)
 fuseblk)
   echo >&2 "WARNING: assuming ntfs"
   features+=(
+    test_no_acl
     test_no_extents
     test_no_reflink
     test_no_sparse
@@ -46,6 +47,7 @@ fuseblk)
 
 vfat)
   features+=(
+    test_no_acl
     test_no_extents
     test_no_reflink
     test_no_sockets
@@ -66,6 +68,7 @@ tmpfs)
 
 zfs)
   features+=(
+    test_no_acl
     test_no_extents
     test_no_reflink
     test_no_sparse

@@ -790,6 +790,7 @@ mod tests {
 
 
     #[test]
+    #[cfg_attr(feature = "test_no_acl", ignore = "No FS support")]
     fn test_copy_acl() -> Result<()> {
         use exacl::{getfacl, AclEntry, Perm, setfacl};
 
