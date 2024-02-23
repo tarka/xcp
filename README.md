@@ -80,6 +80,8 @@ pkgin install xcp
 * Conversion of files to sparse where appropriate, as with `cp`'s
   `--sparse=always` flag.
 * Aggressive sparseness detection with `lseek`.
+* On non-Linux OSs sparse-files are not currenty supported but could be added if
+  supported by the OS.
 
 ### Differences with `cp`
 
@@ -97,14 +99,6 @@ pkgin install xcp
 * `cp` 'simple' backups are not supported, only numbered.
 * Some `cp` options are not available but may be added in the future.
 
-### Anti-Features
-
-* On non-Linux OSs sparse-files are not supported (although could be added if
-  supported by the OS).
-* Assumes a 'modern' system with lots of RAM and fast, solid-state disks. In
-  particular it is likely to thrash on spinning disks unless they are in highly
-  parallel arrays.
-
 ## Performance
 
 Benchmarks are mostly meaningless, but the following are results from a laptop
@@ -112,6 +106,10 @@ with an NVMe disk and in single-user mode. The target copy directory is a git
 checkout of the Firefox codebase, having been recently gc'd (i.e. a single 4.1GB
 pack file). `fstrim -va` and `echo 3 | sudo tee /proc/sys/vm/drop_caches` are
 run before each test run to minimise SSD allocation performance interference.
+
+Note: `xcp` is optimised for 'modern' systems with lots of RAM and solid-state
+disks. In particular it is likely to perform worse on spinning disks unless they
+are in highly parallel arrays.
 
 ### Local copy
 
