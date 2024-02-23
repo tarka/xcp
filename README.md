@@ -81,17 +81,29 @@ pkgin install xcp
   `--sparse=always` flag.
 * Aggressive sparseness detection with `lseek`.
 
+### Differences with `cp`
+
+* Permissions, xattrs and ACLs are copied by default; this can be disabled with
+  `--no-perms`.
+* Virtual file copies are not supported; for example `/proc` and `/sys` files.
+* Character files such as [sockets](https://man7.org/linux/man-pages/man7/unix.7.html) and
+  [pipes](https://man7.org/linux/man-pages/man3/mkfifo.3.html) are copied as
+  devices (i.e. via [mknod](https://man7.org/linux/man-pages/man2/mknod.2.html))
+  rather than copying their contents as a stream.
+* The `--reflink=never` option may silently perform a reflink operation
+  regardless. This is due to the use of
+  [copy_file_range](https://man7.org/linux/man-pages/man2/copy_file_range.2.html)
+  which has no such override and may perform its own optimisations.
+* `cp` 'simple' backups are not supported, only numbered.
+* Some `cp` options are not available but may be added in the future.
+
 ### Anti-Features
 
-* On Linux `copy_file_range()` requires a kernel version of 4.5 and onwards; if
-  it is missing `xcp` will fall-back to user-space copy.
 * On non-Linux OSs sparse-files are not supported (although could be added if
   supported by the OS).
 * Assumes a 'modern' system with lots of RAM and fast, solid-state disks. In
   particular it is likely to thrash on spinning disks unless they are in highly
   parallel arrays.
-* Currently missing a lot of `cp`'s features and flags, although some could be
-  added.
 
 ## Performance
 
