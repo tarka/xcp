@@ -1,6 +1,7 @@
 [package]
 name = "libfs"
-description = "."
+description = "`libfs` is a library of file and filesystem operations that is supplementary to
+`std::fs`"
 version = "0.7.1"
 edition = "2021"
 
