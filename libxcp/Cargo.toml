@@ -23,17 +23,17 @@ use_linux = ["libfs/use_linux"]
 anyhow = "1.0.80"
 blocking-threadpool = "1.0.1"
 cfg-if = "1.0.0"
-crossbeam-channel = "0.5.11"
+crossbeam-channel = "0.5.12"
 ignore = "0.4.22"
 libfs = { version = "0.7.1", path = "../libfs" }
-log = "0.4.20"
+log = "0.4.21"
 num_cpus = "1.16.0"
 regex = "1.10.3"
 thiserror = "1.0.57"
-walkdir = "2.4.0"
+walkdir = "2.5.0"
 
 [dev-dependencies]
-tempfile = "3.10.0"
+tempfile = "3.10.1"
 
 [lints.clippy]
 upper_case_acronyms = "allow"
