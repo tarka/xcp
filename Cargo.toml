@@ -40,14 +40,14 @@ test_no_perms = []
 test_run_expensive = []
 
 [dependencies]
-anyhow = "1.0.80"
+anyhow = "1.0.81"
 crossbeam-channel = "0.5.12"
-clap = { version = "4.5.2", features = ["derive"] }
+clap = { version = "4.5.3", features = ["derive"] }
 glob = "0.3.1"
 ignore = "0.4.22"
 indicatif = "0.17.8"
-libfs = { version = "0.7.1", path = "libfs" }
-libxcp = { version = "0.21.1", path = "libxcp" }
+libfs = { version = "0.7.0", path = "libfs" }
+libxcp = { version = "0.21.0", path = "libxcp" }
 log = "0.4.21"
 num_cpus = "1.16.0"
 simplelog = "0.12.2"

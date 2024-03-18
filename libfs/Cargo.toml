@@ -30,7 +30,7 @@ libc = "0.2.153"
 linux-raw-sys = { version = "0.6.4", features = ["ioctl"] }
 log = "0.4.21"
 rustix = { version = "0.38.31", features = ["fs"] }
-thiserror = "1.0.57"
+thiserror = "1.0.58"
 xattr = "1.3.1"
 
 [dev-dependencies]
