@@ -27,6 +27,7 @@ use libxcp::errors::Result;
 #[command(
     name = "xcp",
     about = "A (partial) clone of the Unix `cp` command with progress and pluggable drivers.",
+    version,
 )]
 pub struct Opts {
     /// Verbosity.
