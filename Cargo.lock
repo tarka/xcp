@@ -940,6 +940,7 @@ dependencies = [
  "rand",
  "rand_distr",
  "rand_xorshift",
+ "rustix",
  "simplelog",
  "tempfile",
  "test-case",

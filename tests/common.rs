@@ -14,10 +14,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fs::{create_dir_all, set_permissions, write, File, Permissions};
+use std::fs::{canonicalize, create_dir_all, set_permissions, write, File, Permissions};
 use std::os::unix::fs::{symlink, PermissionsExt};
 use std::os::unix::net::UnixListener;
 use cfg_if::cfg_if;
+use rustix::io::Errno;
 use test_case::test_case;
 
 
@@ -1258,4 +1259,49 @@ fn copy_dirs_backup(drv: &str) {
     assert!(backup1.exists());
     assert!(backup2.exists());
     assert!(files_match(&source_file, &dest_file));
+}
+
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
+fn test_nested_symlinks(_drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let file = dir.path().join("link-0.txt");
+    create_file(&file, "data").unwrap();
+
+    for i in 1..10 {
+        let from = dir.path().join(format!("link-{}.txt", i-1));
+        let to = dir.path().join(format!("link-{}.txt", i));
+        symlink(from, to).unwrap();
+    }
+    let link = dir.path().join("link-9.txt");
+    assert!(link.is_symlink());
+    let realpath = canonicalize(link).unwrap();
+    assert!(!realpath.is_symlink());
+    assert!(realpath.is_file());
+    assert_eq!("link-0.txt", realpath.file_name().unwrap());
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
+fn test_deep_symlinks(_drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let file = dir.path().join("link-0.txt");
+    create_file(&file, "data").unwrap();
+
+    for i in 1..100 {
+        let from = dir.path().join(format!("link-{}.txt", i-1));
+        let to = dir.path().join(format!("link-{}.txt", i));
+        symlink(from, to).unwrap();
+    }
+    let link = dir.path().join("link-99.txt");
+    let r = canonicalize(link);
+    match r {
+        Ok(_) => assert!(false, "Expected symlink nesting error"),
+        Err(e) => {
+            assert_eq!(e.raw_os_error().unwrap(), Errno::LOOP.raw_os_error());
+        }
+    }
 }

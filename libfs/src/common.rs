@@ -207,11 +207,9 @@ pub fn sync(fd: &File) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::{canonicalize, read};
+    use std::fs::read;
     use std::ops::Range;
-    use std::os::unix::fs::symlink;
-    use rustix::io::Errno;
-    use tempfile::{tempdir, tempdir_in};
+    use tempfile::tempdir;
 
     impl From<Range<u64>> for Extent {
         fn from(r: Range<u64>) -> Self {
@@ -221,12 +219,6 @@ mod tests {
                 shared: false,
             }
         }
-    }
-
-    fn create_file(path: &Path, text: &str) -> Result<(), Error> {
-        let file = File::create(path)?;
-        write!(&file, "{}", text)?;
-        Ok(())
     }
 
     #[test]
@@ -362,67 +354,6 @@ mod tests {
         crate::copy_file(&from, &to)?;
 
         assert_eq!(len, to.metadata()?.len() as usize);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_resolve_symlinks() -> Result<()> {
-        let dir = tempdir_in("../target")?;
-        let file = dir.path().join("file.txt");
-        let link = dir.path().join("link.txt");
-        create_file(&file, "data")?;
-        symlink("file.txt", &link)?;
-
-        assert!(link.is_symlink());
-        let realpath = canonicalize(link)?;
-        assert!(!realpath.is_symlink());
-        assert!(realpath.is_file());
-        assert_eq!("file.txt", realpath.file_name().unwrap());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_nested_symlinks() -> Result<()> {
-        let dir = tempdir_in("../target")?;
-        let file = dir.path().join("link-0.txt");
-        create_file(&file, "data")?;
-
-        for i in 1..10 {
-            let from = dir.path().join(format!("link-{}.txt", i-1));
-            let to = dir.path().join(format!("link-{}.txt", i));
-            symlink(from, to)?;
-        }
-        let link = dir.path().join("link-9.txt");
-        assert!(link.is_symlink());
-        let realpath = canonicalize(link)?;
-        assert!(!realpath.is_symlink());
-        assert!(realpath.is_file());
-        assert_eq!("link-0.txt", realpath.file_name().unwrap());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_deep_symlinks() -> Result<()> {
-        let dir = tempdir_in("../target")?;
-        let file = dir.path().join("link-0.txt");
-        create_file(&file, "data")?;
-
-        for i in 1..100 {
-            let from = dir.path().join(format!("link-{}.txt", i-1));
-            let to = dir.path().join(format!("link-{}.txt", i));
-            symlink(from, to)?;
-        }
-        let link = dir.path().join("link-99.txt");
-        let r = canonicalize(link);
-        match r {
-            Ok(_) => assert!(false, "Expected symlink nesting error"),
-            Err(e) => {
-                assert_eq!(e.raw_os_error().unwrap(), Errno::LOOP.raw_os_error());
-            }
-        }
 
         Ok(())
     }
