@@ -25,6 +25,7 @@ struct VisualBar {
 }
 
 pub trait ProgressBar {
+    #[allow(unused)]
     fn set_size(&self, size: u64);
     fn inc_size(&self, size: u64);
     fn inc(&self, size: u64);
