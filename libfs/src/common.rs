@@ -210,6 +210,7 @@ mod tests {
     use std::fs::{canonicalize, read};
     use std::ops::Range;
     use std::os::unix::fs::symlink;
+    use rustix::io::Errno;
     use tempfile::{tempdir, tempdir_in};
 
     impl From<Range<u64>> for Extent {
@@ -366,7 +367,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
     fn test_resolve_symlinks() -> Result<()> {
         let dir = tempdir_in("../target")?;
         let file = dir.path().join("file.txt");
@@ -377,6 +377,52 @@ mod tests {
         assert!(link.is_symlink());
         let realpath = canonicalize(link)?;
         assert!(!realpath.is_symlink());
+        assert!(realpath.is_file());
+        assert_eq!("file.txt", realpath.file_name().unwrap());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_nested_symlinks() -> Result<()> {
+        let dir = tempdir_in("../target")?;
+        let file = dir.path().join("link-0.txt");
+        create_file(&file, "data")?;
+
+        for i in 1..10 {
+            let from = dir.path().join(format!("link-{}.txt", i-1));
+            let to = dir.path().join(format!("link-{}.txt", i));
+            symlink(from, to)?;
+        }
+        let link = dir.path().join("link-9.txt");
+        assert!(link.is_symlink());
+        let realpath = canonicalize(link)?;
+        assert!(!realpath.is_symlink());
+        assert!(realpath.is_file());
+        assert_eq!("link-0.txt", realpath.file_name().unwrap());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_deep_symlinks() -> Result<()> {
+        let dir = tempdir_in("../target")?;
+        let file = dir.path().join("link-0.txt");
+        create_file(&file, "data")?;
+
+        for i in 1..100 {
+            let from = dir.path().join(format!("link-{}.txt", i-1));
+            let to = dir.path().join(format!("link-{}.txt", i));
+            symlink(from, to)?;
+        }
+        let link = dir.path().join("link-99.txt");
+        let r = canonicalize(link);
+        match r {
+            Ok(_) => assert!(false, "Expected symlink nesting error"),
+            Err(e) => {
+                assert_eq!(e.raw_os_error().unwrap(), Errno::LOOP.raw_os_error());
+            }
+        }
 
         Ok(())
     }
