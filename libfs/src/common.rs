@@ -366,6 +366,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
     fn test_resolve_symlinks() -> Result<()> {
         let dir = tempdir_in("../target")?;
         let file = dir.path().join("file.txt");
