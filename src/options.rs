@@ -40,6 +40,13 @@ pub struct Opts {
     #[arg(short, long)]
     pub recursive: bool,
 
+    /// Dereference symlinks in source
+    ///
+    /// Follow symlinks, possibly recursively, when copying source
+    /// files.
+    #[arg(short = 'L', long)]
+    pub dereference: bool,
+
     /// Number of parallel workers.
     ///
     /// Default is 4; if the value is negative or 0 it uses the number
@@ -166,6 +173,7 @@ impl From<&Opts> for Config {
             no_clobber: opts.no_clobber,
             no_perms: opts.no_perms,
             no_timestamps: opts.no_timestamps,
+            dereference: opts.dereference,
             no_target_directory: opts.no_target_directory,
             fsync: opts.fsync,
             reflink: opts.reflink,

@@ -19,6 +19,7 @@ _xcp() {
     -r
     -v
     -w
+    -L
     "$(_parse_help "$1" -h)" # long options will be parsed from `--help`
   )
   local units='B K M G' # in line with most completions prefer M to MB/MiB

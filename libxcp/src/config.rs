@@ -108,6 +108,9 @@ pub struct Config {
     /// Do not copy the file permissions. Default is `false`.
     pub no_timestamps: bool,
 
+    /// Dereference symlinks. Default is `false`.
+    pub dereference: bool,
+
     /// Target should not be a directory.
     ///
     /// Analogous to cp's no-target-directory. Expected behavior is that when
@@ -154,6 +157,7 @@ impl Default for Config {
             no_clobber: false,
             no_perms: false,
             no_timestamps: false,
+            dereference: false,
             no_target_directory: false,
             fsync: false,
             reflink: Reflink::Auto,
