@@ -362,7 +362,7 @@ checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
 
 [[package]]
 name = "libfs"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "cfg-if",
  "exacl",

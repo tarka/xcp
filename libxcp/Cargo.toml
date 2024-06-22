@@ -25,7 +25,7 @@ blocking-threadpool = "1.0.1"
 cfg-if = "1.0.0"
 crossbeam-channel = "0.5.13"
 ignore = "0.4.22"
-libfs = { version = "0.7.1", path = "../libfs" }
+libfs = { version = "0.7.2", path = "../libfs" }
 log = "0.4.21"
 num_cpus = "1.16.0"
 regex = "1.10.5"
