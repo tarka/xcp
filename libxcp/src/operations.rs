@@ -15,7 +15,7 @@
  */
 
 use std::{cmp, thread};
-use std::fs::{self, File, Metadata, read_link, create_dir_all};
+use std::fs::{self, canonicalize, create_dir_all, read_link, File, Metadata};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -188,10 +188,16 @@ pub fn tree_walker(
             .filter_entry(|e| ignore_filter(e, &gitignore))
         {
             debug!("Got tree entry {:?}", entry);
-            let e = entry?;
-            let from = e.into_path();
+            let epath = entry?.into_path();
+            let from = if config.dereference {
+                let cpath = canonicalize(&epath)?;
+                debug!("Dereferencing {:?} into {:?}", epath, cpath);
+                cpath
+            } else {
+                epath.clone()
+            };
             let meta = from.symlink_metadata()?;
-            let path = from.strip_prefix(&source)?;
+            let path = epath.strip_prefix(&source)?;
             let target = if !empty_path(path) {
                 target_base.join(path)
             } else {

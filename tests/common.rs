@@ -903,7 +903,7 @@ fn dir_copy_containing_symlinks(drv: &str) {
 
     let dest_base = dir.path().join("dest");
     let dest_file = dest_base.join("file.txt");
-    let dest_rlink = source_path.join("link.txt");
+    let dest_rlink = dest_base.join("link.txt");
 
     let out = run(&[
         "--driver",
@@ -1261,6 +1261,47 @@ fn copy_dirs_backup(drv: &str) {
     assert!(files_match(&source_file, &dest_file));
 }
 
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
+fn dir_copy_deref_symlinks(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+
+    let source_path = dir.path().join("mydir");
+    let source_file = source_path.join("file.txt");
+    let source_rlink = source_path.join("link.txt");
+    create_dir_all(&source_path).unwrap();
+    create_file(&source_file, "orig").unwrap();
+    symlink("file.txt", source_rlink).unwrap();
+    symlink("/etc/hosts", source_path.join("hosts")).unwrap();
+
+    let dest_base = dir.path().join("dest");
+    let dest_file = dest_base.join("file.txt");
+    let dest_rlink = dest_base.join("link.txt");
+
+    let out = run(&[
+        "--driver", drv,
+        "-r",
+        "--dereference",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(out.status.success());
+    assert!(dest_file.exists());
+    assert!(! dest_rlink
+        .symlink_metadata()
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    assert!(! dest_base
+        .join("hosts")
+        .symlink_metadata()
+        .unwrap()
+        .file_type()
+        .is_symlink());
+}
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]

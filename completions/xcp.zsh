@@ -14,6 +14,7 @@ _xcp() {
     {-n,--no-clobber}'[Do not overwrite an existing file]'
     {-r,--recursive}'[Copy directories recursively]'
     {-w,--workers}'[Workers for recursive copies (0=auto)]:workers:_values workers {0..$(getconf _NPROCESSORS_ONLN)}'
+    {-L,--dereference}'[Dereference symlinks in source]'
   )
 
   # long
