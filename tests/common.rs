@@ -14,13 +14,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fs::{canonicalize, create_dir_all, set_permissions, write, File, Permissions};
+use std::fs::{create_dir_all, set_permissions, write, File, Permissions};
 use std::os::unix::fs::{symlink, PermissionsExt};
 use std::os::unix::net::UnixListener;
 use cfg_if::cfg_if;
-use rustix::io::Errno;
 use test_case::test_case;
-
 
 mod util;
 use crate::util::*;
@@ -1281,7 +1279,7 @@ fn dir_copy_deref_symlinks(drv: &str) {
 
     let out = run(&[
         "--driver", drv,
-        "-r",
+        "--recursive",
         "--dereference",
         source_path.to_str().unwrap(),
         dest_base.to_str().unwrap(),
@@ -1306,43 +1304,70 @@ fn dir_copy_deref_symlinks(drv: &str) {
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 #[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
-fn test_nested_symlinks(_drv: &str) {
+fn test_nested_symlinks(drv: &str) {
     let dir = tempdir_rel().unwrap();
-    let file = dir.path().join("link-0.txt");
+
+    let source_path = dir.path().join("mydir");
+    create_dir_all(&source_path).unwrap();
+
+    let file = source_path.join("link-0.txt");
     create_file(&file, "data").unwrap();
 
     for i in 1..10 {
-        let from = dir.path().join(format!("link-{}.txt", i-1));
-        let to = dir.path().join(format!("link-{}.txt", i));
+        let from = source_path.join(format!("link-{}.txt", i-1));
+        let to = source_path.join(format!("link-{}.txt", i));
         symlink(from, to).unwrap();
     }
-    let link = dir.path().join("link-9.txt");
-    assert!(link.is_symlink());
-    let realpath = canonicalize(link).unwrap();
-    assert!(!realpath.is_symlink());
-    assert!(realpath.is_file());
-    assert_eq!("link-0.txt", realpath.file_name().unwrap());
+
+    let dest_base = dir.path().join("dest");
+
+    let out = run(&[
+        "--driver", drv,
+        "--recursive",
+        "--dereference",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ]).unwrap();
+    assert!(out.status.success());
+
+    for i in 1..10 {
+        let dest_link = dest_base.join(format!("link-{}.txt", i));
+        assert!(dest_link.exists());
+        assert!(!dest_link.is_symlink());
+        assert!(dest_link.is_file());
+        assert!(file_contains(&dest_link, "data").unwrap());
+    }
 }
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 #[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
-fn test_deep_symlinks(_drv: &str) {
+fn test_deep_symlinks(drv: &str) {
     let dir = tempdir_rel().unwrap();
-    let file = dir.path().join("link-0.txt");
+
+    let source_path = dir.path().join("mydir");
+    create_dir_all(&source_path).unwrap();
+
+    let file = source_path.join("link-0.txt");
     create_file(&file, "data").unwrap();
 
     for i in 1..100 {
-        let from = dir.path().join(format!("link-{}.txt", i-1));
-        let to = dir.path().join(format!("link-{}.txt", i));
+        let from = source_path.join(format!("link-{}.txt", i-1));
+        let to = source_path.join(format!("link-{}.txt", i));
         symlink(from, to).unwrap();
     }
-    let link = dir.path().join("link-99.txt");
-    let r = canonicalize(link);
-    match r {
-        Ok(_) => assert!(false, "Expected symlink nesting error"),
-        Err(e) => {
-            assert_eq!(e.raw_os_error().unwrap(), Errno::LOOP.raw_os_error());
-        }
-    }
+
+    let dest_base = dir.path().join("dest");
+
+    let out = run(&[
+        "--driver", drv,
+        "--recursive",
+        "--dereference",
+        source_path.to_str().unwrap(),
+        dest_base.to_str().unwrap(),
+    ]).unwrap();
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.contains("Too many levels of symbolic links"));
 }
