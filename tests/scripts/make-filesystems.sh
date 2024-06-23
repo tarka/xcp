@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "KERNEL"
+uname -a
+
 sudo apt update
 
 sudo apt install -y zfsutils-linux xfsprogs \
