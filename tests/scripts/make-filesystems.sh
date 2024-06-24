@@ -5,7 +5,7 @@ uname -a
 ls -al /boot/
 grep BCACHEFS /boot/config-$(uname -r)
 echo MODPROBE
-modprobe -v bcachefs
+sudo modprobe -v bcachefs
 
 sudo apt update
 
