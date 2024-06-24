@@ -6,7 +6,7 @@ uname -a
 sudo apt update
 
 sudo apt install -y zfsutils-linux xfsprogs \
-     btrfs-progs ntfs-3g dosfstools
+     btrfs-progs ntfs-3g dosfstools bcachefs-tools
 
 for fs in "$@"; do
     root=/fs/$fs
