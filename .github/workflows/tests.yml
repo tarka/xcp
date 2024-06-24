@@ -6,6 +6,9 @@ jobs:
   ubuntu:
     runs-on: ubuntu-24.04
     steps:
+      - name: Install additional modules
+        run: sudo modprobe -v bcachefs
+
       - uses: actions/checkout@v1
 
       - name: Add necessary packages
