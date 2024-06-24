@@ -3,6 +3,7 @@
 echo "KERNEL"
 uname -a
 ls -al /boot/
+grep BCACHE /boot/config-$(uname -r)
 
 sudo apt update
 
