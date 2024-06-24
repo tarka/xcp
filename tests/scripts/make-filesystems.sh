@@ -2,6 +2,7 @@
 
 echo "KERNEL"
 uname -a
+ls -al /boot/
 
 sudo apt update
 
