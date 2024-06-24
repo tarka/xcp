@@ -4,6 +4,9 @@ echo "KERNEL"
 uname -a
 ls -al /boot/
 grep BCACHEFS /boot/config-$(uname -r)
+echo MODPROBE
+find /lib/modules/
+sudo modprobe -v bcachefs
 
 sudo apt update
 
