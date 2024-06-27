@@ -93,3 +93,17 @@ jobs:
               && ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets \
               && ~/.cargo/bin/cargo clean
           '
+
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add necessary packages
+        run: sudo apt-get update && sudo apt-get install -y libacl1-dev
+
+      - name: Install Rust nightly
+        run: ~/.cargo/bin/rustup toolchain install nightly
+
+      - name: Compile and test with nightly
+        run: ~/.cargo/bin/cargo +nightly test --workspace --features=test_no_reflink
