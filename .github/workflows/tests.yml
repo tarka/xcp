@@ -6,7 +6,7 @@ jobs:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
 
       - name: Add necessary packages
         run: sudo apt-get update && sudo apt-get install -y libacl1-dev
@@ -51,7 +51,7 @@ jobs:
   expensive:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
 
       - name: Add necessary packages
         run: sudo apt-get update && sudo apt-get install -y libacl1-dev
@@ -65,7 +65,7 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash /dev/stdin -y
@@ -79,7 +79,7 @@ jobs:
   freebsd:
      runs-on: ubuntu-latest
      steps:
-     - uses: actions/checkout@v3
+     - uses: actions/checkout@v4
 
      - uses: vmactions/freebsd-vm@v1
        with:
