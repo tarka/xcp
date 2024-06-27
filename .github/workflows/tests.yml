@@ -6,7 +6,7 @@ jobs:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
 
       - name: Add necessary packages
         run: sudo apt-get update && sudo apt-get install -y libacl1-dev
@@ -51,7 +51,7 @@ jobs:
   expensive:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
 
       - name: Add necessary packages
         run: sudo apt-get update && sudo apt-get install -y libacl1-dev
@@ -65,7 +65,7 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
 
       - name: Install Rust
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash /dev/stdin -y
@@ -77,19 +77,33 @@ jobs:
         run: ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets,test_run_expensive
 
   freebsd:
-     runs-on: ubuntu-latest
-     steps:
-     - uses: actions/checkout@v3
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
 
-     - uses: vmactions/freebsd-vm@v1
-       with:
-         usesh: true
-         prepare: |
-           pkg install -y curl
-           pw user add -n testing -m
-         run: |
-           su testing -c '
-             curl -sSf https://sh.rustup.rs | sh /dev/stdin -y \
-               && ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets \
-               && ~/.cargo/bin/cargo clean
-           '
+    - uses: vmactions/freebsd-vm@v1
+      with:
+        usesh: true
+        prepare: |
+          pkg install -y curl
+          pw user add -n testing -m
+        run: |
+          su testing -c '
+            curl -sSf https://sh.rustup.rs | sh /dev/stdin -y \
+              && ~/.cargo/bin/cargo test --workspace --features=test_no_reflink,test_no_sockets \
+              && ~/.cargo/bin/cargo clean
+          '
+
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add necessary packages
+        run: sudo apt-get update && sudo apt-get install -y libacl1-dev
+
+      - name: Install Rust nightly
+        run: ~/.cargo/bin/rustup toolchain install nightly
+
+      - name: Compile and test with nightly
+        run: ~/.cargo/bin/cargo +nightly test --workspace --features=test_no_reflink
