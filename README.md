@@ -23,8 +23,6 @@ same issue.
 
 ## Installation
 
-*NOTE*: `xcp` requires Rust 1.70 or higher.
-
 ### Cargo
 
 `xcp` can be installed directly from `crates.io` with:
