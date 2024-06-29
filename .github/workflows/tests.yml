@@ -107,3 +107,17 @@ jobs:
 
       - name: Compile and test with nightly
         run: ~/.cargo/bin/cargo +nightly test --workspace --features=test_no_reflink
+
+  msrv-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update Rust to latest
+        run: ~/.cargo/bin/rustup update
+
+      - name: Install MSRV checker
+        run: ~/.cargo/bin/cargo install cargo-msrv
+
+      - name: Check MSRV
+        run: ~/.cargo/bin/cargo msrv verify
