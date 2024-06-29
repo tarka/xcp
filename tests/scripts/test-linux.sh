@@ -76,7 +76,13 @@ zfs)
   ;;
 
 *)
-  echo >&2 "WARNING: unknown filesystem $fs, some tests might fail"
+  echo >&2 "WARNING: unknown filesystem $fs, advanced FS tests disabled."
+  features+=(
+    test_no_acl
+    test_no_extents
+    test_no_reflink
+    test_no_sparse
+  )
   ;;
 esac
 
