@@ -930,7 +930,7 @@ dependencies = [
 
 [[package]]
 name = "xcp"
-version = "0.21.1"
+version = "0.21.2"
 dependencies = [
  "anyhow",
  "cfg-if",
