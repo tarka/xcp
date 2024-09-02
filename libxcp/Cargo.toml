@@ -26,14 +26,14 @@ cfg-if = "1.0.0"
 crossbeam-channel = "0.5.13"
 ignore = "0.4.22"
 libfs = { version = "0.7.2", path = "../libfs" }
-log = "0.4.21"
+log = "0.4.22"
 num_cpus = "1.16.0"
-regex = "1.10.5"
-thiserror = "1.0.61"
+regex = "1.10.6"
+thiserror = "1.0.63"
 walkdir = "2.5.0"
 
 [dev-dependencies]
-tempfile = "3.10.1"
+tempfile = "3.12.0"
 
 [lints.clippy]
 upper_case_acronyms = "allow"
