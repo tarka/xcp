@@ -362,7 +362,7 @@ checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
 
 [[package]]
 name = "libfs"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "cfg-if",
  "exacl",
@@ -383,7 +383,7 @@ checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
 
 [[package]]
 name = "libxcp"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "anyhow",
  "blocking-threadpool",
@@ -946,7 +946,7 @@ dependencies = [
 
 [[package]]
 name = "xcp"
-version = "0.21.2"
+version = "0.21.3"
 dependencies = [
  "anyhow",
  "cfg-if",
