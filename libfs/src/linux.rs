@@ -20,6 +20,7 @@ use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::PermissionsExt;
 
 use linux_raw_sys::ioctl::{FS_IOC_FIEMAP, FIEMAP_EXTENT_LAST, FICLONE, FIEMAP_EXTENT_SHARED};
+use log::warn;
 use rustix::fs::CWD;
 use rustix::{fs::{copy_file_range, seek, mknodat, FileType, Mode, RawMode, SeekFrom}, io::Errno};
 
@@ -153,6 +154,7 @@ fn fiemap(fd: &File, req: &FiemapReq) -> Result<bool> {
     if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP as u64, req_ptr) } != 0 {
         let oserr = io::Error::last_os_error();
         if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
+            warn!("FS DOES NOT SUPPORT FIEMAP");
             return Ok(false)
         }
         return Err(oserr.into());
