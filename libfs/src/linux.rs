@@ -154,12 +154,14 @@ fn fiemap(fd: &File, req: &FiemapReq) -> Result<bool> {
     if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP as u64, req_ptr) } != 0 {
         let oserr = io::Error::last_os_error();
         if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
-            warn!("FS DOES NOT SUPPORT FIEMAP");
+            println!("FS DOES NOT SUPPORT FIEMAP");
             return Ok(false)
         }
+        println!("FIEMAP ERROR");
         return Err(oserr.into());
     }
 
+    println!("FIEMAP PASSED");
     Ok(true)
 }
 
