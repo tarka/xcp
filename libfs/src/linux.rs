@@ -146,10 +146,10 @@ impl FiemapReq {
     }
 }
 
-fn fiemap(fd: &File, req: &FiemapReq) -> Result<bool> {
+fn fiemap(fd: &File, req: &mut FiemapReq) -> Result<bool> {
     // FIXME: Rustix has an IOCTL mini-framework but it's a little
     // tricky and is unsafe anyway. This is simpler for now.
-    let req_ptr: *const FiemapReq = req;
+    let req_ptr: *mut FiemapReq = req;
     if unsafe { libc::ioctl(fd.as_raw_fd(), FS_IOC_FIEMAP as u64, req_ptr) } != 0 {
         let oserr = io::Error::last_os_error();
         if oserr.raw_os_error() == Some(libc::EOPNOTSUPP) {
@@ -171,7 +171,7 @@ pub fn map_extents(fd: &File) -> Result<Option<Vec<Extent>>> {
     let mut extents = Vec::with_capacity(FIEMAP_PAGE_SIZE);
 
     loop {
-        if !fiemap(fd, &req)? {
+        if !fiemap(fd, &mut req)? {
             return Ok(None)
         }
         if req.fm_mapped_extents == 0 {
@@ -309,8 +309,8 @@ mod tests {
         let to_fd = File::create(to)?;
 
         {
-            let from_map = FiemapReq::new();
-            assert!(fiemap(&from_fd, &from_map)?);
+            let mut from_map = FiemapReq::new();
+            assert!(fiemap(&from_fd, &mut from_map)?);
             assert!(from_map.fm_mapped_extents > 0);
             // Un-refed file, no shared extents
             assert!(from_map.fm_extents[0].fe_flags & FIEMAP_EXTENT_SHARED == 0);
@@ -320,12 +320,12 @@ mod tests {
         assert!(worked);
 
         {
-            let from_map = FiemapReq::new();
-            assert!(fiemap(&from_fd, &from_map)?);
+            let mut from_map = FiemapReq::new();
+            assert!(fiemap(&from_fd, &mut from_map)?);
             assert!(from_map.fm_mapped_extents > 0);
 
-            let to_map = FiemapReq::new();
-            assert!(fiemap(&to_fd, &to_map)?);
+            let mut to_map = FiemapReq::new();
+            assert!(fiemap(&to_fd, &mut to_map)?);
             assert!(to_map.fm_mapped_extents > 0);
 
             // Now both have shared extents
