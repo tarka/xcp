@@ -8,6 +8,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: CI runtime info
+        run: uname -a
+
       - name: Add necessary packages
         run: sudo apt-get update && sudo apt-get install -y libacl1-dev
 
