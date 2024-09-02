@@ -303,11 +303,10 @@ mod tests {
             let mut fd: File = File::create(&from)?;
             let data = "X".repeat(size);
             write!(fd, "{}", data)?;
+            fd.sync_all();
         }
 
         let from_fd = File::open(from)?;
-        let to_fd = File::create(to)?;
-
         {
             let from_map = FiemapReq::new();
             assert!(fiemap(&from_fd, &from_map)?);
@@ -316,6 +315,7 @@ mod tests {
             assert!(from_map.fm_extents[0].fe_flags & FIEMAP_EXTENT_SHARED == 0);
         }
 
+        let to_fd = File::create(to)?;
         let worked = reflink(&from_fd, &to_fd)?;
         assert!(worked);
 
