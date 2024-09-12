@@ -63,7 +63,7 @@ pub enum Backup {
     Auto,
     /// Create numbered backups. Numbered backups follow the semantics
     /// of `cp` numbered backups (e.g. `file.txt.~123~`).
-    Numbered
+    Numbered,
 }
 
 impl FromStr for Backup {
@@ -75,6 +75,31 @@ impl FromStr for Backup {
             "auto" => Ok(Backup::Auto),
             "numbered" => Ok(Backup::Numbered),
             _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'backup': {}", s))),
+        }
+    }
+}
+
+/// Enum defining configuration options for ownership copy. [FromStr]
+/// is supported.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Chown {
+    /// Do not copy ownership (default).
+    Never,
+    /// Attempt to copy ownership, but ignore if no possible.
+    Try,
+    /// Attempt to copy ownership, failing if not possible
+    Force,
+}
+
+impl FromStr for Chown {
+    type Err = XcpError;
+
+    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "never" | "none" | "off" => Ok(Chown::Never),
+            "try" => Ok(Chown::Try),
+            "force" => Ok(Chown::Force),
+            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'ownership': {}", s))),
         }
     }
 }
@@ -107,6 +132,15 @@ pub struct Config {
 
     /// Do not copy the file permissions. Default is `false`.
     pub no_timestamps: bool,
+
+    /// Copy ownership.
+    ///
+    /// Whether to copy ownship (user/group). Options are 'Never'
+    /// (default); 'Try', which attempts but warn on failure; and
+    /// 'Force', which throws errors on failure. This option requires
+    /// root permissions or appropriate capabilities. Default is
+    /// 'Never'.
+    pub ownership: Chown,
 
     /// Dereference symlinks. Default is `false`.
     pub dereference: bool,
@@ -157,6 +191,7 @@ impl Default for Config {
             no_clobber: false,
             no_perms: false,
             no_timestamps: false,
+            ownership: Chown::Never,
             dereference: false,
             no_target_directory: false,
             fsync: false,

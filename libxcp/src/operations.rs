@@ -21,14 +21,13 @@ use std::sync::Arc;
 
 use crossbeam_channel as cbc;
 use libfs::{
-    allocate_file, copy_file_bytes, copy_permissions,
-    next_sparse_segments, probably_sparse, sync, reflink, FileType, copy_timestamps,
+    allocate_file, copy_file_bytes, copy_owner, copy_permissions, copy_timestamps, next_sparse_segments, probably_sparse, reflink, sync, FileType
 };
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use walkdir::WalkDir;
 
 use crate::backup::{get_backup_path, needs_backup};
-use crate::config::{Config, Reflink};
+use crate::config::{Chown, Config, Reflink};
 use crate::errors::{Result, XcpError};
 use crate::feedback::{StatusUpdate, StatusUpdater};
 use crate::paths::{parse_ignore, ignore_filter};
@@ -135,6 +134,17 @@ impl CopyHandle {
         if !self.config.no_timestamps {
             copy_timestamps(&self.infd, &self.outfd)?;
         }
+        match self.config.ownership {
+            Chown::Try => {
+                if copy_owner(&self.infd, &self.outfd).is_err() {
+                    warn!("Failed to copy file permissions: {:?}", self.infd);
+                }
+            },
+            Chown::Force => {
+                copy_owner(&self.infd, &self.outfd)?;
+            },
+            Chown::Never => {},
+        }
         if self.config.fsync {
             debug!("Syncing file {:?}", self.outfd);
             sync(&self.outfd)?;
@@ -145,7 +155,7 @@ impl CopyHandle {
 
 impl Drop for CopyHandle {
     fn drop(&mut self) {
-        // FIXME: SHould we chcek for panicking() here?
+        // FIXME: SHould we check for panicking() here?
         if let Err(e) = self.finalise_copy() {
             error!("Error during finalising copy operation {:?} -> {:?}: {}", self.infd, self.outfd, e);
         }

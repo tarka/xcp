@@ -16,7 +16,7 @@
 
 use clap::{ArgAction, Parser};
 
-use libxcp::config::{Config, Reflink, Backup};
+use libxcp::config::{Backup, Chown, Config, Reflink};
 use log::LevelFilter;
 use unbytify::unbytify;
 
@@ -90,6 +90,16 @@ pub struct Opts {
     /// Do not copy the file timestamps.
     #[arg(long)]
     pub no_timestamps: bool,
+
+    /// Copy ownership.
+    ///
+    /// Whether to copy ownship (user/group). Options are 'Never'
+    /// (default); 'Try', which attempts but warn on failure; and
+    /// 'Force', which throws errors on failure. This option requires
+    /// root permissions or appropriate capabilities. Default is
+    /// 'Never'.
+    #[arg(long, default_value = "never")]
+    pub ownership: Chown,
 
     /// Driver to use, defaults to 'file-parallel'.
     ///
@@ -173,6 +183,7 @@ impl From<&Opts> for Config {
             no_clobber: opts.no_clobber,
             no_perms: opts.no_perms,
             no_timestamps: opts.no_timestamps,
+            ownership: opts.ownership,
             dereference: opts.dereference,
             no_target_directory: opts.no_target_directory,
             fsync: opts.fsync,
