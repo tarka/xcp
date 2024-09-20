@@ -108,6 +108,10 @@ pub struct Opts {
     #[arg(short = 'T', long)]
     pub no_target_directory: bool,
 
+    /// Copy into a subdirectory of the target
+    #[arg(long)]
+    pub target_directory: Option<String>,
+
     /// Sync each file to disk after writing.
     #[arg(long)]
     pub fsync: bool,

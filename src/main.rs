@@ -87,11 +87,13 @@ fn main() -> Result<()> {
     init_logging(&opts)?;
     opts_check(&opts);
 
-    let (dest, source_patterns) = opts
-        .paths
-        .split_last()
-        .ok_or(XcpError::InvalidArguments("Insufficient arguments".to_string()))
-        .map(|(d, s)| (PathBuf::from(d), s))?;
+    let (dest, source_patterns) = match opts.target_directory {
+        Some(ref d) => { (d, opts.paths.as_slice()) }
+        None => {
+            opts.paths.split_last().ok_or(XcpError::InvalidArguments("Insufficient arguments".to_string()))?
+        }
+    };
+    let dest = PathBuf::from(dest);
 
     let sources = expand_sources(source_patterns, &opts)?;
     if sources.is_empty() {

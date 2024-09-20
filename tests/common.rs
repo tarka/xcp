@@ -606,6 +606,33 @@ fn copy_empty_dir(drv: &str) {
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+fn copy_target_directory(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+
+    let source_path = dir.path().join("mydir");
+    create_dir_all(&source_path).unwrap();
+
+    let dest_base = dir.path().join("dest");
+    create_dir_all(&dest_base).unwrap();
+
+    let out = run(&[
+        "--driver",
+        drv,
+        "-r",
+        "--target-directory",
+        dest_base.to_str().unwrap(),
+        source_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(out.status.success());
+
+    assert!(dest_base.join("mydir").exists());
+    assert!(dest_base.join("mydir").is_dir());
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
 fn copy_all_dirs(drv: &str) {
     let dir = tempdir_rel().unwrap();
 
