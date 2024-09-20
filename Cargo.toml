@@ -40,7 +40,7 @@ test_no_perms = []
 test_run_expensive = []
 
 [dependencies]
-anyhow = "1.0.88"
+anyhow = "1.0.89"
 crossbeam-channel = "0.5.13"
 clap = { version = "4.5.17", features = ["derive"] }
 glob = "0.3.1"

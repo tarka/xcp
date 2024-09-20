@@ -66,7 +66,7 @@ impl CopyHandle {
 
     /// Copy len bytes from wherever the descriptor cursors are set.
     fn copy_bytes(&self, len: u64, updates: &Arc<dyn StatusUpdater>) -> Result<u64> {
-        let mut written = 0u64;
+        let mut written = 0;
         while written < len {
             let bytes_to_copy = cmp::min(len - written, self.config.block_size);
             let bytes = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
