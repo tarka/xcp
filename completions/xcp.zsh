@@ -10,6 +10,7 @@ _xcp() {
     '(- *)'{-h,--help}'[Print help]'
     '*'{-v,--verbose}'[Increase verbosity (can be repeated)]'
     {-T,--no-target-directory}'[Overwrite target directory, do not create a subdirectory]'
+    {--target-directory}'[Copy into a subdirectory of the target]: :_files -/'
     {-g,--glob}'[Expand (glob) filename patterns]'
     {-n,--no-clobber}'[Do not overwrite an existing file]'
     {-r,--recursive}'[Copy directories recursively]'

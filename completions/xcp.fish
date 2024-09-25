@@ -27,6 +27,7 @@ complete -c xcp -s L -l dereference -d 'Dereference symlinks in source'
 
 # long
 complete -c xcp -l fsync -d 'Sync each file to disk after it is written'
+complete -c xcp -l target-directory -d 'Copy into a subdirectory of the target'
 complete -c xcp -l gitignore -d 'Use .gitignore if present'
 complete -c xcp -l no-perms -d 'Do not copy file permissions'
 complete -c xcp -l no-timestamps -d 'Do not copy file timestamps'
