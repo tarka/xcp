@@ -16,7 +16,7 @@
 
 use clap::{ArgAction, Parser};
 
-use libxcp::config::{Backup, Chown, Config, Reflink};
+use libxcp::config::{Backup, Config, Reflink};
 use log::LevelFilter;
 use unbytify::unbytify;
 
@@ -93,13 +93,12 @@ pub struct Opts {
 
     /// Copy ownership.
     ///
-    /// Whether to copy ownship (user/group). Options are 'Never'
-    /// (default); 'Try', which attempts but warn on failure; and
-    /// 'Force', which throws errors on failure. This option requires
-    /// root permissions or appropriate capabilities. Default is
-    /// 'Never'.
-    #[arg(long, default_value = "never")]
-    pub ownership: Chown,
+    /// Whether to copy ownship (user/group).  This option requires
+    /// root permissions or appropriate capabilities; if the attempt
+    /// to copy ownership fails a warning is issued but the operation
+    /// continues.
+    #[arg(long, )]
+    pub ownership: bool,
 
     /// Driver to use, defaults to 'file-parallel'.
     ///

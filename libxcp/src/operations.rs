@@ -27,7 +27,7 @@ use log::{debug, error, info, warn};
 use walkdir::WalkDir;
 
 use crate::backup::{get_backup_path, needs_backup};
-use crate::config::{Chown, Config, Reflink};
+use crate::config::{Config, Reflink};
 use crate::errors::{Result, XcpError};
 use crate::feedback::{StatusUpdate, StatusUpdater};
 use crate::paths::{parse_ignore, ignore_filter};
@@ -134,16 +134,8 @@ impl CopyHandle {
         if !self.config.no_timestamps {
             copy_timestamps(&self.infd, &self.outfd)?;
         }
-        match self.config.ownership {
-            Chown::Try => {
-                if copy_owner(&self.infd, &self.outfd).is_err() {
-                    warn!("Failed to copy file permissions: {:?}", self.infd);
-                }
-            },
-            Chown::Force => {
-                copy_owner(&self.infd, &self.outfd)?;
-            },
-            Chown::Never => {},
+        if self.config.ownership && copy_owner(&self.infd, &self.outfd).is_err() {
+            warn!("Failed to copy file permissions: {:?}", self.infd);
         }
         if self.config.fsync {
             debug!("Syncing file {:?}", self.outfd);

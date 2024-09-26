@@ -79,31 +79,6 @@ impl FromStr for Backup {
     }
 }
 
-/// Enum defining configuration options for ownership copy. [FromStr]
-/// is supported.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Chown {
-    /// Do not copy ownership (default).
-    Never,
-    /// Attempt to copy ownership, but ignore if no possible.
-    Try,
-    /// Attempt to copy ownership, failing if not possible
-    Force,
-}
-
-impl FromStr for Chown {
-    type Err = XcpError;
-
-    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "never" | "none" | "off" => Ok(Chown::Never),
-            "try" => Ok(Chown::Try),
-            "force" => Ok(Chown::Force),
-            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'ownership': {}", s))),
-        }
-    }
-}
-
 /// A structure defining the runtime options for copy-drivers. This
 /// would normally be passed to `load_driver()`.
 #[derive(Clone, Debug)]
@@ -135,12 +110,11 @@ pub struct Config {
 
     /// Copy ownership.
     ///
-    /// Whether to copy ownship (user/group). Options are 'Never'
-    /// (default); 'Try', which attempts but warn on failure; and
-    /// 'Force', which throws errors on failure. This option requires
-    /// root permissions or appropriate capabilities. Default is
-    /// 'Never'.
-    pub ownership: Chown,
+    /// Whether to copy ownship (user/group).  This option requires
+    /// root permissions or appropriate capabilities; if the attempt
+    /// to copy ownership fails a warning is issued but the operation
+    /// continues.
+    pub ownership: bool,
 
     /// Dereference symlinks. Default is `false`.
     pub dereference: bool,
@@ -191,7 +165,7 @@ impl Default for Config {
             no_clobber: false,
             no_perms: false,
             no_timestamps: false,
-            ownership: Chown::Never,
+            ownership: false,
             dereference: false,
             no_target_directory: false,
             fsync: false,
