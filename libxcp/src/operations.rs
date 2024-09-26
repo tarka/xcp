@@ -135,7 +135,7 @@ impl CopyHandle {
             copy_timestamps(&self.infd, &self.outfd)?;
         }
         if self.config.ownership && copy_owner(&self.infd, &self.outfd).is_err() {
-            warn!("Failed to copy file permissions: {:?}", self.infd);
+            warn!("Failed to copy file ownership: {:?}", self.infd);
         }
         if self.config.fsync {
             debug!("Syncing file {:?}", self.outfd);
@@ -147,7 +147,7 @@ impl CopyHandle {
 
 impl Drop for CopyHandle {
     fn drop(&mut self) {
-        // FIXME: SHould we check for panicking() here?
+        // FIXME: Should we check for panicking() here?
         if let Err(e) = self.finalise_copy() {
             error!("Error during finalising copy operation {:?} -> {:?}: {}", self.infd, self.outfd, e);
         }
