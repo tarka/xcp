@@ -186,7 +186,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             workers: num_cpus::get(),
-            block_size: u64::max_value(),
+            block_size: u64::MAX,
             gitignore: false,
             no_clobber: false,
             no_perms: false,

@@ -175,7 +175,7 @@ impl From<&Opts> for Config {
                 opts.workers
             },
             block_size: if opts.no_progress {
-                usize::max_value() as u64
+                usize::MAX as u64
             } else {
                 opts.block_size
             },
