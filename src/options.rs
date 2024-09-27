@@ -97,7 +97,7 @@ pub struct Opts {
     /// root permissions or appropriate capabilities; if the attempt
     /// to copy ownership fails a warning is issued but the operation
     /// continues.
-    #[arg(long, )]
+    #[arg(short, long)]
     pub ownership: bool,
 
     /// Driver to use, defaults to 'file-parallel'.
