@@ -44,6 +44,7 @@ pub use backend::{
 pub use common::{
     allocate_file,
     copy_file,
+    copy_owner,
     copy_permissions,
     copy_timestamps,
     is_same_file,

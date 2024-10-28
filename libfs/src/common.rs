@@ -21,7 +21,7 @@ use rustix::io::{pread, pwrite};
 use std::cmp;
 use std::fs::{File, FileTimes};
 use std::io::{ErrorKind, Read, Write};
-use std::os::unix::fs::MetadataExt;
+use std::os::unix::fs::{fchown, MetadataExt};
 use std::path::Path;
 use xattr::FileExt;
 
@@ -73,6 +73,13 @@ pub fn copy_timestamps(infd: &File, outfd: &File) -> Result<()> {
         .set_accessed(inmeta.accessed()?)
         .set_modified(inmeta.modified()?);
     outfd.set_times(ftime)?;
+
+    Ok(())
+}
+
+pub fn copy_owner(infd: &File, outfd: &File) -> Result<()> {
+    let inmeta = infd.metadata()?;
+    fchown(outfd, Some(inmeta.uid()), Some(inmeta.gid()))?;
 
     Ok(())
 }

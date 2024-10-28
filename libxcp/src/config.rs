@@ -63,7 +63,7 @@ pub enum Backup {
     Auto,
     /// Create numbered backups. Numbered backups follow the semantics
     /// of `cp` numbered backups (e.g. `file.txt.~123~`).
-    Numbered
+    Numbered,
 }
 
 impl FromStr for Backup {
@@ -107,6 +107,14 @@ pub struct Config {
 
     /// Do not copy the file permissions. Default is `false`.
     pub no_timestamps: bool,
+
+    /// Copy ownership.
+    ///
+    /// Whether to copy ownship (user/group).  This option requires
+    /// root permissions or appropriate capabilities; if the attempt
+    /// to copy ownership fails a warning is issued but the operation
+    /// continues.
+    pub ownership: bool,
 
     /// Dereference symlinks. Default is `false`.
     pub dereference: bool,
@@ -152,11 +160,12 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             workers: num_cpus::get(),
-            block_size: u64::max_value(),
+            block_size: u64::MAX,
             gitignore: false,
             no_clobber: false,
             no_perms: false,
             no_timestamps: false,
+            ownership: false,
             dereference: false,
             no_target_directory: false,
             fsync: false,

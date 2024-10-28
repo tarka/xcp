@@ -21,10 +21,9 @@ use std::sync::Arc;
 
 use crossbeam_channel as cbc;
 use libfs::{
-    allocate_file, copy_file_bytes, copy_permissions,
-    next_sparse_segments, probably_sparse, sync, reflink, FileType, copy_timestamps,
+    allocate_file, copy_file_bytes, copy_owner, copy_permissions, copy_timestamps, next_sparse_segments, probably_sparse, reflink, sync, FileType
 };
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use walkdir::WalkDir;
 
 use crate::backup::{get_backup_path, needs_backup};
@@ -67,7 +66,7 @@ impl CopyHandle {
 
     /// Copy len bytes from wherever the descriptor cursors are set.
     fn copy_bytes(&self, len: u64, updates: &Arc<dyn StatusUpdater>) -> Result<u64> {
-        let mut written = 0u64;
+        let mut written = 0;
         while written < len {
             let bytes_to_copy = cmp::min(len - written, self.config.block_size);
             let bytes = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
@@ -135,6 +134,9 @@ impl CopyHandle {
         if !self.config.no_timestamps {
             copy_timestamps(&self.infd, &self.outfd)?;
         }
+        if self.config.ownership && copy_owner(&self.infd, &self.outfd).is_err() {
+            warn!("Failed to copy file ownership: {:?}", self.infd);
+        }
         if self.config.fsync {
             debug!("Syncing file {:?}", self.outfd);
             sync(&self.outfd)?;
@@ -145,7 +147,7 @@ impl CopyHandle {
 
 impl Drop for CopyHandle {
     fn drop(&mut self) {
-        // FIXME: SHould we chcek for panicking() here?
+        // FIXME: Should we check for panicking() here?
         if let Err(e) = self.finalise_copy() {
             error!("Error during finalising copy operation {:?} -> {:?}: {}", self.infd, self.outfd, e);
         }
