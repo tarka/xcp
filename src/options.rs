@@ -65,6 +65,13 @@ pub struct Opts {
     #[arg(short, long)]
     pub no_clobber: bool,
 
+    /// Force (compatability only)
+    ///
+    /// This is currently purely for compatibility with `cp`; however
+    /// it may have an effect in future versions.
+    #[arg(short = 'f', long)]
+    pub force: bool,
+
     /// Use .gitignore if present.
     ///
     /// NOTE: This is fairly basic at the moment, and only honours a
