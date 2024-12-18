@@ -20,6 +20,7 @@ complete -c xcp -s T -l no-target-directory -d 'Overwrite target directory, do n
 complete -c xcp -s g -l glob -d 'Expand (glob) filename patterns'
 complete -c xcp -s h -l help -f -d 'Print help'
 complete -c xcp -s n -l no-clobber -d 'Do not overwrite an existing file'
+complete -c xcp -s f -l force -d 'Compatibility only option'
 complete -c xcp -s r -l recursive -d 'Copy directories recursively'
 complete -c xcp -s v -l verbose -d 'Increase verbosity (can be repeated)'
 complete -c xcp -s w -l workers -d 'Workers for recursive copies (0=auto)' -x -a '(seq 0 (getconf _NPROCESSORS_ONLN))'

@@ -102,6 +102,32 @@ fn dest_file_exists(drv: &str) {
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
+fn mix_noclobber_force(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let source_path = dir.path().join("source.txt");
+    let dest_path = dir.path().join("dest.txt");
+
+    {
+        File::create(&source_path).unwrap();
+        File::create(&dest_path).unwrap();
+    }
+    let out = run(&[
+        "--driver",
+        drv,
+        "--force",
+        "--no-clobber",
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(!out.status.success());
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.contains("--force and --noclobber cannot be set at the same time"));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
 fn source_same_as_dest(drv: &str) {
     let dir = tempdir_rel().unwrap();
     let dest = dir.path().join("dest");
