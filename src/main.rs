@@ -75,17 +75,22 @@ fn expand_sources(source_list: &[String], opts: &Opts) -> Result<Vec<PathBuf>> {
     }
 }
 
-fn opts_check(opts: &Opts) {
+fn opts_check(opts: &Opts) -> Result<()> {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     if opts.reflink == Reflink::Never {
         warn!("--reflink=never is selected, however the Linux kernel may override this.");
     }
+
+    if opts.no_clobber && opts.force {
+        return Err(XcpError::InvalidArguments("--force and --noclobber cannot be set at the same time.".to_string()).into());
+    }
+    Ok(())
 }
 
 fn main() -> Result<()> {
     let opts = Opts::from_args()?;
     init_logging(&opts)?;
-    opts_check(&opts);
+    opts_check(&opts)?;
 
     let (dest, source_patterns) = match opts.target_directory {
         Some(ref d) => { (d, opts.paths.as_slice()) }

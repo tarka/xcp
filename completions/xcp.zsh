@@ -10,9 +10,9 @@ _xcp() {
     '(- *)'{-h,--help}'[Print help]'
     '*'{-v,--verbose}'[Increase verbosity (can be repeated)]'
     {-T,--no-target-directory}'[Overwrite target directory, do not create a subdirectory]'
-    {--target-directory}'[Copy into a subdirectory of the target]: :_files -/'
     {-g,--glob}'[Expand (glob) filename patterns]'
     {-n,--no-clobber}'[Do not overwrite an existing file]'
+    {-f,--force}'[Compatibility only option]'
     {-r,--recursive}'[Copy directories recursively]'
     {-w,--workers}'[Workers for recursive copies (0=auto)]:workers:_values workers {0..$(getconf _NPROCESSORS_ONLN)}'
     {-L,--dereference}'[Dereference symlinks in source]'
@@ -41,6 +41,7 @@ _xcp() {
     --no-perms'[Do not copy file permissions]'
     --no-timestamps'[Do not copy file timestamps]'
     --no-progress'[Disable progress bar]'
+    --target-directory'[Copy into a subdirectory of the target]: :_files -/'
   )
 
   # positional

@@ -65,6 +65,15 @@ pub struct Opts {
     #[arg(short, long)]
     pub no_clobber: bool,
 
+    /// Force (compatability only)
+    ///
+    /// Overwrite files; this is the default behaviour, this flag is
+    /// for compatibility with `cp` only. See `--no-clobber` for the
+    /// inverse flag. Using this in conjunction with `--no-clobber`
+    /// will cause an error.
+    #[arg(short = 'f', long = "force")]
+    pub force: bool,
+
     /// Use .gitignore if present.
     ///
     /// NOTE: This is fairly basic at the moment, and only honours a
