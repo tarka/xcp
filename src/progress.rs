@@ -17,6 +17,7 @@
 use crate::options::Opts;
 
 use libxcp::errors::Result;
+use terminal_size::Width;
 
 struct NoopBar;
 
@@ -66,7 +67,12 @@ impl VisualBar {
     fn new(size: u64) -> Result<Self> {
         let bar = indicatif::ProgressBar::new(size).with_style(
             indicatif::ProgressStyle::default_bar()
-                .template("[{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")?
+                .template(
+		    match terminal_size::terminal_size() {
+			Some((Width(width), _)) if width < 160 => "[{wide_bar:.cyan/blue}]\n{bytes:>11} / {total_bytes:<11} | {percent:>3}% | {bytes_per_sec:^13} | {eta_precise} remaining",
+			_ => "[{wide_bar:.cyan/blue}] {bytes:>11} / {total_bytes:<11} | {percent:>3}% | {bytes_per_sec:^13} | {eta_precise} remaining",
+		    }
+		)?
                 .progress_chars("#>-"),
         );
         Ok(Self { bar })
