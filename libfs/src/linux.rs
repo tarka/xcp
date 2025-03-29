@@ -204,11 +204,11 @@ pub fn map_extents(fd: &File) -> Result<Option<Vec<Extent>>> {
 /// start and end of the data segment.
 // FIXME: Should work on *BSD too?
 pub fn next_sparse_segments(infd: &File, outfd: &File, pos: u64) -> Result<(u64, u64)> {
-    let next_data = match lseek(infd, SeekFrom::Data(pos as i64))? {
+    let next_data = match lseek(infd, SeekFrom::Data(pos))? {
         SeekOff::Offset(off) => off,
         SeekOff::EOF => infd.metadata()?.len(),
     };
-    let next_hole = match lseek(infd, SeekFrom::Hole(next_data as i64))? {
+    let next_hole = match lseek(infd, SeekFrom::Hole(next_data))? {
         SeekOff::Offset(off) => off,
         SeekOff::EOF => infd.metadata()?.len(),
     };

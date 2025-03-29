@@ -17,8 +17,8 @@
 
 use anyhow::{self, Error};
 use fslock::LockFile;
-use rand::{Rng, RngCore, SeedableRng, thread_rng};
-use rand_distr::{Alphanumeric, Pareto, Triangular, Standard};
+use rand::{Rng, RngCore, SeedableRng, rng};
+use rand_distr::{Alphanumeric, Pareto, Triangular, StandardUniform};
 use rand_xorshift::XorShiftRng;
 use std::cmp;
 use std::env::current_dir;
@@ -189,8 +189,8 @@ pub fn probably_sparse(file: &Path) -> Result<bool, Error> {
 }
 
 pub fn rand_data(len: usize) -> Vec<u8> {
-    thread_rng()
-        .sample_iter(Standard)
+    rng()
+        .sample_iter(StandardUniform)
         .take(len)
         .collect()
 }
