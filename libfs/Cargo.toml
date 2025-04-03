@@ -29,7 +29,7 @@ cfg-if = "1.0.0"
 libc = "0.2.171"
 linux-raw-sys = { version = "0.9.3", features = ["ioctl"] }
 log = "0.4.27"
-rustix = { version = "1.0.3", features = ["fs"] }
+rustix = { version = "1.0.5", features = ["fs"] }
 thiserror = "2.0.12"
 xattr = "1.5.0"
 

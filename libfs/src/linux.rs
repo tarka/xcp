@@ -274,9 +274,10 @@ mod tests {
     use super::*;
     use crate::{allocate_file, copy_permissions};
     use std::env::{current_dir, var};
-    use std::fs::{read, OpenOptions};
+    use std::fs::{hard_link, read, OpenOptions};
     use std::io::{self, Seek, Write};
     use std::iter;
+    use std::os::linux::fs::MetadataExt;
     use std::os::unix::net::UnixListener;
     use std::path::PathBuf;
     use std::process::Command;
@@ -824,4 +825,27 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_hard_link() -> Result<()> {
+        let dir = tempdir()?;
+        let from = dir.path().join("file.bin");
+        let to = dir.path().join("copy.bin");
+        let size = 128 * 1024;
+
+        {
+            let mut fd: File = File::create(&from)?;
+            let data = "X".repeat(size);
+            write!(fd, "{}", data)?;
+        }
+        assert_eq!(1, from.metadata()?.st_nlink());
+
+        hard_link(&from, &to)?;
+        assert!(to.exists());
+
+        assert_eq!(2, from.metadata()?.st_nlink());
+
+        Ok(())
+    }
+
 }
