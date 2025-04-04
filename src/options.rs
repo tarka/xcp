@@ -147,6 +147,12 @@ pub struct Opts {
     #[arg(long, default_value = "auto")]
     pub reflink: Reflink,
 
+    /// Preserve hard-links.
+    ///
+    /// Attempt to preserve hard-linked files during copy.
+    #[arg(short = 'H', long)]
+    pub hard_links: bool,
+
     /// Backup options
     ///
     /// Whether to create backups of overwritten files. Current
