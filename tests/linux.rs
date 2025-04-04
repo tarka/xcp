@@ -37,7 +37,7 @@ mod test {
         {
             let mut infd = File::create(&source_path).unwrap();
             let data = rand_data(size);
-            infd.write(&data).unwrap();
+            infd.write_all(&data).unwrap();
         }
 
         {
@@ -77,7 +77,7 @@ mod test {
                 .open(&dest_path).unwrap();
             outfd.seek(SeekFrom::Start(0)).unwrap();
             let data = rand_data(size);
-            outfd.write(&data).unwrap();
+            outfd.write_all(&data).unwrap();
             // brtfs at least seems to need this to force CoW and
             // de-share the extents.
             sync(&outfd).unwrap();

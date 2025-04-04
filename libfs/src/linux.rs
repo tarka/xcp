@@ -376,7 +376,7 @@ mod tests {
         {
             let mut fd = OpenOptions::new().write(true).append(false).open(&file)?;
             let s = "x".repeat(512*1024);
-            fd.write(s.as_bytes())?;
+            fd.write_all(s.as_bytes())?;
             assert!(probably_sparse(&fd)?);
         }
 
@@ -674,8 +674,8 @@ mod tests {
         assert!(extents_p.is_some());
         let extents = extents_p.unwrap();
         assert_eq!(extents.len(), 1);
-        assert_eq!(extents[0].start, offset as u64);
-        assert_eq!(extents[0].end, offset as u64 + 4 * 1024); // FIXME: Assume 4k blocks
+        assert_eq!(extents[0].start, offset);
+        assert_eq!(extents[0].end, offset + 4 * 1024); // FIXME: Assume 4k blocks
         assert!(!extents[0].shared);
 
         Ok(())
@@ -695,7 +695,7 @@ mod tests {
         let fsize = 1024 * 1024;
         // FIXME: Assumes 4k blocks
         let bsize = 4 * 1024;
-        let block = iter::repeat(0xff_u8).take(bsize).collect::<Vec<u8>>();
+        let block = iter::repeat_n(0xff_u8, bsize).collect::<Vec<u8>>();
 
         let mut fd = OpenOptions::new().write(true).append(false).open(&file)?;
         // Skip every-other block
@@ -731,7 +731,7 @@ mod tests {
         let extents = extents_p.unwrap();
 
         assert_eq!(1, extents.len());
-        assert_eq!(0 as u64, extents[0].start);
+        assert_eq!(0u64, extents[0].start);
         assert_eq!(size as u64, extents[0].end);
 
         Ok(())

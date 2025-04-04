@@ -1191,7 +1191,7 @@ fn unreadable_file_error(drv: &str) {
 
     create_file(&source_path, text).unwrap();
 
-    let perms = Permissions::from_mode(0);
+    let perms = Permissions::from_mode(0o0);
     set_permissions(&source_path, perms).unwrap();
 
     let out = run(&[
@@ -1217,7 +1217,7 @@ fn dest_file_exists_not_writable(drv: &str) {
         create_file(&source_path, "falskjdfa;lskdjfa").unwrap();
         File::create(&dest_path).unwrap();
     }
-    set_permissions(&dest_path, Permissions::from_mode(0)).unwrap();
+    set_permissions(&dest_path, Permissions::from_mode(0o0)).unwrap();
 
     let out = run(&[
         "--driver",
