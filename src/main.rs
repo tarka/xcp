@@ -127,7 +127,7 @@ fn main() -> Result<()> {
 
         let sourcedir = source
             .components()
-            .last()
+            .next_back()
             .ok_or(XcpError::InvalidSource("Failed to find source directory name."))?;
 
         let target_base = if dest.exists() && dest.is_dir() && !opts.no_target_directory {
