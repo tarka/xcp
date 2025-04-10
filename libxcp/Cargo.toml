@@ -23,7 +23,7 @@ use_linux = ["libfs/use_linux"]
 anyhow = "1.0.97"
 blocking-threadpool = "1.0.1"
 cfg-if = "1.0.0"
-crossbeam-channel = "0.5.14"
+crossbeam-channel = "0.5.15"
 ignore = "0.4.23"
 libfs = { version = "0.9.0", path = "../libfs" }
 log = "0.4.27"
