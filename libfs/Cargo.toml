@@ -1,7 +1,7 @@
 [package]
 name = "libfs"
 description = "`libfs` is a library of file and filesystem operations that is supplementary to `std::fs`"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2021"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
