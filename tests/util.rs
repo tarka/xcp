@@ -56,7 +56,7 @@ pub fn tempdir_rel() -> Result<TempDir, Error> {
 
 pub fn create_file(path: &Path, text: &str) -> Result<(), Error> {
     let file = File::create(path)?;
-    write!(&file, "{}", text)?;
+    write!(&file, "{text}")?;
     Ok(())
 }
 
@@ -94,13 +94,13 @@ pub fn create_sparse(file: &Path, head: u64, tail: u64) -> Result<u64, Error> {
         .open(file)?;
 
     fd.seek(SeekFrom::Start(head))?;
-    write!(fd, "{}", data)?;
+    write!(fd, "{data}")?;
 
     fd.seek(SeekFrom::Start(1024 * 4096))?;
-    write!(fd, "{}", data)?;
+    write!(fd, "{data}")?;
 
     fd.seek(SeekFrom::Start(4096 * 4096))?;
-    write!(fd, "{}", data)?;
+    write!(fd, "{data}")?;
 
     Ok(len)
 }
@@ -115,7 +115,7 @@ pub fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
 }
 
 pub fn files_match(a: &Path, b: &Path) -> bool {
-    println!("Checking: {:?}", a);
+    println!("Checking: {a:?}");
     if a.metadata().unwrap().len() != b.metadata().unwrap().len() {
         return false;
     }
@@ -206,7 +206,7 @@ pub fn gen_file_name(rng: &mut dyn RngCore, len: u64) -> String {
 }
 
 pub fn gen_file(path: &Path, rng: &mut dyn RngCore, size: usize, sparse: bool) -> TResult {
-    println!("Generating: {:?}", path);
+    println!("Generating: {path:?}");
     let mut fd = File::create(path)?;
     const BSIZE: usize = 4096;
     let mut buffer = [0; BSIZE];

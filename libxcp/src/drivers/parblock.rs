@@ -68,7 +68,7 @@ impl Driver {
     pub fn new(config: Arc<Config>) -> Result<Self> {
         if !supported_platform() {
             let msg = "The parblock driver is not currently supported on this OS.";
-            error!("{}", msg);
+            error!("{msg}");
             return Err(XcpError::UnsupportedOS(msg).into());
         }
 
@@ -138,8 +138,8 @@ fn queue_file_range(
                 }
             };
             if let Err(e) = stat_result {
-                let msg = format!("Failed to send status update message. This should not happen; aborting. Error: {}", e);
-                error!("{}", msg);
+                let msg = format!("Failed to send status update message. This should not happen; aborting. Error: {e}");
+                error!("{msg}");
                 panic!("{}", msg);
             }
         });
@@ -207,7 +207,7 @@ fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: &Arc<dyn StatusUpdat
                 let r = queue_file_blocks(&from, &to, &copy_pool, stats, &config);
                 if let Err(e) = r {
                     stats.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
-                    error!("Dispatcher: Error copying {:?} -> {:?}.", from, to);
+                    error!("Dispatcher: Error copying {from:?} -> {to:?}.");
                     return Err(e)
                 }
             }
@@ -218,7 +218,7 @@ fn dispatch_worker(file_q: cbc::Receiver<Operation>, stats: &Arc<dyn StatusUpdat
                 let r = symlink(&from, &to);
                 if let Err(e) = r {
                     stats.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
-                    error!("Error symlinking: {:?} -> {:?}; aborting.", from, to);
+                    error!("Error symlinking: {from:?} -> {to:?}; aborting.");
                     return Err(e.into())
                 }
             }

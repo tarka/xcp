@@ -44,7 +44,7 @@ mod test {
             let infd = File::open(&source_path).unwrap();
             let inext = map_extents(&infd).unwrap().unwrap();
             // Single file, extent not shared.
-            assert_eq!(false, inext[0].shared);
+            assert!(!inext[0].shared);
         }
 
         let out = run(&[
@@ -65,8 +65,8 @@ mod test {
             // Extents should be shared.
             let inext = map_extents(&infd).unwrap().unwrap();
             let outext = map_extents(&outfd).unwrap().unwrap();
-            assert_eq!(true, inext[0].shared);
-            assert_eq!(true, outext[0].shared);
+            assert!(inext[0].shared);
+            assert!(outext[0].shared);
         }
 
         {
@@ -89,8 +89,8 @@ mod test {
             // First extent should now be un-shared.
             let inext = map_extents(&infd).unwrap().unwrap();
             let outext = map_extents(&outfd).unwrap().unwrap();
-            assert_eq!(false, inext[0].shared);
-            assert_eq!(false, outext[0].shared);
+            assert!(!inext[0].shared);
+            assert!(!outext[0].shared);
         }
 
     }

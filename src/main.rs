@@ -113,7 +113,7 @@ fn main() -> Result<()> {
 
     // Sanity-check all sources up-front
     for source in &sources {
-        info!("Copying source {:?} to {:?}", source, dest);
+        info!("Copying source {source:?} to {dest:?}");
         if !source.exists() {
             return Err(XcpError::InvalidSource("Source does not exist.").into());
         }
@@ -168,7 +168,7 @@ fn main() -> Result<()> {
             StatusUpdate::Size(v) => pb.inc_size(v),
             StatusUpdate::Error(e) => {
                 // FIXME: Optional continue?
-                error!("Received error: {}", e);
+                error!("Received error: {e}");
                 return Err(e.into());
             }
         }

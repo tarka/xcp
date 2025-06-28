@@ -723,7 +723,7 @@ fn copy_dirs_files(drv: &str) {
     for d in ["one", "two", "three"].iter() {
         p.push(d);
         create_dir_all(&p).unwrap();
-        create_file(&p.join(format!("{}.txt", d)), d).unwrap();
+        create_file(&p.join(format!("{d}.txt")), d).unwrap();
     }
 
     let dest_base = dir.path().join("dest");
@@ -1368,7 +1368,7 @@ fn test_nested_symlinks(drv: &str) {
 
     for i in 1..10 {
         let from = source_path.join(format!("link-{}.txt", i-1));
-        let to = source_path.join(format!("link-{}.txt", i));
+        let to = source_path.join(format!("link-{i}.txt"));
         symlink(from, to).unwrap();
     }
 
@@ -1384,7 +1384,7 @@ fn test_nested_symlinks(drv: &str) {
     assert!(out.status.success());
 
     for i in 1..10 {
-        let dest_link = dest_base.join(format!("link-{}.txt", i));
+        let dest_link = dest_base.join(format!("link-{i}.txt"));
         assert!(dest_link.exists());
         assert!(!dest_link.is_symlink());
         assert!(dest_link.is_file());
@@ -1406,7 +1406,7 @@ fn test_deep_symlinks(drv: &str) {
 
     for i in 1..100 {
         let from = source_path.join(format!("link-{}.txt", i-1));
-        let to = source_path.join(format!("link-{}.txt", i));
+        let to = source_path.join(format!("link-{i}.txt"));
         symlink(from, to).unwrap();
     }
 

@@ -121,13 +121,13 @@ mod tests {
         for stat in stat_rx {
             match stat {
                 StatusUpdate::Copied(v) => {
-                    println!("Copied {} bytes", v);
+                    println!("Copied {v} bytes");
                 },
                 StatusUpdate::Size(v) => {
-                    println!("Size update: {}", v);
+                    println!("Size update: {v}");
                 },
                 StatusUpdate::Error(e) => {
-                    println!("Error during copy: {}", e);
+                    println!("Error during copy: {e}");
                     return Err(e.into());
                 }
             }

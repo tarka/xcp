@@ -302,7 +302,7 @@ mod tests {
         {
             let mut fd: File = File::create(&from)?;
             let data = "X".repeat(size);
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
         }
 
         let from_fd = File::open(from)?;
@@ -393,7 +393,7 @@ mod tests {
 
         {
             let mut fd = File::create(&from)?;
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
         }
 
         let out = Command::new("/usr/bin/truncate")
@@ -422,7 +422,7 @@ mod tests {
 
         {
             let mut fd = File::create(&from)?;
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
         }
 
         let out = Command::new("/usr/bin/truncate")
@@ -472,7 +472,7 @@ mod tests {
         {
             let mut fd = File::create(&from)?;
             fd.seek(io::SeekFrom::Start(offset as u64))?;
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
         }
 
         let out = Command::new("/usr/bin/truncate")
@@ -512,7 +512,7 @@ mod tests {
 
         {
             let mut fd = File::create(&from)?;
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
         }
 
         let out = Command::new("/usr/bin/truncate")
@@ -552,13 +552,13 @@ mod tests {
 
         {
             let mut fd = File::create(&file)?;
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
 
             fd.seek(io::SeekFrom::Start(1024 * 4096))?;
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
 
             fd.seek(io::SeekFrom::Start(4096 * 4096 - data.len() as u64))?;
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
         }
 
         assert!(probably_sparse(&File::open(&file)?)?);
@@ -644,7 +644,7 @@ mod tests {
 
         {
             let mut fd = File::create(&from)?;
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
         }
 
         let out = Command::new("/usr/bin/truncate")
@@ -722,7 +722,7 @@ mod tests {
         {
             let mut fd: File = File::create(&file)?;
             let data = "X".repeat(size);
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
         }
 
         let fd = File::open(file)?;
@@ -801,10 +801,10 @@ mod tests {
 
         {
             let mut fd: File = File::create(&from)?;
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
 
             let mut fd: File = File::create(&to)?;
-            write!(fd, "{}", data)?;
+            write!(fd, "{data}")?;
         }
 
         let acl = AclEntry::allow_user("mail", Perm::READ, None);

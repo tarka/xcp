@@ -91,7 +91,7 @@ impl CopyDriver for Driver {
 fn copy_worker(work: cbc::Receiver<Operation>, config: &Arc<Config>, updates: Arc<dyn StatusUpdater>) -> Result<()> {
     debug!("Starting copy worker {:?}", thread::current().id());
     for op in work {
-        debug!("Received operation {:?}", op);
+        debug!("Received operation {op:?}");
 
         match op {
             Operation::Copy(from, to) => {
@@ -103,7 +103,7 @@ fn copy_worker(work: cbc::Receiver<Operation>, config: &Arc<Config>, updates: Ar
                     .and_then(|hdl| hdl.copy_file(&updates));
                 if let Err(e) = r {
                     updates.send(StatusUpdate::Error(XcpError::CopyError(e.to_string())))?;
-                    error!("Error copying: {:?} -> {:?}; aborting.", from, to);
+                    error!("Error copying: {from:?} -> {to:?}; aborting.");
                     return Err(e)
                 }
             }

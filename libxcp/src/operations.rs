@@ -47,7 +47,7 @@ impl CopyHandle {
 
         if needs_backup(to, config)? {
             let backup = get_backup_path(to)?;
-            info!("Backup: Rename {:?} to {:?}", to, backup);
+            info!("Backup: Rename {to:?} to {backup:?}");
             fs::rename(to, backup)?;
         }
 
@@ -181,7 +181,7 @@ pub fn tree_walker(
         } else {
             dest.to_path_buf()
         };
-        debug!("Target base is {:?}", target_base);
+        debug!("Target base is {target_base:?}");
 
         let gitignore = parse_ignore(&source, config)?;
 
@@ -189,11 +189,11 @@ pub fn tree_walker(
             .into_iter()
             .filter_entry(|e| ignore_filter(e, &gitignore))
         {
-            debug!("Got tree entry {:?}", entry);
+            debug!("Got tree entry {entry:?}");
             let epath = entry?.into_path();
             let from = if config.dereference {
                 let cpath = canonicalize(&epath)?;
-                debug!("Dereferencing {:?} into {:?}", epath, cpath);
+                debug!("Dereferencing {epath:?} into {cpath:?}");
                 cpath
             } else {
                 epath.clone()
@@ -216,14 +216,14 @@ pub fn tree_walker(
             let ft = FileType::from(meta.file_type());
             match ft {
                 FileType::File => {
-                    debug!("Send copy operation {:?} to {:?}", from, target);
+                    debug!("Send copy operation {from:?} to {target:?}");
                     stats.send(StatusUpdate::Size(meta.len()))?;
                     work_tx.send(Operation::Copy(from, target))?;
                 }
 
                 FileType::Symlink => {
                     let lfile = read_link(from)?;
-                    debug!("Send symlink operation {:?} to {:?}", lfile, target);
+                    debug!("Send symlink operation {lfile:?} to {target:?}");
                     work_tx.send(Operation::Link(lfile, target))?;
                 }
 
@@ -231,21 +231,21 @@ pub fn tree_walker(
                     // Create dir tree immediately as we can't
                     // guarantee a worker will action the creation
                     // before a subsequent copy operation requires it.
-                    debug!("Creating target directory {:?}", target);
+                    debug!("Creating target directory {target:?}");
                     if let Err(err) = create_dir_all(&target) {
-                        let msg = format!("Error creating target directory: {}", err);
+                        let msg = format!("Error creating target directory: {err}");
                         error!("{msg}");
                         return Err(XcpError::CopyError(msg).into())
                     }
                 }
 
                 FileType::Socket | FileType::Char | FileType::Fifo => {
-                    debug!("Special file found: {:?} to {:?}", from, target);
+                    debug!("Special file found: {from:?} to {target:?}");
                     work_tx.send(Operation::Special(from, target))?;
                 }
 
                 FileType::Block | FileType::Other => {
-                    error!("Unsupported filetype found: {:?} -> {:?}", target, ft);
+                    error!("Unsupported filetype found: {target:?} -> {ft:?}");
                     return Err(XcpError::UnknownFileType(target).into());
                 }
             };

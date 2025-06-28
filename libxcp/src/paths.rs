@@ -26,7 +26,7 @@ use crate::errors::Result;
 pub fn parse_ignore(source: &Path, config: &Config) -> Result<Option<Gitignore>> {
     let gitignore = if config.gitignore {
         let gifile = source.join(".gitignore");
-        info!("Using .gitignore file {:?}", gifile);
+        info!("Using .gitignore file {gifile:?}");
         let mut builder = GitignoreBuilder::new(source);
         builder.add(&gifile);
         let ignore = builder.build()?;

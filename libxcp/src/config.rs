@@ -48,7 +48,7 @@ impl FromStr for Reflink {
             "always" => Ok(Reflink::Always),
             "auto" => Ok(Reflink::Auto),
             "never" => Ok(Reflink::Never),
-            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'reflink': {}", s))),
+            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'reflink': {s}"))),
         }
     }
 }
@@ -74,7 +74,7 @@ impl FromStr for Backup {
             "none" | "off" => Ok(Backup::None),
             "auto" => Ok(Backup::Auto),
             "numbered" => Ok(Backup::Numbered),
-            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'backup': {}", s))),
+            _ => Err(XcpError::InvalidArguments(format!("Unexpected value for 'backup': {s}"))),
         }
     }
 }

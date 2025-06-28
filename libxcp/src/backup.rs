@@ -17,7 +17,7 @@ fn get_regex() -> &'static Regex {
 
 pub(crate) fn get_backup_path(file: &Path) -> Result<PathBuf> {
     let num = next_backup_num(file)?;
-    let suffix = format!(".~{}~", num);
+    let suffix = format!(".~{num}~");
     // Messy but PathBuf has no concept of mulitiple extensions.
     let mut bstr = file.to_path_buf().into_os_string();
     bstr.push(suffix);
@@ -52,7 +52,7 @@ fn ls_file_dir(file: &Path) -> Result<ReadDir> {
 
 fn filename(path: &Path) -> Result<String> {
     let fname = path.file_name()
-        .ok_or(XcpError::InvalidArguments(format!("Invalid path found: {:?}", path)))?
+        .ok_or(XcpError::InvalidArguments(format!("Invalid path found: {path:?}")))?
         .to_string_lossy();
     Ok(fname.to_string())
 }

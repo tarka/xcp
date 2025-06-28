@@ -34,7 +34,7 @@ fn copy_xattr(infd: &File, outfd: &File) -> Result<()> {
         debug!("Starting xattr copy...");
         for attr in infd.list_xattr()? {
             if let Some(val) = infd.get_xattr(&attr)? {
-                debug!("Copy xattr {:?}", attr);
+                debug!("Copy xattr {attr:?}");
                 outfd.set_xattr(attr, val.as_slice())?;
             }
         }
@@ -51,7 +51,7 @@ pub fn copy_permissions(infd: &File, outfd: &File) -> Result<()> {
         // FIXME: We don't have a way of detecting if the
         // target FS supports XAttr, so assume any error is
         // "Unsupported" for now.
-        warn!("Failed to copy xattrs from {:?}: {}", infd, e);
+        warn!("Failed to copy xattrs from {infd:?}: {e}");
     }
 
     // FIXME: ACLs, selinux, etc.
@@ -238,7 +238,7 @@ mod tests {
 
         {
             let mut fd: File = File::create(&from).unwrap();
-            write!(fd, "{}", data).unwrap();
+            write!(fd, "{data}").unwrap();
         }
 
         {
@@ -268,7 +268,7 @@ mod tests {
 
         {
             let mut fd: File = File::create(&from).unwrap();
-            write!(fd, "{}", data).unwrap();
+            write!(fd, "{data}").unwrap();
         }
 
         {
@@ -352,7 +352,7 @@ mod tests {
         {
             let mut fd = File::create(&from)?;
             let data = "X".repeat(len);
-            write!(fd, "{}", data).unwrap();
+            write!(fd, "{data}").unwrap();
         }
 
         assert_eq!(len, from.metadata()?.len() as usize);
