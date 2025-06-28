@@ -40,32 +40,32 @@ test_no_perms = []
 test_run_expensive = []
 
 [dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 crossbeam-channel = "0.5.15"
-clap = { version = "4.5.35", features = ["derive"] }
+clap = { version = "4.5.40", features = ["derive"] }
 glob = "0.3.2"
 ignore = "0.4.23"
 indicatif = "0.17.11"
 libfs = { version = "0.9.1", path = "libfs" }
 libxcp = { version = "0.24.1", path = "libxcp" }
 log = "0.4.27"
-num_cpus = "1.16.0"
+num_cpus = "1.17.0"
 simplelog = "0.12.2"
 unbytify = "0.2.0"
 terminal_size = "0.4.2"
 
 [dev-dependencies]
-cfg-if = "1.0.0"
+cfg-if = "1.0.1"
 fslock = "0.2.1"
-rand = "0.9.0"
+rand = "0.9.1"
 rand_distr = "0.5.1"
 rand_xorshift = "0.4.0"
-rustix = "1.0.5"
-tempfile = "3.19.1"
+rustix = "1.0.7"
+tempfile = "3.20.0"
 test-case = "3.3.1"
-uuid = { version = "1.16.0", features = ["v4"] }
+uuid = { version = "1.17.0", features = ["v4"] }
 walkdir = "2.5.0"
-xattr = "1.5.0"
+xattr = "1.5.1"
 
 [lints.clippy]
 upper_case_acronyms = "allow"
