@@ -2,8 +2,8 @@
 name = "libfs"
 description = "`libfs` is a library of file and filesystem operations that is supplementary to `std::fs`"
 version = "0.9.1"
-edition = "2021"
-rust-version = "1.82.0"
+edition = "2024"
+rust-version = "1.88.0"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
 homepage = "https://github.com/tarka/xcp/libfs"
