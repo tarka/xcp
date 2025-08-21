@@ -20,20 +20,20 @@ parblock = []
 use_linux = ["libfs/use_linux"]
 
 [dependencies]
-anyhow = "1.0.98"
+anyhow = "1.0.99"
 blocking-threadpool = "1.0.1"
-cfg-if = "1.0.1"
+cfg-if = "1.0.3"
 crossbeam-channel = "0.5.15"
 ignore = "0.4.23"
 libfs = { version = "0.9.1", path = "../libfs" }
 log = "0.4.27"
 num_cpus = "1.17.0"
 regex = "1.11.1"
-thiserror = "2.0.12"
+thiserror = "2.0.16"
 walkdir = "2.5.0"
 
 [dev-dependencies]
-tempfile = "3.20.0"
+tempfile = "3.21.0"
 
 [lints.clippy]
 upper_case_acronyms = "allow"

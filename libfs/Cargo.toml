@@ -26,17 +26,17 @@ test_no_extents = []
 test_no_sockets = []
 
 [dependencies]
-cfg-if = "1.0.1"
-libc = "0.2.174"
-linux-raw-sys = { version = "0.9.4", features = ["ioctl"] }
+cfg-if = "1.0.3"
+libc = "0.2.175"
+linux-raw-sys = { version = "0.10.0", features = ["ioctl"] }
 log = "0.4.27"
-rustix = { version = "1.0.7", features = ["fs"] }
-thiserror = "2.0.12"
+rustix = { version = "1.0.8", features = ["fs"] }
+thiserror = "2.0.16"
 xattr = "1.5.1"
 
 [dev-dependencies]
 exacl = "0.12.0"
-tempfile = "3.20.0"
+tempfile = "3.21.0"
 
 [lints.clippy]
 upper_case_acronyms = "allow"
