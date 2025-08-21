@@ -9,10 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: CI runtime info
-        run: uname -a && cat /etc/os-release && whoami
-
-      - name: User info
-        run: sudo whoami
+        run: uname -a && cat /etc/os-release
 
       - name: Add necessary packages
         run: sudo apt-get update && sudo apt-get install -y libacl1-dev
@@ -53,6 +50,20 @@ jobs:
       - name: Run tests on ZFS
         run: /fs/zfs/src/tests/scripts/test-linux.sh
         if: always()
+
+  root:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add necessary packages
+        run: sudo apt-get update && sudo apt-get install -y libacl1-dev
+
+      - name: Update Rust to latest
+        run: ~/.cargo/bin/rustup update
+
+      - name: Run expensive tests
+        run: sudo ./tests/scripts/test-linux.sh
 
   expensive:
     runs-on: ubuntu-latest
