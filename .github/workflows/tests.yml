@@ -12,7 +12,7 @@ jobs:
         run: uname -a && cat /etc/os-release && whoami
 
       - name: User info
-        run: whoami
+        run: sudo whoami
 
       - name: Add necessary packages
         run: sudo apt-get update && sudo apt-get install -y libacl1-dev
