@@ -63,7 +63,7 @@ jobs:
         run: ~/.cargo/bin/rustup update
 
       - name: Run root tests
-        run: dpkg -l rustup
+        run: sudo apt install -y rustup
 
   expensive:
     runs-on: ubuntu-latest
