@@ -37,6 +37,7 @@ test_no_acl = ["libfs/test_no_acl"]
 test_no_xattr = []
 test_no_symlinks = []
 test_no_perms = []
+test_no_root = []
 test_run_expensive = []
 
 [dependencies]

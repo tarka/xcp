@@ -10,6 +10,9 @@ fs=$(df --output=fstype . | tail -n 1)
 
 # list features supported by all filesystems
 features=(use_linux "$@")
+if [[ "$(id -u)" == "0" ]]; then
+    features+=(test_no_root)
+fi
 
 # disable tests that will not work on this filesystem
 case "$fs" in
