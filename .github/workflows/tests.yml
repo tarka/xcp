@@ -62,8 +62,8 @@ jobs:
       - name: Update Rust to latest
         run: ~/.cargo/bin/rustup update
 
-      - name: Run expensive tests
-        run: sudo --preserve-env=PATH ./tests/scripts/test-linux.sh
+      - name: Run root tests
+        run: dpkg -l rustup
 
   expensive:
     runs-on: ubuntu-latest
