@@ -63,7 +63,7 @@ jobs:
         run: ~/.cargo/bin/rustup update
 
       - name: Run expensive tests
-        run: sudo ./tests/scripts/test-linux.sh
+        run: sudo --preserve-env=PATH ./tests/scripts/test-linux.sh
 
   expensive:
     runs-on: ubuntu-latest
