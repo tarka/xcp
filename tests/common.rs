@@ -15,7 +15,7 @@
  */
 
 use std::fs::{create_dir_all, set_permissions, write, File, Permissions};
-use std::os::unix::fs::{symlink, PermissionsExt};
+use std::os::unix::fs::{chown, symlink, PermissionsExt, MetadataExt};
 use std::os::unix::net::UnixListener;
 use cfg_if::cfg_if;
 use test_case::test_case;
@@ -1425,4 +1425,41 @@ fn test_deep_symlinks(drv: &str) {
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();
     assert!(stderr.contains("Too many levels of symbolic links"));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(not(feature = "test_run_root"), ignore = "Not root, skipping")]
+fn file_copy_ownership(drv: &str) {
+    if rustix::process::geteuid() != rustix::process::Uid::ROOT {
+        assert!(false, "Process is not root");
+    }
+    let dir = tempdir_rel().unwrap();
+    let source_dir = dir.path().join("srcdir");
+    let source_file = source_dir.join("source.txt");
+    let text = "This is a test file.";
+
+    let dest_dir = dir.path().join("dstdir");
+    let dest_file = dest_dir.join("source.txt");
+
+    create_dir_all(&source_dir).unwrap();
+    create_file(&source_file, text).unwrap();
+
+    let id = Some(1);
+    chown(&source_dir, id, id).unwrap();
+    chown(&source_file, id, id).unwrap();
+
+    let out = run(&[
+        "--driver", drv,
+        "--recursive",
+        source_dir.to_str().unwrap(),
+        dest_dir.to_str().unwrap(),
+    ]).unwrap();
+
+    assert!(out.status.success());
+    assert!(file_contains(&dest_file, text).unwrap());
+
+    assert_eq!(1, dest_dir.metadata().unwrap().uid());
+    assert_eq!(1, dest_file.metadata().unwrap().uid());
+
 }

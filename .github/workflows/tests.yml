@@ -63,7 +63,7 @@ jobs:
         run: sudo rustup default stable
 
       - name: Run root tests
-        run: sudo ./tests/scripts/test-linux.sh
+        run: sudo ./tests/scripts/test-linux.sh test_run_root
 
   expensive:
     runs-on: ubuntu-latest
