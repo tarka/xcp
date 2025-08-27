@@ -7,7 +7,6 @@ below).
 
 [![Crates.io](https://img.shields.io/crates/v/xcp.svg?colorA=777777)](https://crates.io/crates/xcp) 
 ![Github Actions](https://github.com/tarka/xcp/actions/workflows/tests.yml/badge.svg)
-[![CircleCI](https://circleci.com/gh/tarka/xcp.svg?style=shield)](https://circleci.com/gh/tarka/xcp)
 [![Packaging status](https://repology.org/badge/tiny-repos/xcp.svg)](https://repology.org/project/xcp/versions)
 
 *Warning*: `xcp` is currently beta-level software and almost certainly contains
