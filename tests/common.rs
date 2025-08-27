@@ -15,7 +15,7 @@
  */
 
 use std::fs::{create_dir_all, set_permissions, write, File, Permissions};
-use std::os::unix::fs::{symlink, PermissionsExt};
+use std::os::unix::fs::{chown, symlink, PermissionsExt, MetadataExt};
 use std::os::unix::net::UnixListener;
 use cfg_if::cfg_if;
 use test_case::test_case;
@@ -1183,6 +1183,7 @@ fn test_sockets_dir(drv: &str) {
 #[cfg_attr(all(feature = "parblock", not(feature = "test_no_perms")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 #[cfg_attr(feature = "test_no_perms", ignore = "No FS support")]
+#[cfg_attr(feature = "test_no_root", ignore = "Not root compatible")]
 fn unreadable_file_error(drv: &str) {
     let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
@@ -1208,6 +1209,7 @@ fn unreadable_file_error(drv: &str) {
 #[cfg_attr(all(feature = "parblock", not(feature = "test_no_perms")), test_case("parblock"; "Test with parallel block driver"))]
 #[test_case("parfile"; "Test with parallel file driver")]
 #[cfg_attr(feature = "test_no_perms", ignore = "No FS support")]
+#[cfg_attr(feature = "test_no_root", ignore = "Not root compatible")]
 fn dest_file_exists_not_writable(drv: &str) {
     let dir = tempdir_rel().unwrap();
     let source_path = dir.path().join("source.txt");
@@ -1423,4 +1425,55 @@ fn test_deep_symlinks(drv: &str) {
     assert!(!out.status.success());
     let stderr = String::from_utf8(out.stderr).unwrap();
     assert!(stderr.contains("Too many levels of symbolic links"));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(not(feature = "test_run_root"), ignore = "Not root, skipping")]
+fn file_copy_ownership(drv: &str) {
+    if rustix::process::geteuid() != rustix::process::Uid::ROOT {
+        assert!(false, "Process is not root");
+    }
+    let dir = tempdir_rel().unwrap();
+    let source_dir = dir.path().join("srcdir");
+    let src_int_dir = source_dir.join("inter");
+    create_dir_all(&src_int_dir).unwrap();
+    let source_file = src_int_dir.join("source.txt");
+    let text = "This is a test file.";
+    create_file(&source_file, text).unwrap();
+
+
+    let dest_dir = dir.path().join("dstdir");
+    let dest_int_dir = dest_dir.join("inter");
+    let dest_file = dest_int_dir.join("source.txt");
+
+    let id = Some(1);
+    chown(&source_dir, id, id).unwrap();
+    chown(&src_int_dir, id, id).unwrap();
+    chown(&source_file, id, id).unwrap();
+
+    assert_eq!(1, source_dir.metadata().unwrap().uid());
+    assert_eq!(1, source_dir.metadata().unwrap().gid());
+    assert_eq!(1, src_int_dir.metadata().unwrap().uid());
+    assert_eq!(1, src_int_dir.metadata().unwrap().gid());
+    assert_eq!(1, source_file.metadata().unwrap().uid());
+    assert_eq!(1, source_file.metadata().unwrap().gid());
+
+    let out = run(&[
+        "--driver", drv,
+        "--ownership",
+        "--recursive",
+        source_dir.to_str().unwrap(),
+        dest_dir.to_str().unwrap(),
+    ]).unwrap();
+
+    assert!(out.status.success());
+    assert!(file_contains(&dest_file, text).unwrap());
+
+    assert_eq!(1, dest_dir.metadata().unwrap().uid());
+    assert_eq!(1, dest_dir.metadata().unwrap().gid());
+    assert_eq!(1, dest_int_dir.metadata().unwrap().uid());
+    assert_eq!(1, dest_int_dir.metadata().unwrap().gid());
+    assert_eq!(1, dest_file.metadata().unwrap().uid());
+    assert_eq!(1, dest_file.metadata().unwrap().gid());
 }
