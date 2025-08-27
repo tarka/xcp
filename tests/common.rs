@@ -1456,6 +1456,7 @@ fn file_copy_ownership(drv: &str) {
 
     let out = run(&[
         "--driver", drv,
+        "--ownership",
         "--recursive",
         source_dir.to_str().unwrap(),
         dest_dir.to_str().unwrap(),
