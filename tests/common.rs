@@ -1436,21 +1436,26 @@ fn file_copy_ownership(drv: &str) {
     }
     let dir = tempdir_rel().unwrap();
     let source_dir = dir.path().join("srcdir");
-    let source_file = source_dir.join("source.txt");
+    let src_int_dir = source_dir.join("inter");
+    let source_file = src_int_dir.join("source.txt");
     let text = "This is a test file.";
 
     let dest_dir = dir.path().join("dstdir");
-    let dest_file = dest_dir.join("source.txt");
+    let dest_int_dir = dir.path().join("inter");
+    let dest_file = dest_int_dir.join("source.txt");
 
     create_dir_all(&source_dir).unwrap();
     create_file(&source_file, text).unwrap();
 
     let id = Some(1);
     chown(&source_dir, id, id).unwrap();
+    chown(&src_int_dir, id, id).unwrap();
     chown(&source_file, id, id).unwrap();
 
     assert_eq!(1, source_dir.metadata().unwrap().uid());
     assert_eq!(1, source_dir.metadata().unwrap().gid());
+    assert_eq!(1, src_int_dir.metadata().unwrap().uid());
+    assert_eq!(1, src_int_dir.metadata().unwrap().gid());
     assert_eq!(1, source_file.metadata().unwrap().uid());
     assert_eq!(1, source_file.metadata().unwrap().gid());
 
@@ -1467,6 +1472,8 @@ fn file_copy_ownership(drv: &str) {
 
     assert_eq!(1, dest_dir.metadata().unwrap().uid());
     assert_eq!(1, dest_dir.metadata().unwrap().gid());
+    assert_eq!(1, dest_int_dir.metadata().unwrap().uid());
+    assert_eq!(1, dest_int_dir.metadata().unwrap().gid());
     assert_eq!(1, dest_file.metadata().unwrap().uid());
     assert_eq!(1, dest_file.metadata().unwrap().gid());
 }
