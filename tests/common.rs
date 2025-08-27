@@ -1437,15 +1437,15 @@ fn file_copy_ownership(drv: &str) {
     let dir = tempdir_rel().unwrap();
     let source_dir = dir.path().join("srcdir");
     let src_int_dir = source_dir.join("inter");
+    create_dir_all(&src_int_dir).unwrap();
     let source_file = src_int_dir.join("source.txt");
     let text = "This is a test file.";
+    create_file(&source_file, text).unwrap();
+
 
     let dest_dir = dir.path().join("dstdir");
-    let dest_int_dir = dir.path().join("inter");
+    let dest_int_dir = dest_dir.join("inter");
     let dest_file = dest_int_dir.join("source.txt");
-
-    create_dir_all(&source_dir).unwrap();
-    create_file(&source_file, text).unwrap();
 
     let id = Some(1);
     chown(&source_dir, id, id).unwrap();
