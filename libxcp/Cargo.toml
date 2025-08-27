@@ -28,7 +28,7 @@ ignore = "0.4.23"
 libfs = { version = "0.9.1", path = "../libfs" }
 log = "0.4.27"
 num_cpus = "1.17.0"
-regex = "1.11.1"
+regex = "1.11.2"
 thiserror = "2.0.16"
 walkdir = "2.5.0"
 
