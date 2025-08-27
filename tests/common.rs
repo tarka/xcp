@@ -1449,6 +1449,11 @@ fn file_copy_ownership(drv: &str) {
     chown(&source_dir, id, id).unwrap();
     chown(&source_file, id, id).unwrap();
 
+    assert_eq!(1, source_dir.metadata().unwrap().uid());
+    assert_eq!(1, source_dir.metadata().unwrap().gid());
+    assert_eq!(1, source_file.metadata().unwrap().uid());
+    assert_eq!(1, source_file.metadata().unwrap().gid());
+
     let out = run(&[
         "--driver", drv,
         "--recursive",
@@ -1460,6 +1465,7 @@ fn file_copy_ownership(drv: &str) {
     assert!(file_contains(&dest_file, text).unwrap());
 
     assert_eq!(1, dest_dir.metadata().unwrap().uid());
+    assert_eq!(1, dest_dir.metadata().unwrap().gid());
     assert_eq!(1, dest_file.metadata().unwrap().uid());
-
+    assert_eq!(1, dest_file.metadata().unwrap().gid());
 }
