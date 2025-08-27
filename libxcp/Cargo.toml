@@ -1,7 +1,7 @@
 [package]
 name = "libxcp"
 description = "`libxcp` is a high-level file-copy engine with support for multi-threading, fine-grained progress feedback, pluggable drivers, and `.gitignore` filters. `libxcp` provides the core functionality of `xcp`."
-version = "0.24.1"
+version = "0.24.2"
 edition = "2024"
 rust-version = "1.88.0"
 
@@ -25,7 +25,7 @@ blocking-threadpool = "1.0.1"
 cfg-if = "1.0.3"
 crossbeam-channel = "0.5.15"
 ignore = "0.4.23"
-libfs = { version = "0.9.1", path = "../libfs" }
+libfs = { version = "0.9.2", path = "../libfs" }
 log = "0.4.27"
 num_cpus = "1.17.0"
 regex = "1.11.2"
