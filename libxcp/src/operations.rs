@@ -14,6 +14,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::os::unix::fs::{chown, MetadataExt};
 use std::{cmp, thread};
 use std::fs::{self, canonicalize, create_dir_all, read_link, File, Metadata};
 use std::path::{Path, PathBuf};
@@ -236,6 +237,11 @@ pub fn tree_walker(
                         let msg = format!("Error creating target directory: {err}");
                         error!("{msg}");
                         return Err(XcpError::CopyError(msg).into())
+                    }
+                    if config.ownership &&
+                        let Err(e) = chown(&target, Some(meta.uid()), Some(meta.gid()))
+                    {
+                        warn!("Failed to copy directory ownership: {target:?}: {e}");
                     }
                 }
 
