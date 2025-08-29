@@ -1432,7 +1432,7 @@ fn test_deep_symlinks(drv: &str) {
 #[cfg_attr(not(feature = "test_run_root"), ignore = "Not root, skipping")]
 fn file_copy_ownership(drv: &str) {
     if rustix::process::geteuid() != rustix::process::Uid::ROOT {
-        assert!(false, "Process is not root");
+        panic!("Process is not root");
     }
     let dir = tempdir_rel().unwrap();
     let source_dir = dir.path().join("srcdir");
