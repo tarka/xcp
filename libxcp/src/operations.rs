@@ -27,7 +27,7 @@ use libfs::{
 };
 use log::{debug, error, info, warn};
 use walkdir::WalkDir;
-use xxhash_rust::xxh64::Xxh64;
+use xxhash_rust::xxh3::Xxh3;
 
 use crate::backup::{get_backup_path, needs_backup};
 use crate::config::{Config, Reflink};
@@ -75,7 +75,7 @@ impl CopyHandle {
     fn copy_bytes(&self, len: u64, updates: &Arc<dyn StatusUpdater>) -> Result<u64> {
         let mut written = 0;
         let mut hasher = if self.config.verify_checksum {
-            Some(Xxh64::new(0))
+            Some(Xxh3::new())
         } else {
             None
         };
@@ -302,7 +302,7 @@ fn empty_path(path: &Path) -> bool {
     *path == PathBuf::new()
 }
 
-fn copy_file_bytes_with_hash(infd: &File, outfd: &File, bytes: u64, hasher: &mut Xxh64) -> Result<u64> {
+fn copy_file_bytes_with_hash(infd: &File, outfd: &File, bytes: u64, hasher: &mut Xxh3) -> Result<u64> {
     use std::io::BufReader;
 
     const BUFFER_SIZE: usize = 64 * 1024;
@@ -333,7 +333,7 @@ fn compute_file_checksum(path: &Path) -> Result<u64> {
     const BUFFER_SIZE: usize = 64 * 1024;
     let file = File::open(path)?;
     let mut reader = BufReader::with_capacity(BUFFER_SIZE, file);
-    let mut hasher = Xxh64::new(0);
+    let mut hasher = Xxh3::new();
     let mut buffer = vec![0u8; BUFFER_SIZE];
 
     loop {
