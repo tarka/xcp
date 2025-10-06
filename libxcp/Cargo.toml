@@ -31,6 +31,7 @@ num_cpus = "1.17.0"
 regex = "1.11.2"
 thiserror = "2.0.16"
 walkdir = "2.5.0"
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
 
 [dev-dependencies]
 tempfile = "3.21.0"
