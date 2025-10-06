@@ -144,6 +144,13 @@ pub struct Config {
     /// semantics of `cp` numbered backups
     /// (e.g. `file.txt.~123~`). Default is `None`.
     pub backup: Backup,
+
+    /// Verify checksums after copying.
+    ///
+    /// Calculates a checksum during the copy operation and verifies
+    /// it by reading back the destination file. If the checksums
+    /// don't match, an error is returned. Default is `false`.
+    pub verify_checksum: bool,
 }
 
 impl Config {
@@ -171,6 +178,7 @@ impl Default for Config {
             fsync: false,
             reflink: Reflink::Auto,
             backup: Backup::None,
+            verify_checksum: false,
         }
     }
 }

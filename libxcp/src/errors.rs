@@ -51,4 +51,11 @@ pub enum XcpError {
 
     #[error("Unsupported OS")]
     UnsupportedOS(&'static str),
+
+    #[error("Checksum verification failed for {path}: expected {expected:016x}, got {actual:016x}")]
+    ChecksumMismatch {
+        path: PathBuf,
+        expected: u64,
+        actual: u64,
+    },
 }
