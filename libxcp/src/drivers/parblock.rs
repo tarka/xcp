@@ -172,7 +172,9 @@ fn queue_file_blocks(
         queue_file_range(&harc, 0..len, pool, status_channel)
     };
 
-    if probably_sparse(&harc.infd)? {
+    // Disable sparse file optimization when checksum verification is enabled
+    // to ensure consistent hashing of all file content including holes
+    if !harc.config.verify_checksum && probably_sparse(&harc.infd)? {
         if let Some(extents) = map_extents(&harc.infd)? {
             let sparse_map = merge_extents(extents)?;
             let mut queued = 0;

@@ -186,7 +186,9 @@ fn checksum_sparse_file(drv: &str) {
 
     assert!(out.status.success());
     assert!(files_match(&source, &dest));
-    assert!(probably_sparse(&dest).unwrap());
+    // With checksum verification, sparse optimization is disabled to ensure
+    // consistent hashing, so the destination file will not be sparse
+    assert!(!probably_sparse(&dest).unwrap());
 }
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
