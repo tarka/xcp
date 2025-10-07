@@ -158,7 +158,9 @@ impl CopyHandle {
         if self.config.ownership && copy_owner(&self.infd, &self.outfd).is_err() {
             warn!("Failed to copy file ownership: {:?}", self.infd);
         }
-        if self.config.fsync {
+
+        // Must sync before checksum verification to ensure data is written to disk
+        if self.config.fsync || self.config.verify_checksum {
             debug!("Syncing file {:?}", self.outfd);
             sync(&self.outfd)?;
         }
