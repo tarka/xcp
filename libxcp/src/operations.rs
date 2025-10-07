@@ -139,7 +139,9 @@ impl CopyHandle {
         if self.try_reflink()? {
             return Ok(self.metadata.len());
         }
-        let total = if probably_sparse(&self.infd)? {
+        // Disable sparse file optimization when checksum verification is enabled
+        // to ensure consistent hashing of all file content including holes
+        let total = if !self.config.verify_checksum && probably_sparse(&self.infd)? {
             self.copy_sparse(updates)?
         } else {
             self.copy_bytes(self.metadata.len(), updates)?
