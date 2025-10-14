@@ -17,8 +17,9 @@
 use std::os::unix::fs::{chown, MetadataExt};
 use std::{cmp, thread};
 use std::fs::{self, canonicalize, create_dir_all, read_link, File, Metadata};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crossbeam_channel as cbc;
 use libfs::{
@@ -26,6 +27,7 @@ use libfs::{
 };
 use log::{debug, error, info, warn};
 use walkdir::WalkDir;
+use xxhash_rust::xxh3::Xxh3;
 
 use crate::backup::{get_backup_path, needs_backup};
 use crate::config::{Config, Reflink};
@@ -39,6 +41,8 @@ pub struct CopyHandle {
     pub outfd: File,
     pub metadata: Metadata,
     pub config: Arc<Config>,
+    pub to: PathBuf,
+    src_checksum: Mutex<Option<u64>>,
 }
 
 impl CopyHandle {
@@ -60,6 +64,8 @@ impl CopyHandle {
             outfd,
             metadata,
             config: config.clone(),
+            to: to.to_path_buf(),
+            src_checksum: Mutex::new(None),
         };
 
         Ok(handle)
@@ -68,11 +74,25 @@ impl CopyHandle {
     /// Copy len bytes from wherever the descriptor cursors are set.
     fn copy_bytes(&self, len: u64, updates: &Arc<dyn StatusUpdater>) -> Result<u64> {
         let mut written = 0;
+        let mut hasher = if self.config.verify_checksum {
+            Some(Xxh3::new())
+        } else {
+            None
+        };
+
         while written < len {
             let bytes_to_copy = cmp::min(len - written, self.config.block_size);
-            let bytes = copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64;
+            let bytes = if let Some(ref mut h) = hasher {
+                copy_file_bytes_with_hash(&self.infd, &self.outfd, bytes_to_copy, h)?
+            } else {
+                copy_file_bytes(&self.infd, &self.outfd, bytes_to_copy)? as u64
+            };
             written += bytes;
             updates.send(StatusUpdate::Copied(bytes))?;
+        }
+
+        if let Some(h) = hasher {
+            *self.src_checksum.lock().unwrap() = Some(h.digest());
         }
 
         Ok(written)
@@ -119,7 +139,9 @@ impl CopyHandle {
         if self.try_reflink()? {
             return Ok(self.metadata.len());
         }
-        let total = if probably_sparse(&self.infd)? {
+        // Disable sparse file optimization when checksum verification is enabled
+        // to ensure consistent hashing of all file content including holes
+        let total = if !self.config.verify_checksum && probably_sparse(&self.infd)? {
             self.copy_sparse(updates)?
         } else {
             self.copy_bytes(self.metadata.len(), updates)?
@@ -138,10 +160,27 @@ impl CopyHandle {
         if self.config.ownership && copy_owner(&self.infd, &self.outfd).is_err() {
             warn!("Failed to copy file ownership: {:?}", self.infd);
         }
+
         if self.config.fsync {
             debug!("Syncing file {:?}", self.outfd);
             sync(&self.outfd)?;
         }
+
+        if self.config.verify_checksum {
+            if let Some(expected) = *self.src_checksum.lock().unwrap() {
+                debug!("Verifying checksum for {:?}", self.to);
+                let actual = compute_file_checksum(&self.to)?;
+                if expected != actual {
+                    return Err(XcpError::ChecksumMismatch {
+                        path: self.to.clone(),
+                        expected,
+                        actual,
+                    }.into());
+                }
+                debug!("Checksum verified: {:016x}", expected);
+            }
+        }
+
         Ok(())
     }
 }
@@ -264,4 +303,49 @@ pub fn tree_walker(
 
 fn empty_path(path: &Path) -> bool {
     *path == PathBuf::new()
+}
+
+fn copy_file_bytes_with_hash(infd: &File, outfd: &File, bytes: u64, hasher: &mut Xxh3) -> Result<u64> {
+    use std::io::BufReader;
+
+    const BUFFER_SIZE: usize = 64 * 1024;
+    let mut reader = BufReader::with_capacity(BUFFER_SIZE, infd);
+    let mut writer = std::io::BufWriter::with_capacity(BUFFER_SIZE, outfd);
+    let mut buffer = vec![0u8; BUFFER_SIZE];
+    let mut total_copied = 0u64;
+
+    while total_copied < bytes {
+        let to_read = cmp::min(bytes - total_copied, BUFFER_SIZE as u64) as usize;
+        let n = reader.read(&mut buffer[..to_read])?;
+        if n == 0 {
+            break;
+        }
+
+        hasher.update(&buffer[..n]);
+        std::io::Write::write_all(&mut writer, &buffer[..n])?;
+        total_copied += n as u64;
+    }
+
+    std::io::Write::flush(&mut writer)?;
+    Ok(total_copied)
+}
+
+fn compute_file_checksum(path: &Path) -> Result<u64> {
+    use std::io::BufReader;
+
+    const BUFFER_SIZE: usize = 64 * 1024;
+    let file = File::open(path)?;
+    let mut reader = BufReader::with_capacity(BUFFER_SIZE, file);
+    let mut hasher = Xxh3::new();
+    let mut buffer = vec![0u8; BUFFER_SIZE];
+
+    loop {
+        let n = reader.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buffer[..n]);
+    }
+
+    Ok(hasher.digest())
 }

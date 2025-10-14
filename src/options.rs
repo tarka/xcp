@@ -157,6 +157,16 @@ pub struct Opts {
     #[arg(long, default_value = "none")]
     pub backup: Backup,
 
+    /// Verify checksums after copying.
+    ///
+    /// Calculates a checksum during the copy operation and verifies
+    /// it by reading back the destination file. If the checksums
+    /// don't match, an error is returned. This detects storage or
+    /// memory errors during copy. Note: This will re-read the
+    /// destination file after copying, which may impact performance.
+    #[arg(long)]
+    pub verify_checksum: bool,
+
     /// Path list.
     ///
     /// Source and destination files, or multiple source(s) to a directory.
@@ -201,6 +211,7 @@ impl From<&Opts> for Config {
             fsync: opts.fsync,
             reflink: opts.reflink,
             backup: opts.backup,
+            verify_checksum: opts.verify_checksum,
         }
     }
 }

@@ -71,6 +71,10 @@ pkgin install xcp
   (although sparse-files are not yet supported in this case).
 * Optionally understands `.gitignore` files to limit the copied directories.
 * Optional native file-globbing.
+* Optional checksum verification to detect copy errors caused by storage or
+  memory issues. The checksum is calculated during the copy and verified by
+  re-reading only the destination file. Uses xxHash for minimal performance
+  impact.
 
 ### (Possible) future features
 
@@ -132,3 +136,72 @@ large files this can be a significant win:
 * Single 4.1GB file on NFSv4 mount
     * `cp`: 6m18s
     * `xcp`: 0m37s
+
+## Usage Examples
+
+### Basic Copy
+
+```bash
+# Simple file copy
+xcp source.txt dest.txt
+
+# Recursive directory copy
+xcp -r source_dir/ dest_dir/
+
+# Copy with progress bar disabled
+xcp --no-progress large_file.bin /mnt/backup/
+```
+
+### Checksum Verification
+
+Use `--verify-checksum` to detect copy errors caused by hardware issues:
+
+```bash
+# Copy with checksum verification
+xcp --verify-checksum important_file.bin backup.bin
+
+# Recursive copy with verification
+xcp -r --verify-checksum project/ /backup/project/
+
+# Works with both drivers
+xcp --driver=parblock --verify-checksum large_file.bin dest.bin
+```
+
+**How it works:**
+- Checksum calculated during copy (using xxHash3 for speed)
+- Destination file re-read to verify integrity
+- Error returned immediately on mismatch (no retry)
+- Works with both `parfile` and `parblock` drivers
+- Sparse file optimization is disabled when checksum verification is enabled to
+  ensure consistent hashing
+
+**Performance:** ~2x overhead due to destination re-read (e.g., 34ms → 70ms for
+50MB). Worthwhile for critical data where integrity matters.
+
+**For mechanical hard drives (HDD):** Checksum verification may cause performance
+issues due to the read-after-write pattern. If you experience hangs or slow
+performance on HDDs, the verification should still work correctly but may be slower.
+For maximum data integrity assurance, add `--fsync` to force data to disk before
+verification (slower but guarantees correct checksums even in rare cache coherency
+scenarios):
+
+```bash
+# Maximum integrity for critical data (slower on HDD)
+xcp --verify-checksum --fsync critical_data.db backup.db
+```
+
+### Other Options
+
+```bash
+# Copy with specific number of workers
+xcp --workers 8 -r large_dir/ backup/
+
+# Use block-level parallelism
+xcp --driver=parblock --block-size=4MB huge_file.bin dest.bin
+
+# Respect .gitignore files
+xcp -r --gitignore project/ backup/
+
+# Sync to disk after each file
+xcp --fsync critical_file.db backup.db
+```
