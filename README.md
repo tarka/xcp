@@ -168,13 +168,27 @@ xcp --driver=parblock --verify-checksum large_file.bin dest.bin
 ```
 
 **How it works:**
-- Checksum calculated during copy (using xxHash64 for speed)
+- Checksum calculated during copy (using xxHash3 for speed)
 - Destination file re-read to verify integrity
 - Error returned immediately on mismatch (no retry)
 - Works with both `parfile` and `parblock` drivers
+- Sparse file optimization is disabled when checksum verification is enabled to
+  ensure consistent hashing
 
 **Performance:** ~2x overhead due to destination re-read (e.g., 34ms → 70ms for
 50MB). Worthwhile for critical data where integrity matters.
+
+**For mechanical hard drives (HDD):** Checksum verification may cause performance
+issues due to the read-after-write pattern. If you experience hangs or slow
+performance on HDDs, the verification should still work correctly but may be slower.
+For maximum data integrity assurance, add `--fsync` to force data to disk before
+verification (slower but guarantees correct checksums even in rare cache coherency
+scenarios):
+
+```bash
+# Maximum integrity for critical data (slower on HDD)
+xcp --verify-checksum --fsync critical_data.db backup.db
+```
 
 ### Other Options
 
