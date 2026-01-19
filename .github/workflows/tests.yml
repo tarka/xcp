@@ -51,11 +51,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: Add necessary packages
         run: sudo apt-get update && sudo apt-get install -y libacl1-dev rustup
+
+      - name: Install stable rust for root
+        run: sudo rustup default stable
 
       - name: Run root tests
         run: sudo ./tests/scripts/test-linux.sh test_run_root
