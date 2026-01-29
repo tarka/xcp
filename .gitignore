@@ -3,3 +3,4 @@ target
 /.idea
 bacon.toml
 \#*\#
+/.dir-locals.el

@@ -57,7 +57,7 @@ fn filename(path: &Path) -> Result<String> {
     Ok(fname.to_string())
 }
 
-fn has_backup(file: &Path) -> Result<bool> {
+pub(crate) fn has_backup(file: &Path) -> Result<bool> {
     let fname = filename(file)?;
     let exists = ls_file_dir(file)?
         .any(|der| if let Ok(de) = der {
@@ -68,7 +68,7 @@ fn has_backup(file: &Path) -> Result<bool> {
     Ok(exists)
 }
 
-fn next_backup_num(file: &Path) -> Result<u64> {
+pub(crate) fn next_backup_num(file: &Path) -> Result<u64> {
     let fname = filename(file)?;
     let current = ls_file_dir(file)?
         .filter_map(|der| is_num_backup(&fname, &der.ok()?.path()))
@@ -77,7 +77,7 @@ fn next_backup_num(file: &Path) -> Result<u64> {
     Ok(current + 1)
 }
 
-fn is_num_backup(base_file: &str, candidate: &Path) -> Option<u64> {
+pub(crate) fn is_num_backup(base_file: &str, candidate: &Path) -> Option<u64> {
     let cname = candidate
         .file_name()?
         .to_str()?;
@@ -94,95 +94,4 @@ fn is_num_backup(base_file: &str, candidate: &Path) -> Option<u64> {
         .parse::<u64>()
         .ok()?;
     Some(num)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::{path::PathBuf, fs::File};
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_is_backup() {
-        let cand = PathBuf::from("/some/path/file.txt.~123~");
-
-        let bnum = is_num_backup("file.txt", &cand);
-        assert!(bnum.is_some());
-        assert_eq!(123, bnum.unwrap());
-
-        let bnum = is_num_backup("other_file.txt", &cand);
-        assert!(bnum.is_none());
-
-        let bnum = is_num_backup("le.txt", &cand);
-        assert!(bnum.is_none());
-    }
-
-    #[test]
-    fn test_backup_num_scan() -> Result<()> {
-        let tdir = TempDir::new()?;
-        let dir = tdir.path();
-        let base = dir.join("file.txt");
-
-        {
-            File::create(&base)?;
-        }
-        let next = next_backup_num(&base)?;
-        assert_eq!(1, next);
-
-        {
-            File::create(dir.join("file.txt.~123~"))?;
-        }
-        let next = next_backup_num(&base)?;
-        assert_eq!(124, next);
-
-        {
-            File::create(dir.join("file.txt.~999~"))?;
-        }
-        let next = next_backup_num(&base)?;
-        assert_eq!(1000, next);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_gen_backup_path() -> Result<()> {
-        let tdir = TempDir::new()?;
-        let dir = tdir.path();
-        let base = dir.join("file.txt");
-        {
-            File::create(&base)?;
-        }
-
-        let backup = get_backup_path(&base)?;
-        let mut bs = base.into_os_string();
-        bs.push(".~1~");
-        assert_eq!(PathBuf::from(bs), backup);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_needs_backup() -> Result<()> {
-        let tdir = TempDir::new()?;
-        let dir = tdir.path();
-        let base = dir.join("file.txt");
-
-        {
-            File::create(&base)?;
-        }
-        assert!(!has_backup(&base)?);
-
-        {
-            File::create(dir.join("file.txt.~123~"))?;
-        }
-        assert!(has_backup(&base)?);
-
-        {
-            File::create(dir.join("file.txt.~999~"))?;
-        }
-        assert!(has_backup(&base)?);
-
-        Ok(())
-    }
-
 }

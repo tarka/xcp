@@ -17,6 +17,9 @@
 mod common;
 mod errors;
 
+#[cfg(test)]
+mod tests;
+
 use std::{fs, ops::Range};
 
 use cfg_if::cfg_if;
