@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.24.3](https://github.com/tarka/xcp/compare/xcp-v0.24.2...xcp-v0.24.3) - 2026-01-29
 
+Minor maintenance release:
+
+- Releases are now performed with release-plz.
+- Add a short AI-contributions policy.
+
 ### Other
 
 - Add release-plz config.
