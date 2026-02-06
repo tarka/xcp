@@ -42,9 +42,9 @@ test_run_root = []
 test_run_expensive = []
 
 [dependencies]
-anyhow = "1.0.100"
+anyhow = "1.0.101"
 crossbeam-channel = "0.5.15"
-clap = { version = "4.5.55", features = ["derive"] }
+clap = { version = "4.5.57", features = ["derive"] }
 glob = "0.3.3"
 ignore = "0.4.25"
 indicatif = "0.18.3"
