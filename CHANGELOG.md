@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.7](https://github.com/tarka/xcp/compare/xcp-v0.24.6...xcp-v0.24.7) - 2026-02-06
+
+### Other
+
+- Remove warnings->error override as we will get these with cross-platform compilation.
+- Add warning about reflinking on Mac.
+- Tag already includes `xcp`
+
 ## [0.24.6](https://github.com/tarka/xcp/compare/xcp-v0.24.5...xcp-v0.24.6) - 2026-02-06
 
 ### Other
