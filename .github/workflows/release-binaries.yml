@@ -55,7 +55,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
           tar: all
-          archive: $bin-$tag-${{ matrix.target }}
+          archive: $tag-${{ matrix.target }}
           leading-dir: true
           bin-leading-dir: bin
           include: LICENSE,README.md
