@@ -80,6 +80,10 @@ fn opts_check(opts: &Opts) -> Result<()> {
     if opts.reflink == Reflink::Never {
         warn!("--reflink=never is selected, however the Linux kernel may override this.");
     }
+    #[cfg(target_os = "macos")]
+    if opts.reflink == Reflink::Always {
+        warn!("--reflink is unsupported on Mac.");
+    }
 
     if opts.no_clobber && opts.force {
         return Err(XcpError::InvalidArguments("--force and --noclobber cannot be set at the same time.".to_string()).into());
