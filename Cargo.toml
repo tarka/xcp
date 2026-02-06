@@ -10,7 +10,7 @@ resolver = "2"
 [package]
 name = "xcp"
 description = "xcp is a (partial) clone of the Unix `cp` command, with more user-friendly feedback and some performance optimisations. See the README for features and limitations."
-version = "0.24.5"
+version = "0.24.6"
 rust-version = "1.88.0"
 edition = "2024"
 

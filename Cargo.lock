@@ -1060,7 +1060,7 @@ dependencies = [
 
 [[package]]
 name = "xcp"
-version = "0.24.5"
+version = "0.24.6"
 dependencies = [
  "anyhow",
  "cfg-if",

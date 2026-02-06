@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.6](https://github.com/tarka/xcp/compare/xcp-v0.24.5...xcp-v0.24.6) - 2026-02-06
+
+### Other
+
+- More tweaks to release-plz workflow.
+- Convert to using a GH PAT token for release-plz to allow binary releases.
+
 ## [0.24.5](https://github.com/tarka/xcp/compare/xcp-v0.24.4...xcp-v0.24.5) - 2026-02-06
 
 ### Other
