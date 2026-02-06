@@ -3,7 +3,7 @@ name: "Release Binaries"
 on:
   push:
     tags:
-      - v[0-9]+.*
+      - xcp-v[0-9]+.*
 
 env:
   CARGO_INCREMENTAL: 0
