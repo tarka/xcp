@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.5](https://github.com/tarka/xcp/compare/xcp-v0.24.4...xcp-v0.24.5) - 2026-02-06
+
+### Other
+
+- Fix release binary matcher.
+
 ## [0.24.4](https://github.com/tarka/xcp/compare/xcp-v0.24.3...xcp-v0.24.4) - 2026-02-06
 
 ### <!-- 4 -->Performance
