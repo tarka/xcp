@@ -118,11 +118,11 @@ fn main() -> Result<()> {
     // Sanity-check all sources up-front
     for source in &sources {
         info!("Copying source {source:?} to {dest:?}");
-        if !source.exists() {
-            return Err(XcpError::InvalidSource("Source does not exist.").into());
-        }
+        let metadata = source.symlink_metadata().map_err(|_|
+            XcpError::InvalidSource("Source does not exist, or perhaps you lack permission to access it.")
+        )?;
 
-        if source.is_dir() && !opts.recursive {
+        if metadata.is_dir() && !opts.recursive {
             return Err(XcpError::InvalidSource("Source is directory and --recursive not specified.").into());
         }
         if source == &dest {

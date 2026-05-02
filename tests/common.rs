@@ -53,7 +53,72 @@ fn source_missing(drv: &str) {
     assert!(out.status.code().unwrap() == 1);
 
     let stderr = String::from_utf8(out.stderr).unwrap();
-    assert!(stderr.contains("Source does not exist"));
+    assert!(stderr.contains("Source does not exist, or perhaps"));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
+fn source_broken_symlink(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let source_path = dir.path().join("broken-symlink");
+    let dest_path = dir.path().join("broken-symlink-copy");
+    symlink("/this/should/not/exist", &source_path).unwrap();
+
+    let out = run(&["--driver", drv,
+        source_path.to_str().unwrap(),
+        dest_path.to_str().unwrap(),
+    ]).unwrap();
+
+    assert!(out.status.success());
+    assert!(files_match(&source_path, &dest_path));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
+fn source_symlink(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let source_file = dir.path().join("file.txt");
+    let source_link = dir.path().join("link.txt");
+    create_file(&source_file, "orig").unwrap();
+    symlink("file.txt", &source_link).unwrap();
+    let dest = dir.path().join("dest");
+
+    let out = run(&[
+        "--driver", drv,
+        source_link.to_str().unwrap(),
+        dest.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(out.status.success());
+    assert!(files_match(&source_link, &dest));
+}
+
+#[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]
+#[test_case("parfile"; "Test with parallel file driver")]
+#[cfg_attr(feature = "test_no_symlinks", ignore = "No FS support")]
+fn source_symlink_deref(drv: &str) {
+    let dir = tempdir_rel().unwrap();
+    let source_file = dir.path().join("file.txt");
+    let source_link = dir.path().join("link.txt");
+    create_file(&source_file, "orig").unwrap();
+    symlink("file.txt", &source_link).unwrap();
+    let dest = dir.path().join("dest");
+
+    let out = run(&[
+        "--driver", drv,
+        "--dereference",
+        source_link.to_str().unwrap(),
+        dest.to_str().unwrap(),
+    ])
+    .unwrap();
+
+    assert!(out.status.success());
+    // The destination should make the `source_file` that the `source_link` (the thing we gave to
+    // xcp) points at.
+    assert!(files_match(&source_file, &dest));
 }
 
 #[cfg_attr(feature = "parblock", test_case("parblock"; "Test with parallel block driver"))]

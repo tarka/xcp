@@ -116,25 +116,32 @@ pub fn file_contains(path: &Path, text: &str) -> Result<bool, Error> {
 
 pub fn files_match(a: &Path, b: &Path) -> bool {
     println!("Checking: {a:?}");
-    if a.metadata().unwrap().len() != b.metadata().unwrap().len() {
+    let a_metadata = a.symlink_metadata().unwrap();
+    let b_metadata = b.symlink_metadata().unwrap();
+    if a_metadata.len() != b_metadata.len() {
         return false;
     }
-    let mut abr = BufReader::with_capacity(1024 * 1024, File::open(a).unwrap());
-    let mut bbr = BufReader::with_capacity(1024 * 1024, File::open(b).unwrap());
-    loop {
-        let read = {
-            let ab = abr.fill_buf().unwrap();
-            let bb = bbr.fill_buf().unwrap();
-            if ab != bb {
-                return false;
-            }
-            if ab.is_empty() {
-                return true;
-            }
-            ab.len()
-        };
-        abr.consume(read);
-        bbr.consume(read);
+
+    if a_metadata.is_symlink() || b_metadata.is_symlink() {
+        a.read_link().unwrap() == b.read_link().unwrap()
+    } else {
+        let mut abr = BufReader::with_capacity(1024 * 1024, File::open(a).unwrap());
+        let mut bbr = BufReader::with_capacity(1024 * 1024, File::open(b).unwrap());
+        loop {
+            let read = {
+                let ab = abr.fill_buf().unwrap();
+                let bb = bbr.fill_buf().unwrap();
+                if ab != bb {
+                    return false;
+                }
+                if ab.is_empty() {
+                    return true;
+                }
+                ab.len()
+            };
+            abr.consume(read);
+            bbr.consume(read);
+        }
     }
 }
 

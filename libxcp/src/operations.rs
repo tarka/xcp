@@ -186,7 +186,7 @@ pub fn tree_walker(
 
         let gitignore = parse_ignore(&source, config)?;
 
-        for entry in WalkDir::new(&source)
+        for entry in WalkDir::new(&source).follow_root_links(false)
             .into_iter()
             .filter_entry(|e| ignore_filter(e, &gitignore))
         {
