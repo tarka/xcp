@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.8](https://github.com/tarka/xcp/compare/xcp-v0.24.7...xcp-v0.24.8) - 2026-05-03
+
+### <!-- 1 -->Bug Fixes
+
+- *(xcp)* Update rand to latest and fix API usage.
+- *(xcp)* treat source roots that are symlinks the same as deeper symlinks
+
 ## [0.24.7](https://github.com/tarka/xcp/compare/xcp-v0.24.6...xcp-v0.24.7) - 2026-02-06
 
 ### Other
