@@ -17,7 +17,7 @@
 
 use anyhow::{self, Error};
 use fslock::LockFile;
-use rand::{Rng, RngCore, SeedableRng, rng};
+use rand::{Rng, RngExt, SeedableRng, rng};
 use rand_distr::{Alphanumeric, Pareto, Triangular, StandardUniform};
 use rand_xorshift::XorShiftRng;
 use std::cmp;
@@ -204,7 +204,7 @@ pub fn rand_data(len: usize) -> Vec<u8> {
 
 const MAXDEPTH: u64 = 2;
 
-pub fn gen_file_name(rng: &mut dyn RngCore, len: u64) -> String {
+pub fn gen_file_name(rng: &mut dyn Rng, len: u64) -> String {
     let r = rng
         .sample_iter(Alphanumeric)
         .take(len as usize)
@@ -212,7 +212,7 @@ pub fn gen_file_name(rng: &mut dyn RngCore, len: u64) -> String {
     String::from_utf8(r).unwrap()
 }
 
-pub fn gen_file(path: &Path, rng: &mut dyn RngCore, size: usize, sparse: bool) -> TResult {
+pub fn gen_file(path: &Path, rng: &mut dyn Rng, size: usize, sparse: bool) -> TResult {
     println!("Generating: {path:?}");
     let mut fd = File::create(path)?;
     const BSIZE: usize = 4096;
@@ -239,7 +239,7 @@ pub fn gen_file(path: &Path, rng: &mut dyn RngCore, size: usize, sparse: bool) -
 /// project, with most files in the 10's of Ks, and a few larger
 /// ones. With a seeded PRNG (see below) this will give a repeatable
 /// tree depending on the seed.
-pub fn gen_subtree(base: &Path, rng: &mut dyn RngCore, depth: u64, with_sparse: bool) -> TResult {
+pub fn gen_subtree(base: &Path, rng: &mut dyn Rng, depth: u64, with_sparse: bool) -> TResult {
     create_dir_all(base)?;
 
     let dist0 = Triangular::new(0.0, 64.0, 64.0 / 5.0)?;

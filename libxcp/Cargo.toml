@@ -20,7 +20,7 @@ parblock = []
 use_linux = ["libfs/use_linux"]
 
 [dependencies]
-anyhow = "1.0.101"
+anyhow = "1.0.102"
 blocking-threadpool = "1.0.3"
 cfg-if = "1.0.4"
 crossbeam-channel = "0.5.15"
@@ -33,7 +33,7 @@ thiserror = "2.0.18"
 walkdir = "2.5.0"
 
 [dev-dependencies]
-tempfile = "3.24.0"
+tempfile = "3.27.0"
 
 [lints.clippy]
 upper_case_acronyms = "allow"
