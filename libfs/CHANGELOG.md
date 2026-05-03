@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4](https://github.com/tarka/xcp/compare/libfs-v0.9.3...libfs-v0.9.4) - 2026-05-03
+
+### <!-- 1 -->Bug Fixes
+
+- *(xcp)* Update rand to latest and fix API usage.
+
 ## [0.9.3](https://github.com/tarka/xcp/compare/libfs-v0.9.2...libfs-v0.9.3) - 2026-01-29
 
 ### Other
