@@ -7,12 +7,12 @@ use regex::Regex;
 
 use crate::{errors::{Result, XcpError}, config::{Config, Backup}};
 
-const BAK_PATTTERN: &str = r"^\~(\d+)\~$";
+const BAK_PATTERN: &str = r"^\~(\d+)\~$";
 static BAK_REGEX: OnceLock<Regex> = OnceLock::new();
 
 fn get_regex() -> &'static Regex {
     // Fixed regex, so should never error.
-    BAK_REGEX.get_or_init(|| Regex::new(BAK_PATTTERN).unwrap())
+    BAK_REGEX.get_or_init(|| Regex::new(BAK_PATTERN).unwrap())
 }
 
 pub(crate) fn get_backup_path(file: &Path) -> Result<PathBuf> {
