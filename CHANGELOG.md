@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.9](https://github.com/tarka/xcp/compare/xcp-v0.24.8...xcp-v0.24.9) - 2026-06-23
+
+### <!-- 3 -->Documentation
+
+- Add SECURITY.md
+
+### Other
+
+- Dependency update
+- Typo
+
 ## [0.24.8](https://github.com/tarka/xcp/compare/xcp-v0.24.7...xcp-v0.24.8) - 2026-05-03
 
 ### <!-- 1 -->Bug Fixes
