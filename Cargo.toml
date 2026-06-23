@@ -46,11 +46,11 @@ anyhow = "1.0.102"
 crossbeam-channel = "0.5.15"
 clap = { version = "4.6.1", features = ["derive"] }
 glob = "0.3.3"
-ignore = "0.4.25"
+ignore = "0.4.26"
 indicatif = "0.18.4"
 libfs = { version = "0.9.4", path = "libfs" }
 libxcp = { version = "0.24.5", path = "libxcp" }
-log = "0.4.29"
+log = "0.4.33"
 num_cpus = "1.17.0"
 simplelog = "0.12.2"
 unbytify = "0.2.0"
@@ -65,7 +65,7 @@ rand_xorshift = "0.5.0"
 rustix = { version = "1.1.4", features = ["process"] }
 tempfile = "3.27.0"
 test-case = "3.3.1"
-uuid = { version = "1.23.1", features = ["v4"] }
+uuid = { version = "1.23.3", features = ["v4"] }
 walkdir = "2.5.0"
 xattr = "1.6.1"
 
