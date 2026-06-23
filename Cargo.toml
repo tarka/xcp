@@ -10,7 +10,7 @@ resolver = "2"
 [package]
 name = "xcp"
 description = "xcp is a (partial) clone of the Unix `cp` command, with more user-friendly feedback and some performance optimisations. See the README for features and limitations."
-version = "0.24.8"
+version = "0.24.9"
 rust-version = "1.88.0"
 edition = "2024"
 
@@ -48,8 +48,8 @@ clap = { version = "4.6.1", features = ["derive"] }
 glob = "0.3.3"
 ignore = "0.4.26"
 indicatif = "0.18.4"
-libfs = { version = "0.9.4", path = "libfs" }
-libxcp = { version = "0.24.5", path = "libxcp" }
+libfs = { version = "0.9.5", path = "libfs" }
+libxcp = { version = "0.24.6", path = "libxcp" }
 log = "0.4.33"
 num_cpus = "1.17.0"
 simplelog = "0.12.2"

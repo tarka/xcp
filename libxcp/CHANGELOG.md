@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.6](https://github.com/tarka/xcp/compare/libxcp-v0.24.5...libxcp-v0.24.6) - 2026-06-23
+
+### Other
+
+- Dependency update
+- Typo
+
 ## [0.24.5](https://github.com/tarka/xcp/compare/libxcp-v0.24.4...libxcp-v0.24.5) - 2026-05-03
 
 ### <!-- 1 -->Bug Fixes
