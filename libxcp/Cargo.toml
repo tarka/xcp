@@ -20,16 +20,16 @@ parblock = []
 use_linux = ["libfs/use_linux"]
 
 [dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0.104"
 blocking-threadpool = "1.0.3"
-cfg-if = "1.0.4"
-crossbeam-channel = "0.5.15"
-ignore = "0.4.26"
+cfg-if = "1.0.5"
+crossbeam-channel = "0.5.17"
+ignore = "0.4.33"
 libfs = { version = "0.9.4", path = "../libfs" }
-log = "0.4.33"
+log = "0.4.34"
 num_cpus = "1.17.0"
-regex = "1.12.4"
-thiserror = "2.0.18"
+regex = "1.13.1"
+thiserror = "2.0.21"
 walkdir = "2.5.0"
 
 [dev-dependencies]

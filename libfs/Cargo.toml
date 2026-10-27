@@ -26,12 +26,12 @@ test_no_extents = []
 test_no_sockets = []
 
 [dependencies]
-cfg-if = "1.0.4"
-libc = "0.2.186"
+cfg-if = "1.0.5"
+libc = "0.2.191"
 linux-raw-sys = { version = "0.12.1", features = ["ioctl"] }
-log = "0.4.33"
-rustix = { version = "1.1.4", features = ["fs"] }
-thiserror = "2.0.18"
+log = "0.4.34"
+rustix = { version = "1.1.5", features = ["fs"] }
+thiserror = "2.0.21"
 xattr = "1.6.1"
 
 [dev-dependencies]
