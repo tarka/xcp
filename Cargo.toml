@@ -15,7 +15,6 @@ rust-version = "1.88.0"
 edition = "2024"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
-homepage = "https://github.com/tarka/xcp"
 repository = "https://github.com/tarka/xcp"
 readme = "README.md"
 

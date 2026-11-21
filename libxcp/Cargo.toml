@@ -6,8 +6,7 @@ edition = "2024"
 rust-version = "1.88.0"
 
 authors = ["Steve Smith <tarkasteve@gmail.com>"]
-homepage = "https://github.com/tarka/xcp"
-repository = "https://github.com/tarka/xcp"
+repository = "https://github.com/tarka/xcp/tree/master/libxcp"
 readme = "README.md"
 
 keywords = ["coreutils", "cp", "files", "filesystem"]
