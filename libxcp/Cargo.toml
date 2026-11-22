@@ -23,13 +23,13 @@ anyhow = "1.0.104"
 blocking-threadpool = "1.0.3"
 cfg-if = "1.0.5"
 crossbeam-channel = "0.5.17"
-ignore = "0.4.33"
+ignore = "0.4.34"
 libfs = { version = "0.9.5", path = "../libfs" }
-log = "0.4.34"
+log = "0.4.35"
 num_cpus = "1.17.0"
-regex = "1.13.1"
+regex = "1.13.2"
 thiserror = "2.0.21"
-walkdir = "2.5.0"
+walkdir = "2.5.1"
 
 [dev-dependencies]
 tempfile = "3.27.0"

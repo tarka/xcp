@@ -28,10 +28,10 @@ test_no_sockets = []
 cfg-if = "1.0.5"
 libc = "0.2.191"
 linux-raw-sys = { version = "0.12.1", features = ["ioctl"] }
-log = "0.4.34"
-rustix = { version = "1.1.5", features = ["fs"] }
+log = "0.4.35"
+rustix = { version = "1.1.6", features = ["fs"] }
 thiserror = "2.0.21"
-xattr = "1.6.1"
+xattr = "1.7.0"
 
 [dev-dependencies]
 exacl = "0.13.0"
