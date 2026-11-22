@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.10](https://github.com/tarka/xcp/compare/xcp-v0.24.9...xcp-v0.24.10) - 2026-11-22
+
+### <!-- 7 -->Testing
+
+- Fix ACL test.
+- Correct sparse check.
+
+### <!-- 8 -->Miscellaneous Tasks
+
+- Update dependencies.
+- redundant homepage and incorrect deps url
+
 ## [0.24.9](https://github.com/tarka/xcp/compare/xcp-v0.24.8...xcp-v0.24.9) - 2026-10-27
 
 ### <!-- 4 -->Documentation
