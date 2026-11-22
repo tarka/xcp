@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6](https://github.com/tarka/xcp/compare/libfs-v0.9.5...libfs-v0.9.6) - 2026-11-22
+
+### <!-- 7 -->Testing
+
+- Fix ACL test.
+
+### <!-- 8 -->Miscellaneous Tasks
+
+- Update dependencies.
+- redundant homepage and incorrect deps url
+
 ## [0.9.5](https://github.com/tarka/xcp/compare/libfs-v0.9.4...libfs-v0.9.5) - 2026-10-27
 
 ### <!-- 8 -->Miscellaneous Tasks
