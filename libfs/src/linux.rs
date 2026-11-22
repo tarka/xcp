@@ -819,7 +819,7 @@ mod tests {
             copy_permissions(&from_fd, &to_fd)?;
         }
 
-        let to_acl = getfacl(&from, None)?;
+        let to_acl = getfacl(&to, None)?;
         assert!(to_acl.contains(&acl));
 
         Ok(())
