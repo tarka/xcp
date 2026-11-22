@@ -303,7 +303,7 @@ pub fn compare_trees(src: &Path, dest: &Path) -> TResult {
         );
 
         if from.is_file() {
-            assert_eq!(probably_sparse(&to)?, probably_sparse(&to)?);
+            assert_eq!(probably_sparse(&from)?, probably_sparse(&to)?);
             assert!(files_match(&from, &to));
             // FIXME: Ideally we'd check sparse holes here, but
             // there's no guarantee they'll match exactly due to
